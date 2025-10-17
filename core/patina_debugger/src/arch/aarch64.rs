@@ -279,6 +279,8 @@ impl DebuggerArch for Aarch64Arch {
                 print_sysreg!("spsr_el2", out);
                 print_sysreg!("daif", out);
                 print_sysreg!("hcr_el2", out);
+                print_sysreg!("oslsr_el1", out);
+                print_sysreg!("mdscr_el1", out);
             }
             _ => {
                 let _ = out.write_str("Unknown AArch64 monitor command. Supported commands: regs");
