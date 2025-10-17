@@ -62,6 +62,7 @@ where
     pub fn init_advanced_logger(&self, physical_hob_list: *const c_void) -> Result<()> {
         debug_assert!(!physical_hob_list.is_null(), "Could not initialize adv logger due to null hob list.");
         let hob_list_info =
+            // SAFETY: The caller must provide a valid physical HOB list pointer.
             unsafe { (physical_hob_list as *const PhaseHandoffInformationTable).as_ref() }.ok_or_else(|| {
                 log::error!("Could not initialize adv logger due to null hob list.");
                 EfiError::InvalidParameter
@@ -149,17 +150,21 @@ mod tests {
     static TEST_LOGGER: AdvancedLogger<UartNull> =
         AdvancedLogger::new(patina::log::Format::Standard, &[], log::LevelFilter::Trace, UartNull {});
 
-    unsafe fn create_adv_logger_hob_list() -> *const c_void {
+    fn create_adv_logger_hob_list() -> *const c_void {
         const LOG_LEN: usize = 0x2000;
         let log_buff = Box::into_raw(Box::new([0_u8; LOG_LEN]));
         let log_address = log_buff as *const u8 as efi::PhysicalAddress;
 
         // initialize the log so it's valid for the hob list
+        //
+        // SAFETY: We just allocated this memory so it's valid.
         unsafe { AdvancedLog::initialize_memory_log(log_address, LOG_LEN as u32) };
 
         const HOB_LEN: usize = size_of::<GuidHob>() + size_of::<efi::PhysicalAddress>();
         let hob_buff = Box::into_raw(Box::new([0_u8; HOB_LEN]));
         let hob = hob_buff as *mut GuidHob;
+
+        // SAFETY: We just allocated this memory so it's valid.
         unsafe {
             ptr::write(
                 hob,
@@ -170,7 +175,9 @@ mod tests {
             )
         };
 
+        // SAFETY: Space for the additional physical address was explicitly allocated.
         let address: *mut efi::PhysicalAddress = unsafe { hob.add(1) } as *mut efi::PhysicalAddress;
+        // SAFETY: There is space for this address, writing it out of the structure as the C implementation does.
         unsafe { (*address) = log_address };
         hob_buff as *const c_void
     }
@@ -178,7 +185,8 @@ mod tests {
     #[test]
     fn component_test() {
         let component = AdvancedLoggerComponent::new(&TEST_LOGGER);
-        let hob_list = unsafe { create_adv_logger_hob_list() };
+
+        let hob_list = create_adv_logger_hob_list();
 
         let res = component.init_advanced_logger(hob_list);
         assert_eq!(res, Ok(()));

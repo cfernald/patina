@@ -24,6 +24,9 @@ fn adv_logger_test(bs: StandardBootServices) -> patina::test::Result {
 
     // Get a reference to the advanced logger buffer. The actual transport does
     // not matter so use the NULL implementation as a stand-in.
+    //
+    // SAFETY: The advanced logger protocol should have been installed by the
+    //         component initialization of the same type.
     let result = unsafe { bs.locate_protocol::<AdvancedLoggerProtocol>(None) };
 
     u_assert!(result.is_ok(), "adv_logger_test: Failed to locate the advanced logger protocol.");
