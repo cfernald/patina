@@ -1,6 +1,6 @@
-//! A Hello world component implementation example using a struct component.
+//! Hello World Component Examples
 //!
-//! A simple component implementation used to demonstrate how to build a component.
+//! This module demonstrates basic component implementations using both struct and enum types.
 //!
 //! ## License
 //!
