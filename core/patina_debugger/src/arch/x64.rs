@@ -12,7 +12,7 @@ use patina_internal_cpu::interrupts::ExceptionContext;
 use patina_paging::PagingType;
 
 use super::{DebuggerArch, UefiArchRegs};
-use crate::{ExceptionInfo, ExceptionType, memory};
+use crate::{ExceptionInfo, ExceptionType};
 
 /// The "int 3" instruction.
 const INT_3: u8 = 0xCC;
@@ -35,7 +35,7 @@ impl DebuggerArch for X64Arch {
     const GDB_TARGET_XML: &'static str = r#"<?xml version="1.0"?><!DOCTYPE target SYSTEM "gdb-target.dtd"><target><architecture>i386:x86-64</architecture><xi:include href="registers.xml"/></target>"#;
     const GDB_REGISTERS_XML: &'static str = include_str!("xml/x64_registers.xml");
 
-    type PageTable = patina_paging::x64::X64PageTable<memory::DebugPageAllocator>;
+    type PageTable = patina_paging::x64::X64PageTable<patina_paging::page_allocator::PageAllocatorStub>;
 
     #[inline(always)]
     fn breakpoint() {
@@ -155,8 +155,12 @@ impl DebuggerArch for X64Arch {
         // SAFETY: The CR3 is currently being should be identity mapped and so
         // should point to a valid page table.
         unsafe {
-            patina_paging::x64::X64PageTable::from_existing(cr3, memory::DebugPageAllocator {}, paging_type)
-                .map_err(|_| ())
+            patina_paging::x64::X64PageTable::from_existing(
+                cr3,
+                patina_paging::page_allocator::PageAllocatorStub,
+                paging_type,
+            )
+            .map_err(|_| ())
         }
     }
 

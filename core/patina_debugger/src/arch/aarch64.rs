@@ -8,7 +8,7 @@ use core::{
 use gdbstub::arch::{RegId, Registers};
 use patina_internal_cpu::interrupts::ExceptionContext;
 
-use crate::{ExceptionInfo, ExceptionType, memory};
+use crate::{ExceptionInfo, ExceptionType};
 
 use super::{DebuggerArch, UefiArchRegs};
 use bitfield_struct::bitfield;
@@ -88,7 +88,7 @@ impl DebuggerArch for Aarch64Arch {
     const GDB_TARGET_XML: &'static str = r#"<?xml version="1.0"?><!DOCTYPE target SYSTEM "gdb-target.dtd"><target><architecture>aarch64</architecture><xi:include href="registers.xml"/></target>"#;
     const GDB_REGISTERS_XML: &'static str = include_str!("xml/aarch64_registers.xml");
 
-    type PageTable = patina_paging::aarch64::AArch64PageTable<memory::DebugPageAllocator>;
+    type PageTable = patina_paging::aarch64::AArch64PageTable<patina_paging::page_allocator::PageAllocatorStub>;
 
     #[inline(always)]
     fn breakpoint() {
@@ -251,7 +251,7 @@ impl DebuggerArch for Aarch64Arch {
         unsafe {
             patina_paging::aarch64::AArch64PageTable::from_existing(
                 ttbr0_el2,
-                memory::DebugPageAllocator {},
+                patina_paging::page_allocator::PageAllocatorStub,
                 patina_paging::PagingType::Paging4Level,
             )
             .map_err(|_| ())

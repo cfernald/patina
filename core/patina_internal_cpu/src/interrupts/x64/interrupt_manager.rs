@@ -19,9 +19,7 @@ use x86_64::VirtAddr;
 use x86_64::structures::idt::InterruptDescriptorTable;
 use x86_64::structures::idt::InterruptStackFrame;
 
-use crate::interrupts::{
-    EfiExceptionStackTrace, HandlerType, InterruptManager, exception_handling::FaultAllocator, x64::ExceptionContextX64,
-};
+use crate::interrupts::{EfiExceptionStackTrace, HandlerType, InterruptManager, x64::ExceptionContextX64};
 
 global_asm!(include_str!("interrupt_handler.asm"));
 
@@ -244,7 +242,13 @@ fn interpret_gp_fault_exception_data(exception_data: u64) {
 }
 
 fn dump_pte(cr2: u64, cr3: u64, paging_type: PagingType) {
-    if let Ok(pt) = unsafe { patina_paging::x64::X64PageTable::from_existing(cr3, FaultAllocator {}, paging_type) } {
+    if let Ok(pt) = unsafe {
+        patina_paging::x64::X64PageTable::from_existing(
+            cr3,
+            patina_paging::page_allocator::PageAllocatorStub,
+            paging_type,
+        )
+    } {
         let _ = pt.dump_page_tables(cr2 & !(UEFI_PAGE_MASK as u64), UEFI_PAGE_SIZE as u64);
     }
 }

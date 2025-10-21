@@ -9,7 +9,7 @@
 
 use core::ptr;
 
-use patina_paging::{MemoryAttributes, PageTable, page_allocator::PageAllocator};
+use patina_paging::{MemoryAttributes, PageTable};
 
 use crate::arch::DebuggerArch;
 
@@ -148,16 +148,6 @@ fn check_paging_range<P: PageTable>(page_table: &P, start_address: u64, length: 
     }
 
     Ok(length)
-}
-
-/// Implements a page allocator for the debugger that will panic if allocations
-/// are attempted.
-pub struct DebugPageAllocator {}
-
-impl PageAllocator for DebugPageAllocator {
-    fn allocate_page(&mut self, _align: u64, _size: u64, _is_root: bool) -> patina_paging::PtResult<u64> {
-        panic!("Should not allocate page tables from the debugger!");
-    }
 }
 
 #[cfg(test)]
