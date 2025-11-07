@@ -7,7 +7,6 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-use core::arch::global_asm;
 use patina::{
     base::{UEFI_PAGE_MASK, UEFI_PAGE_SIZE},
     bit,
@@ -21,21 +20,22 @@ use crate::interrupts::{
     EfiExceptionStackTrace, EfiSystemContext, HandlerType, InterruptManager, aarch64::ExceptionContextAArch64,
     disable_interrupts, enable_interrupts,
 };
-#[cfg(all(not(test), target_arch = "aarch64"))]
-use patina::{read_sysreg, write_sysreg};
 
-#[cfg(all(not(test), target_arch = "aarch64"))]
-use crate::interrupts::aarch64::gic_manager::get_current_el;
+cfg_if::cfg_if! {
+    if #[cfg(all(not(test), target_arch = "aarch64"))] {
+        use core::arch::global_asm;
+        use patina::{read_sysreg, write_sysreg};
+        use crate::interrupts::aarch64::gic_manager::get_current_el;
 
-global_asm!(include_str!("exception_handler.asm"));
+        global_asm!(include_str!("exception_handler.asm"));
 
-#[cfg(all(not(test), target_arch = "aarch64"))]
-// extern "efiapi" fn AsmGetVectorAddress(index: u64);
-unsafe extern "C" {
-    static exception_handlers_start: u64;
-    static sp_el0_end: u64;
+        // extern "efiapi" fn AsmGetVectorAddress(index: u64);
+        unsafe extern "C" {
+            static exception_handlers_start: u64;
+            static sp_el0_end: u64;
+        }
+    }
 }
-
 /// AARCH64 Implementation of the InterruptManager.
 #[derive(Default, Copy, Clone, IntoService)]
 #[service(dyn InterruptManager)]

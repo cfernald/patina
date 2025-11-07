@@ -56,6 +56,7 @@ impl InterruptsX64 {
 
 impl InterruptManager for InterruptsX64 {}
 
+#[coverage(off)]
 /// Default handler for GP faults.
 extern "efiapi" fn general_protection_fault_handler(_exception_type: isize, context: EfiSystemContext) {
     // SAFETY: We don't have any choice here, we are in an exception and have to do our best
@@ -89,6 +90,7 @@ extern "efiapi" fn general_protection_fault_handler(_exception_type: isize, cont
     panic!("EXCEPTION: GP FAULT");
 }
 
+#[coverage(off)]
 /// Default handler for page faults.
 extern "efiapi" fn page_fault_handler(_exception_type: isize, context: EfiSystemContext) {
     // SAFETY: We don't have any choice here, we are in an exception and have to do our best
@@ -129,6 +131,7 @@ extern "efiapi" fn page_fault_handler(_exception_type: isize, context: EfiSystem
     panic!("EXCEPTION: PAGE FAULT");
 }
 
+#[coverage(off)]
 fn interpret_page_fault_exception_data(exception_data: u64) {
     log::error!("Error Code: {exception_data:#X?}");
     if (exception_data & 0x1) == 0 {
@@ -158,6 +161,8 @@ fn interpret_page_fault_exception_data(exception_data: u64) {
     }
 }
 
+// There is no value in coverage for this function.
+#[coverage(off)]
 fn interpret_gp_fault_exception_data(exception_data: u64) {
     log::error!("Error Code: {exception_data:#X?}");
     if (exception_data & 0x1) != 0 {
@@ -175,6 +180,8 @@ fn interpret_gp_fault_exception_data(exception_data: u64) {
     }
 }
 
+// There is no value in coverage for this function.
+#[coverage(off)]
 /// Dumps the page table entries for the given CR2 and CR3 values.
 ///
 /// ## Safety
@@ -198,4 +205,23 @@ unsafe fn dump_pte(cr2: u64, cr3: u64, paging_type: PagingType) {
     log::error!("");
     log::error!("MTRR Cache Attribute: {}", mtrr.get_memory_attribute(cr2));
     log::error!("");
+}
+
+#[coverage(off)]
+#[cfg(test)]
+mod test {
+    extern crate std;
+
+    use serial_test::serial;
+
+    use super::*;
+
+    #[test]
+    #[serial(exception_handlers)]
+    fn test_interrupts_x64() {
+        let mut interrupts = InterruptsX64::new();
+        assert!(interrupts.initialize().is_ok());
+        assert!(interrupts.unregister_exception_handler(13).is_ok());
+        assert!(interrupts.unregister_exception_handler(14).is_ok());
+    }
 }

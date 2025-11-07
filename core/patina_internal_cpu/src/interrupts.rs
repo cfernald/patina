@@ -20,11 +20,14 @@ use patina::{error::EfiError, pi::protocols::cpu_arch::EfiSystemContext};
 
 mod exception_handling;
 
-#[cfg(target_arch = "aarch64")]
+// The aarch64 module contains all exception handlers and architecture specific code, of little testing value.
+#[coverage(off)]
+#[cfg(any(target_arch = "aarch64", test))]
 mod aarch64;
+#[coverage(off)]
 #[cfg(not(target_os = "uefi"))]
 mod stub;
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", test))]
 mod x64;
 
 // For std builds, publish the stub version of the interrupt functions.
@@ -35,12 +38,15 @@ cfg_if::cfg_if! {
         pub type Interrupts = stub::InterruptsStub;
 
         /// Enables CPU interrupts.
+        #[coverage(off)]
         pub fn enable_interrupts() {}
 
         /// Disables CPU interrupts.
+        #[coverage(off)]
         pub fn disable_interrupts() {}
 
         /// Gets the current state of CPU interrupts.
+        #[coverage(off)]
         pub fn get_interrupt_state() -> Result<bool, EfiError> {
             Ok(false)
         }
@@ -209,4 +215,20 @@ pub trait InterruptHandler<T = ExceptionContextArch>: Sync {
     /// then the handler should panic or otherwise halt the system.
     ///
     fn handle_interrupt(&'static self, exception_type: ExceptionType, context: &mut ExceptionContext<T>);
+}
+
+#[coverage(off)]
+#[cfg(test)]
+mod tests {
+    extern crate std;
+
+    use super::*;
+
+    #[test]
+    fn test_exception_context_deref() {
+        let mut exception_context = ExceptionContext(0u64);
+        *exception_context = 42;
+        let exception_context = exception_context;
+        assert_eq!(*exception_context, 42u64);
+    }
 }

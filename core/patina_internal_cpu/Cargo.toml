@@ -38,6 +38,7 @@ x86_64 = { workspace = true, features = [
     "abi_x86_interrupt",
 ] }
 mockall = { workspace = true }
+serial_test = { workspace = true }
 
 [features]
 default = []

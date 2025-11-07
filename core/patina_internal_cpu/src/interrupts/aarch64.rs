@@ -11,8 +11,10 @@ use crate::log_registers;
 use patina::{error::EfiError, pi::protocols::cpu_arch::EfiSystemContext};
 use patina_stacktrace::{StackFrame, StackTrace};
 
+#[cfg(not(test))]
 pub mod gic_manager;
 mod interrupt_manager;
+#[cfg(not(test))]
 use patina::{read_sysreg, write_sysreg};
 
 #[cfg(not(test))]
