@@ -68,6 +68,8 @@ impl MmCommRegion {
     /// # Returns
     /// A mutable slice representing the memory region.
     pub unsafe fn as_buffer(&self) -> &'static mut [u8] {
+        // SAFETY: The caller guarantees via function preconditions that region_address points to a valid
+        // memory region of the appropriate size and that it won't be accessed concurrently.
         unsafe { slice::from_raw_parts_mut(self.region_address as usize as *mut u8, self.size()) }
     }
 }

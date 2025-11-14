@@ -127,6 +127,7 @@ use crate::component::{
 };
 
 pub mod memory;
+pub mod perf_timer;
 
 pub use patina_macro::IntoService;
 
@@ -295,6 +296,8 @@ impl<T: ?Sized + 'static> Deref for Service<T> {
                 //   - The `initialize` function, which consumes another `Service` type, which has the same guarantees
                 //     as above.
                 // - If the Service is uninitialized, it will panic at the normal unreachable! macro call below.
+                // SAFETY: Service value was validated to be initialized in the Some(v) match arm.
+                // unreachable_unchecked provides optimizer hints for the impossible None case.
                 unsafe { core::hint::unreachable_unchecked() }
             }
         } else {
@@ -311,11 +314,15 @@ impl<T: ?Sized + 'static> Clone for Service<T> {
     }
 }
 
-// SAFETY: The Service type is Send and Sync as the underlying type is a static, and all access methods to the
-//   underlying implementation are via immutable references (The Deref trait).
+// SAFETY: Service<T> wraps a static reference with PhantomData.
+// All access is through immutable Deref. Static lifetime and immutable access make it Send+Sync safe.
 unsafe impl<T: ?Sized + 'static> Send for Service<T> {}
+// SAFETY: Service<T> wraps a static reference with PhantomData.
+// All access is through immutable Deref. Static lifetime and immutable access make it Send+Sync safe.
 unsafe impl<T: ?Sized + 'static> Sync for Service<T> {}
 
+// SAFETY: Service<T> parameter provides access to registered services.
+// State tracks the service ID. Validates service availability before access.
 unsafe impl<T: ?Sized + 'static> Param for Service<T> {
     type State = usize;
     type Item<'storage, 'state> = Service<T>;
@@ -324,6 +331,8 @@ unsafe impl<T: ?Sized + 'static> Param for Service<T> {
         state: &'state Self::State,
         storage: UnsafeStorageCell<'storage>,
     ) -> Self::Item<'storage, 'state> {
+        // SAFETY: State was validated by validate() to contain a valid service ID.
+        // UnsafeStorageCell provides exclusive access to storage under Param protocol.
         Service::from(unsafe {
             storage.storage().get_raw_service(*state).unwrap_or_else(|| {
                 panic!("Could not find Service value with id [{}] even though it was just validated.", *state)
@@ -332,6 +341,7 @@ unsafe impl<T: ?Sized + 'static> Param for Service<T> {
     }
 
     fn validate(state: &Self::State, storage: UnsafeStorageCell) -> bool {
+        // SAFETY: Storage access is controlled by UnsafeStorageCell. Just checking service existence.
         unsafe { storage.storage() }.get_raw_service(*state).is_some()
     }
 
@@ -428,6 +438,7 @@ mod tests {
         storage.add_service(MyServiceImpl);
 
         assert!(<Service<dyn MyService> as Param>::try_validate(&id, (&storage).into()).is_ok());
+        // SAFETY: Test code - Service<dyn MyService> has been validated and is available in storage.
         let service = unsafe { <Service<dyn MyService> as Param>::get_param(&id, (&storage).into()) };
         assert_eq!(42, service.do_something());
     }
@@ -455,6 +466,7 @@ mod tests {
         }
 
         let storage = Storage::default();
+        // SAFETY: Test code - intentionally calling get_param without validation to test panic behavior.
         let _service =
             unsafe { <Service<dyn MyService> as Param>::get_param(&0, UnsafeStorageCell::new_readonly(&storage)) };
     }

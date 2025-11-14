@@ -38,6 +38,8 @@ impl<'a, R: CPtr<'a, Type = T>, T> PtrMetadata<'a, R> {
     /// # Safety
     /// Caller must ensure that the pointed-to memory is still valid and uphold rust pointer invariants (e.g. no aliasing)
     pub unsafe fn try_into_original_ptr(self) -> Option<R> {
+        // SAFETY: Caller guarantees that the memory is still valid and pointer invariants are upheld.
+        // NonZeroUsize ensures the pointer is not null before transmuting back to the original pointer type.
         NonZeroUsize::new(self.ptr_value).map(|non_zero| unsafe { mem::transmute_copy(&non_zero.get()) })
     }
 }
@@ -92,6 +94,8 @@ pub unsafe trait CMutPtr<'a>: CPtr<'a> {
 pub unsafe trait CRef<'a>: CPtr<'a> {
     /// Returns a reference to the pointed-to value.
     fn as_ref(&self) -> &Self::Type {
+        // SAFETY: CRef trait guarantees the pointer is non-null and valid.
+        // Implementers of CRef must ensure the pointed-to memory is valid for lifetime 'a.
         unsafe { self.as_ptr().as_ref().unwrap() }
     }
 }
@@ -104,6 +108,8 @@ pub unsafe trait CRef<'a>: CPtr<'a> {
 pub unsafe trait CMutRef<'a>: CRef<'a> + CMutPtr<'a> {
     /// Returns a mutable reference to the pointed-to value.
     fn as_mut(&mut self) -> &mut Self::Type {
+        // SAFETY: CMutRef trait guarantees the pointer is non-null, valid, and exclusively accessible.
+        // Implementers must ensure the pointed-to memory is valid for lifetime 'a and mutable.
         unsafe { self.as_mut_ptr().as_mut().unwrap() }
     }
 }
@@ -196,6 +202,8 @@ unsafe impl CMutPtr<'static> for () {
 }
 
 // Option<T>
+// SAFETY: Option<R> preserves the pointer semantics of R. None maps to null pointer,
+// Some(r) delegates to r.as_ptr(). Memory layout and safety are preserved.
 unsafe impl<'a, R: CPtr<'a, Type = T>, T> CPtr<'a> for Option<R> {
     type Type = T;
 
@@ -207,6 +215,8 @@ unsafe impl<'a, R: CPtr<'a, Type = T>, T> CPtr<'a> for Option<R> {
 unsafe impl<'a, R: CMutPtr<'a, Type = T>, T> CMutPtr<'a> for Option<R> {}
 
 // ManuallyDrop<T>
+// SAFETY: ManuallyDrop<R> is a transparent wrapper that preserves the memory layout
+// and pointer semantics of R. Deref provides safe access to the inner R.
 unsafe impl<'a, R: CPtr<'a, Type = T>, T> CPtr<'a> for ManuallyDrop<R> {
     type Type = T;
 
@@ -254,6 +264,7 @@ mod tests {
         assert_eq!(b_ptr, CPtr::into_ptr(b));
 
         // Box should leak with into_ptr
+        // SAFETY: Test code - b_ptr is valid as it was just leaked from into_ptr above.
         let mut b = unsafe { Box::from_raw(b_ptr as *mut i32) };
         assert_eq!(&10, <Box<_> as AsRef<_>>::as_ref(&b));
 
@@ -298,6 +309,7 @@ mod tests {
         assert_eq!(ptr, mdb.as_mut_ptr());
         assert_eq!(ptr, mdb.into_ptr());
 
+        // SAFETY: Test code - ptr is valid as it was just leaked from into_ptr above.
         let mdb = ManuallyDrop::new(unsafe { Box::from_raw(ptr as *mut i32) });
         assert_eq!(ptr, mdb.into_mut_ptr());
 

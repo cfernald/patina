@@ -6,7 +6,10 @@ repository.workspace = true
 license.workspace = true
 edition.workspace = true
 readme = "README.md"
-description = "Performance support for the DXE Core."
+description = "Performance measurement infrastructure."
+
+[lints]
+workspace = true
 
 [dependencies]
 r-efi = { workspace = true }

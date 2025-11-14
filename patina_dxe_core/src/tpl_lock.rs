@@ -184,6 +184,8 @@ mod tests {
 
     fn mock_boot_services() -> *mut efi::BootServices {
         let boot_services = MaybeUninit::zeroed();
+        // SAFETY: Test code - initializing a zeroed BootServices structure for mocking.
+        // The function pointers are immediately overwritten with valid mock implementations.
         let mut boot_services: efi::BootServices = unsafe { boot_services.assume_init() };
         boot_services.raise_tpl = mock_raise_tpl;
         boot_services.restore_tpl = mock_restore_tpl;

@@ -44,8 +44,16 @@ pub(crate) fn with_global_lock<F: Fn() + std::panic::RefUnwindSafe>(f: F) -> Res
     })
 }
 
+/// Allocates a chunk of memory of the specified size from the system allocator.
+///
+/// ## Safety
+/// This function is intended for test code only. The caller must ensure that the size is valid
+/// for allocation.
 pub(crate) unsafe fn get_memory(size: usize) -> &'static mut [u8] {
+    // SAFETY: Test code - allocates memory from the system allocator with UEFI page alignment.
+    // The returned slice is intentionally leaked for test simplicity and valid for 'static lifetime.
     let addr = unsafe { alloc::alloc::alloc(alloc::alloc::Layout::from_size_align(size, 0x1000).unwrap()) };
+    // SAFETY: The allocated pointer is valid for `size` bytes and properly aligned.
     unsafe { core::slice::from_raw_parts_mut(addr, size) }
 }
 
@@ -54,13 +62,21 @@ const TEST_GCD_MEM_SIZE: usize = 0x1000000;
 
 /// Reset the GCD with a default chunk of memory from the system allocator. This will ensure that the GCD is able
 /// to support interactions with other core subsystem (e.g. allocators).
+///
 /// Note: for simplicity, this implementation intentionally leaks the memory allocated for the GCD. Expectation is
 /// that this should be called few enough times in testing so that this leak does not cause problems.
+///
+/// ## Safety
+/// This function modifies global state. It should be called with the test lock held to ensure
+/// that no other tests are concurrently modifying the GCD.
 pub(crate) unsafe fn init_test_gcd(size: Option<usize>) {
     let size = size.unwrap_or(TEST_GCD_MEM_SIZE);
+    // SAFETY: Allocates memory from the system allocator with UEFI page alignment for GCD memory blocks.
     let addr = unsafe { alloc::alloc::alloc(alloc::alloc::Layout::from_size_align(size, 0x1000).unwrap()) };
+    // SAFETY: Resetting the global GCD state in test context - called with test lock held.
     unsafe { GCD.reset() };
     GCD.init(48, 16);
+    // SAFETY: Initializing GCD memory blocks with allocated memory.
     unsafe {
         GCD.init_memory_blocks(
             GcdMemoryType::SystemMemory,
@@ -80,12 +96,22 @@ pub(crate) unsafe fn init_test_gcd(size: Option<usize>) {
 }
 
 /// Resets the ALLOCATOR map to empty and resets the static allocators
+///
+/// ## Safety
+/// This function modifies global state. It should be called with the test lock held to ensure
+/// that no other tests are concurrently modifying the allocator state.
 pub(crate) unsafe fn reset_allocators() {
+    // SAFETY: Test code - resetting the global allocator state with the test lock held.
     unsafe { crate::allocator::reset_allocators() }
 }
 
 /// Reset and re-initialize the protocol database to default empty state.
+///
+/// ## Safety
+/// This function modifies global state. It should be called with the test lock held to ensure
+/// that no other tests are concurrently modifying the protocol database.
 pub(crate) unsafe fn init_test_protocol_db() {
+    // SAFETY: Test code - resetting the global protocol database state with the test lock held.
     unsafe { PROTOCOL_DB.reset() };
     PROTOCOL_DB.init_protocol_db();
 }
@@ -96,6 +122,7 @@ pub(crate) fn reset_dispatcher_context() {
 }
 
 pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
+    // SAFETY: Test code - allocates memory for the test HOB list.
     let mem = unsafe { get_memory(mem_size as usize) };
     let mem_base = mem.as_mut_ptr() as u64;
 
@@ -293,6 +320,8 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
     let end =
         header::Hob { r#type: hob::END_OF_HOB_LIST, length: core::mem::size_of::<header::Hob>() as u16, reserved: 0 };
 
+    // SAFETY: Test code - constructing a test HOB list by copying structures into allocated memory.
+    // The memory is allocated in this function.
     unsafe {
         let mut cursor = mem.as_mut_ptr();
 
@@ -381,6 +410,8 @@ mod tests {
 
     // Compact Hoblist with DXE core Alloction hob. Use this when DXE core hob is required.
     pub(crate) fn build_test_hob_list_compact(mem_size: u64) -> *const c_void {
+        // SAFETY: Test code - allocates memory for compact test HOB list. mem_size is large
+        // enough to hold all HOB structures in the given unit test infrastructure.
         let mem = unsafe { get_memory(mem_size as usize) };
         let mem_base = mem.as_mut_ptr() as u64;
 
@@ -451,6 +482,9 @@ mod tests {
             reserved: 0,
         };
 
+        // SAFETY: Test code - constructing a compact test HOB list by copying structures into allocated memory.
+        // The memory is valid and large enough to hold all HOB structures in the given unit test infrastructure
+        // implementation.
         unsafe {
             let mut cursor = mem.as_mut_ptr();
 
@@ -528,7 +562,9 @@ mod tests {
             return Err("File contents exceed allocated memory length");
         }
 
-        // Write the file contents into the memory region specified by the HOB
+        // SAFETY: Test code - writing file contents into memory region specified by the DXE core HOB.
+        // The memory region is valid and sized according to the HOB. The file size has been checked to
+        // verify that it fits within the allocated memory length.
         unsafe {
             let memory_slice = slice::from_raw_parts_mut(memory_base_address as *mut u8, memory_length as usize);
             let file_size = file_size as usize; // Convert file_size to usize
@@ -545,6 +581,8 @@ mod tests {
 
     #[test]
     fn test_build_test_hob_list_compact() {
+        // Note: The mem_size specified here must  be large enough to hold all HOB structures in this test
+        // infrastructure.
         let physical_hob_list = build_test_hob_list_compact(0x2000000);
         let mut hob_list = HobList::default();
         hob_list.discover_hobs(physical_hob_list);

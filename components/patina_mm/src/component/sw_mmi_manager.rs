@@ -111,6 +111,12 @@ unsafe impl SwMmiTrigger for SwMmiManager {
                 cfg_if::cfg_if! {
                     if #[cfg(any(feature = "doc", all(target_os = "uefi", target_arch = "x86_64")))] {
                         log::trace!(target: "sw_mmi", "Writing SMI command port: {_port:#X}");
+                        // SAFETY: This I/O port write is considered safe to use because:
+                        // 1. The port address comes from platform configuration (self.inner_config.cmd_port)
+                        // 2. The SwMmiTrigger trait is marked unsafe, requiring callers to ensure hardware is
+                        //    initialized upholding its safety contract.
+                        // 3. This service is only registered after platform initialization (entry_point completion)
+                        // 4. Writing to the SMI command port is the defined mechanism for triggering software MMIs
                         unsafe { port::Port::new(_port).write(_cmd_port_value); }
                         log::trace!(target: "sw_mmi", "SMI command port write completed");
                     } else {
@@ -131,6 +137,12 @@ unsafe impl SwMmiTrigger for SwMmiManager {
                 cfg_if::cfg_if! {
                     if #[cfg(any(feature = "doc", all(target_os = "uefi", target_arch = "x86_64")))] {
                         log::trace!(target: "sw_mmi", "Writing SMI data port: {_port:#X}");
+                        // SAFETY: This I/O port write is considered safe to use because:
+                        // 1. The port address comes from platform configuration (self.inner_config.data_port)
+                        // 2. The SwMmiTrigger trait is marked unsafe, requiring callers to ensure hardware is
+                        //     initialized upholding its safety contract.
+                        // 3. This service is only registered after platform initialization (entry_point completion)
+                        // 4. Writing to the SMI data port is the defined mechanism for passing data to MMI handlers
                         unsafe { port::Port::new(_port).write(_data_port_value); }
                         log::trace!(target: "sw_mmi", "SMI data port write completed");
                     } else {

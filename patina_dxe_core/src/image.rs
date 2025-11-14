@@ -1544,6 +1544,7 @@ mod tests {
     use std::{fs::File, io::Read};
 
     fn with_locked_state<F: Fn() + std::panic::RefUnwindSafe>(f: F) {
+        // SAFETY: Test code only - initializing test infrastructure within the global test lock.
         test_support::with_global_lock(|| unsafe {
             test_support::init_test_gcd(None);
             test_support::init_test_protocol_db();
@@ -1555,6 +1556,7 @@ mod tests {
     }
 
     unsafe fn init_test_image_support() {
+        // SAFETY: Test code - resetting global image data state with test lock held.
         unsafe { PRIVATE_IMAGE_DATA.lock().reset() };
 
         const DXE_CORE_MEMORY_SIZE: usize = 0x10000;
@@ -1611,6 +1613,7 @@ mod tests {
 
             let private_data = PRIVATE_IMAGE_DATA.lock();
             let image_data = private_data.private_image_data.get(&image_handle).unwrap();
+            // SAFETY: Test code - dereferencing image buffer pointer that was just created by LoadImage.
             let image_buf_len = unsafe { (&*image_data.image_buffer).len() as usize };
             assert_eq!(image_buf_len, image_data.image_info.image_size as usize);
             assert_eq!(image_data.image_info.image_data_type, efi::BOOT_SERVICES_DATA);
@@ -1669,6 +1672,7 @@ mod tests {
 
             let private_data = PRIVATE_IMAGE_DATA.lock();
             let image_data = private_data.private_image_data.get(&image_handle).unwrap();
+            // SAFETY: Test code - dereferencing image buffer pointer that was just created by LoadImage.
             let image_buf_len = unsafe { (&*image_data.image_buffer).len() as usize };
             assert_eq!(image_buf_len, image_data.image_info.image_size as usize);
             assert_eq!(image_data.image_info.image_data_type, efi::BOOT_SERVICES_DATA);
@@ -1753,6 +1757,7 @@ mod tests {
 
             let private_data = PRIVATE_IMAGE_DATA.lock();
             let image_data = private_data.private_image_data.get(&image_handle).unwrap();
+            // SAFETY: Test code - dereferencing image buffer pointer that was just created by LoadImage.
             let image_buf_len = unsafe { (&*image_data.image_buffer).len() as usize };
             assert_eq!(image_buf_len, image_data.image_info.image_size as usize);
             assert_eq!(image_data.image_info.image_data_type, efi::BOOT_SERVICES_DATA);
@@ -1943,6 +1948,7 @@ mod tests {
         buffer: *mut c_void,
     ) -> efi::Status {
         let mut test_file = File::open(test_collateral!("RustImageTestDxe.efi")).expect("failed to open test file.");
+        // SAFETY: Test mock - creating a mutable slice from the provided buffer pointer.
         unsafe {
             let slice = core::slice::from_raw_parts_mut(buffer as *mut u8, *buffer_size);
             let read_bytes = test_file.read(slice).unwrap();
@@ -1975,6 +1981,7 @@ mod tests {
         let file_info_ptr = Box::into_raw(Box::new(file_info));
 
         let mut status = efi::Status::SUCCESS;
+        // SAFETY: Test mock - copying file info structure to caller's buffer if large enough.
         unsafe {
             if *size >= (*file_info_ptr).size.try_into().unwrap() {
                 core::ptr::copy(file_info_ptr, buffer as *mut efi::protocols::file::Info, 1);
@@ -1995,6 +2002,7 @@ mod tests {
         _attributes: u64,
     ) -> efi::Status {
         let file_ptr = get_file_protocol_mock();
+        // SAFETY: Test mock - writing the mock file protocol pointer to the output parameter.
         unsafe {
             new_handle.write(file_ptr);
         }
@@ -2009,6 +2017,7 @@ mod tests {
         unimplemented!();
     }
 
+    #[allow(clippy::undocumented_unsafe_blocks)]
     fn get_file_protocol_mock() -> *mut efi::protocols::file::Protocol {
         // mock file interface
         #[allow(clippy::missing_transmute_annotations)]
@@ -2091,6 +2100,7 @@ mod tests {
                 root: *mut *mut efi::protocols::file::Protocol,
             ) -> efi::Status {
                 let file_ptr = get_file_protocol_mock();
+                // SAFETY: Test mock - writing the mock file protocol pointer to the output parameter.
                 unsafe {
                     root.write(file_ptr);
                 }
@@ -2149,6 +2159,7 @@ mod tests {
                 let mut test_file =
                     File::open(test_collateral!("RustImageTestDxe.efi")).expect("failed to open test file.");
                 let status;
+                // SAFETY: Test mock - reading file into caller's buffer if large enough.
                 unsafe {
                     if *buffer_size < test_file.metadata().unwrap().len() as usize {
                         buffer_size.write(test_file.metadata().unwrap().len() as usize);

@@ -30,9 +30,9 @@ impl super::EfiSystemContextFactory for ExceptionContextAArch64 {
 
 impl super::EfiExceptionStackTrace for ExceptionContextAArch64 {
     fn dump_stack_trace(&self) {
-        // SAFETY: This is called from the exception context. We have no choice but to trust the ELR and SP values.
-        // the stack trace module does its best to not cause recursive exceptions.
         let stack_frame = StackFrame { pc: self.elr, sp: self.sp, fp: self.fp };
+        // SAFETY: Called during exception handling with CPU context registers. The exception context
+        // is considered valid to dump at this time.
         if let Err(err) = unsafe { StackTrace::dump_with(stack_frame) } {
             log::error!("StackTrace: {err}");
         }

@@ -14,10 +14,14 @@ extern crate alloc;
 use crate::config;
 use alloc::boxed::Box;
 use core::{clone::Clone, convert::AsRef};
-use mu_rust_helpers::perf_timer::{Arch, ArchFunctionality};
 use patina::{
     boot_services::{BootServices, StandardBootServices, event::EventType, tpl::Tpl},
-    component::{IntoComponent, hob::Hob, params::Config},
+    component::{
+        IntoComponent,
+        hob::Hob,
+        params::Config,
+        service::{Service, perf_timer::ArchTimerFunctionality},
+    },
     error::EfiError,
     guids::{EVENT_GROUP_END_OF_DXE, PERFORMANCE_PROTOCOL},
     performance::{
@@ -49,6 +53,7 @@ impl Performance {
         runtime_services: StandardRuntimeServices,
         records_buffers_hobs: Option<Hob<HobPerformanceData>>,
         mm_comm_region_hobs: Option<Hob<MmCommRegion>>,
+        timer: Service<dyn ArchTimerFunctionality>,
     ) -> Result<(), EfiError> {
         if !config.enable_component {
             log::warn!("Patina Performance Component is not enabled, skipping entry point.");
@@ -57,28 +62,28 @@ impl Performance {
 
         set_perf_measurement_mask(config.enabled_measurements);
 
-        set_static_state(StandardBootServices::clone(&boot_services)).unwrap_or_else(|_| {
+        set_static_state(StandardBootServices::clone(&boot_services), timer.clone()).unwrap_or_else(|_| {
             log::error!(
                 "[{}]: Performance static state was set somewhere else. It should only be set here!",
                 function!()
             );
         });
 
-        let Some((_, fbpt)) = get_static_state() else {
+        let Some((_, fbpt, _)) = get_static_state() else {
             log::error!("[{}]: Performance static state was not initialized properly.", function!());
             return Err(EfiError::Aborted);
         };
 
         let Some(mm_comm_region_hobs) = mm_comm_region_hobs else {
             // If no MM communication region is provided, we can skip the SMM performance records.
-            return self._entry_point(boot_services, runtime_services, records_buffers_hobs, None, fbpt);
+            return self._entry_point(boot_services, runtime_services, records_buffers_hobs, None, fbpt, timer);
         };
 
         let Some(mm_comm_region) = mm_comm_region_hobs.iter().find(|r| r.is_user_type()) else {
             return Ok(());
         };
 
-        self._entry_point(boot_services, runtime_services, records_buffers_hobs, Some(*mm_comm_region), fbpt)
+        self._entry_point(boot_services, runtime_services, records_buffers_hobs, Some(*mm_comm_region), fbpt, timer)
     }
 
     /// Entry point that have generic parameter.
@@ -89,6 +94,7 @@ impl Performance {
         records_buffers_hobs: Option<P>,
         mm_comm_region: Option<MmCommRegion>,
         fbpt: &'static TplMutex<'static, F, B>,
+        timer: Service<dyn ArchTimerFunctionality>,
     ) -> Result<(), EfiError>
     where
         BB: AsRef<B> + Clone + 'static,
@@ -151,15 +157,17 @@ impl Performance {
             );
         }
 
+        log::info!("Performance: Performance component initialized.");
+
         // Install configuration table for performance property.
         // SAFETY: `install_configuration_table` requires that the data match the GUID; PERFORMANCE_PROTOCOL matches `PerformanceProperty`.
         unsafe {
             boot_services.as_ref().install_configuration_table(
                 &PERFORMANCE_PROTOCOL,
                 Box::new(PerformanceProperty::new(
-                    Arch::perf_frequency(),
-                    Arch::cpu_count_start(),
-                    Arch::cpu_count_end(),
+                    timer.perf_frequency(),
+                    timer.cpu_count_start(),
+                    timer.cpu_count_end(),
                 )),
             )?
         };
@@ -174,11 +182,12 @@ mod tests {
     use super::*;
 
     use alloc::rc::Rc;
-    use core::{assert_eq, ptr};
+    use core::assert_eq;
     use r_efi::efi;
 
     use patina::{
         boot_services::{MockBootServices, c_ptr::CPtr},
+        component::service::IntoService,
         runtime_services::MockRuntimeServices,
         uefi_protocol::{ProtocolInterface, performance_measurement::EDKII_PERFORMANCE_MEASUREMENT_PROTOCOL_GUID},
     };
@@ -188,6 +197,19 @@ mod tests {
         record::{PerformanceRecordBuffer, hob::MockHobPerformanceDataExtractor},
         table::MockFirmwareBasicBootPerfTable,
     };
+
+    #[derive(IntoService)]
+    #[service(dyn ArchTimerFunctionality)]
+    struct MockTimer {}
+
+    impl ArchTimerFunctionality for MockTimer {
+        fn perf_frequency(&self) -> u64 {
+            100
+        }
+        fn cpu_count(&self) -> u64 {
+            200
+        }
+    }
 
     #[test]
     fn test_entry_point() {
@@ -279,15 +301,22 @@ mod tests {
         let mut fbpt = MockFirmwareBasicBootPerfTable::new();
         fbpt.expect_set_perf_records().once().return_const(());
 
-        let fbpt = TplMutex::new(unsafe { &*ptr::addr_of!(boot_services) }, Tpl::NOTIFY, fbpt);
-        let fbpt = unsafe { &*ptr::addr_of!(fbpt) };
+        let boot_services_rc = Rc::new(boot_services);
+
+        // Leak a reference to boot_services to create a 'static reference for TplMutex.
+        let boot_services_static = Box::leak(Box::new(Rc::clone(&boot_services_rc)));
+        let fbpt = TplMutex::new(&**boot_services_static, Tpl::NOTIFY, fbpt);
+
+        // Leak the fbpt to create a 'static reference for testing.
+        let fbpt = Box::leak(Box::new(fbpt));
 
         let _ = Performance._entry_point(
-            Rc::new(boot_services),
+            boot_services_rc,
             Rc::new(runtime_services),
             Some(hob_perf_data_extractor),
             Some(mm_comm_region),
             fbpt,
+            Service::mock(Box::new(MockTimer {})),
         );
     }
 }

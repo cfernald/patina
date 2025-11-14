@@ -80,9 +80,9 @@ extern "efiapi" fn general_protection_fault_handler(_exception_type: isize, cont
     (x64_context as &ExceptionContextX64).dump_system_context_registers();
 
     log::error!("Dumping Exception Stack Trace:");
-    // SAFETY: As before, we don't have any choice. The stacktrace module will do its best to not cause a
-    // recursive exception.
     let stack_frame = StackFrame { pc: x64_context.rip, sp: x64_context.rsp, fp: x64_context.rbp };
+    // SAFETY: Called during exception handling with CPU context registers. The exception context
+    // is considered valid to dump at this time.
     if let Err(err) = unsafe { StackTrace::dump_with(stack_frame) } {
         log::error!("StackTrace: {err}");
     }
@@ -121,9 +121,9 @@ extern "efiapi" fn page_fault_handler(_exception_type: isize, context: EfiSystem
     unsafe { dump_pte(x64_context.cr2, x64_context.cr3, paging_type) };
 
     log::error!("Dumping Exception Stack Trace:");
-    // SAFETY: As before, we don't have any choice. The stacktrace module will do its best to not cause a
-    // recursive exception.
     let stack_frame = StackFrame { pc: x64_context.rip, sp: x64_context.rsp, fp: x64_context.rbp };
+    // SAFETY: Called during page fault exception handling with CPU context registers. The exception context
+    // is considered valid to dump at this time.
     if let Err(err) = unsafe { StackTrace::dump_with(stack_frame) } {
         log::error!("StackTrace: {err}");
     }

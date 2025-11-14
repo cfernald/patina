@@ -195,9 +195,9 @@ extern "efiapi" fn synchronous_exception_handler(_exception_type: isize, context
     log::debug!("Full Context: {aarch64_context:#X?}");
 
     log::error!("Dumping Exception Stack Trace:");
-    // SAFETY: As before, we don't have any choice. The stacktrace module will do its best to not cause a
-    // recursive exception.
     let stack_frame = StackFrame { pc: aarch64_context.elr, sp: aarch64_context.sp, fp: aarch64_context.fp };
+    // SAFETY: Called during exception handling with CPU context registers. The exception context
+    // is considered valid to dump at this time.
     if let Err(err) = unsafe { StackTrace::dump_with(stack_frame) } {
         log::error!("StackTrace: {err}");
     }

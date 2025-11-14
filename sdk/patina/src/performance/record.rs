@@ -319,6 +319,7 @@ mod tests {
         performance_record_buffer.push_record(DynamicStringEventRecord::new(1, 0, 10, guid, "test")).unwrap();
 
         let mut buffer = vec![0_u8; 1000];
+        // SAFETY: Test code - creating a mutable slice from vector for testing record reporting.
         let buffer = unsafe { slice::from_raw_parts_mut(buffer.as_mut_ptr(), buffer.len()) };
 
         performance_record_buffer.report(buffer).unwrap();
