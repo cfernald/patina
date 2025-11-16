@@ -71,7 +71,7 @@ fn enable_fiq() {
     {
         write_sysreg!(reg daifclr, imm 0x01, "isb sy");
     }
-    #[cfg(not(target_arch = "aarch64"))]
+    #[cfg(any(test, not(target_arch = "aarch64")))]
     {
         unimplemented!()
     }
@@ -82,7 +82,7 @@ fn disable_fiq() {
     {
         write_sysreg!(reg daifset, imm 0x01, "isb sy");
     }
-    #[cfg(not(target_arch = "aarch64"))]
+    #[cfg(any(test, not(target_arch = "aarch64")))]
     {
         unimplemented!()
     }
@@ -105,7 +105,7 @@ fn enable_async_abort() {
     {
         write_sysreg!(reg daifclr, imm 0x04, "isb sy");
     }
-    #[cfg(not(target_arch = "aarch64"))]
+    #[cfg(any(test, not(target_arch = "aarch64")))]
     {
         unimplemented!()
     }

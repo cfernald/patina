@@ -63,7 +63,7 @@ pub fn enable_interrupts() {
     {
         write_sysreg!(reg daifclr, imm 0x02, "isb sy");
     }
-    #[cfg(not(target_arch = "aarch64"))]
+    #[cfg(any(test, not(target_arch = "aarch64")))]
     {
         unimplemented!()
     }
@@ -75,7 +75,7 @@ pub fn disable_interrupts() {
     {
         write_sysreg!(reg daifset, imm 0x02, "isb sy");
     }
-    #[cfg(not(target_arch = "aarch64"))]
+    #[cfg(any(test, not(target_arch = "aarch64")))]
     {
         unimplemented!()
     }
