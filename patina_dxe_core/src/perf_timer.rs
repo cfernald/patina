@@ -88,8 +88,6 @@ pub(crate) fn arch_cpu_count() -> u64 {
 /// Skip coverage as any value could be valid, including 0.
 #[coverage(off)]
 pub(crate) fn arch_perf_frequency() -> u64 {
-    let mut frequency = 0u64;
-
     // Try to get TSC frequency from CPUID (most Intel and AMD platforms).
     #[cfg(target_arch = "x86_64")]
     {
@@ -99,26 +97,31 @@ pub(crate) fn arch_perf_frequency() -> u64 {
         if eax != 0 && ebx != 0 && ecx != 0 {
             // CPUID 0x15 gives TSC_frequency = (ECX * EAX) / EBX.
             // Most modern x86 platforms support this leaf.
-            frequency = (ecx as u64 * ebx as u64) / eax as u64;
+            return (ecx as u64 * ebx as u64) / eax as u64;
         } else {
             // CPUID 0x16 gives base frequency in MHz in EAX.
             // This is supported on some older x86 platforms.
             // This is a nominal frequency and is less accurate for reflecting actual operating conditions.
             let CpuidResult { eax, .. } = unsafe { x86_64::__cpuid(0x16) };
             if eax != 0 {
-                frequency = (eax * 1_000_000) as u64;
+                return (eax * 1_000_000) as u64;
             }
         }
+        // If we couldn't determine frequency, return 0
+        0u64
     }
 
     // Use CNTFRQ_EL0 for aarch64 platforms.
     #[cfg(target_arch = "aarch64")]
     {
         use patina::read_sysreg;
-        frequency = read_sysreg!(CNTFRQ_EL0);
+        read_sysreg!(CNTFRQ_EL0)
     }
 
-    frequency
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+    {
+        0u64
+    }
 }
 
 #[cfg(test)]

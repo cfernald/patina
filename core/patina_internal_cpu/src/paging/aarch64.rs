@@ -82,7 +82,7 @@ mod tests {
         impl PageTable for PageTable {
             fn map_memory_region(&mut self, address: u64, size: u64, attributes: MemoryAttributes) -> Result<(), PtError>;
             fn unmap_memory_region(&mut self, address: u64, size: u64) -> Result<(), PtError>;
-            fn install_page_table(&self) -> Result<(), PtError>;
+            fn install_page_table(&mut self) -> Result<(), PtError>;
             fn query_memory_region(&self, address: u64, size: u64) -> Result<MemoryAttributes, PtError>;
             fn dump_page_tables(&self, address: u64, size: u64) -> Result<(), PtError>;
         }

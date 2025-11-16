@@ -94,7 +94,7 @@ fn get_fiq_state() -> Result<bool, EfiError> {
         let daif = read_sysreg!(daif);
         Ok(daif & 0x40 == 0)
     }
-    #[cfg(not(target_arch = "aarch64"))]
+    #[cfg(any(test, not(target_arch = "aarch64")))]
     {
         Err(EfiError::Unsupported)
     }
@@ -206,10 +206,19 @@ extern "efiapi" fn synchronous_exception_handler(_exception_type: isize, context
 }
 
 fn dump_pte(far: u64) {
-    #[cfg(all(not(test), target_arch = "aarch64"))]
-    let ttbr0_el2 = read_sysreg!(ttbr0_el2);
+    #[cfg(target_arch = "aarch64")]
+    let ttbr0_el2 = {
+        #[cfg(not(test))]
+        {
+            read_sysreg!(ttbr0_el2)
+        }
+        #[cfg(test)]
+        {
+            0u64
+        }
+    };
     #[cfg(not(target_arch = "aarch64"))]
-    let ttbr0_el2 = 0;
+    let ttbr0_el2 = 0u64;
 
     // SAFETY: TTBR0 must be valid as it is the current page table base.
     if let Ok(pt) = unsafe {

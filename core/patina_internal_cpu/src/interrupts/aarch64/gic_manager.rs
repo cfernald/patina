@@ -8,6 +8,7 @@ use safe_mmio::field;
 use patina::{read_sysreg, write_sysreg};
 
 // Create basic enum for GIC version
+#[allow(dead_code)]
 #[derive(PartialEq)]
 pub enum GicVersion {
     ArmGicV2 = 2,
@@ -19,6 +20,7 @@ pub fn get_current_el() -> u64 {
     read_sysreg!(CurrentEL)
 }
 
+#[allow(dead_code)]
 fn get_control_system_reg_enable() -> u64 {
     let current_el = get_current_el();
     match current_el {
@@ -28,6 +30,7 @@ fn get_control_system_reg_enable() -> u64 {
     }
 }
 
+#[allow(dead_code)]
 fn set_control_system_reg_enable(icc_sre: u64) -> u64 {
     let current_el = get_current_el();
     match current_el {
@@ -43,6 +46,7 @@ fn set_control_system_reg_enable(icc_sre: u64) -> u64 {
     get_control_system_reg_enable()
 }
 
+#[allow(dead_code)]
 fn get_system_gic_version() -> GicVersion {
     let pfr0_el1 = read_sysreg!(ID_AA64PFR0_EL1);
 
@@ -73,6 +77,7 @@ fn get_system_gic_version() -> GicVersion {
 /// initialized during core initialization and not expected to change during
 /// runtime.
 ///
+#[allow(dead_code)]
 pub unsafe fn gic_initialize<'a>(gicd_base: *mut u64, gicr_base: *mut u64) -> Result<GicV3<'a>, EfiError> {
     let gic_v = get_system_gic_version();
     if gic_v == GicVersion::ArmGicV2 {
@@ -108,6 +113,7 @@ pub unsafe fn gic_initialize<'a>(gicd_base: *mut u64, gicr_base: *mut u64) -> Re
     Ok(gic_v3)
 }
 
+#[allow(dead_code)]
 pub struct AArch64InterruptInitializer<'a> {
     pub gic_v3: GicV3<'a>,
 }

@@ -95,9 +95,9 @@ impl EfiCpuAarch64 {
             };
             return 4 << ((ctr_el0 >> 16) & 0xf);
         }
-        #[cfg(not(target_arch = "aarch64"))]
+        #[cfg(any(test, not(target_arch = "aarch64")))]
         {
-            // For all other cases, return 64 bytes
+            // For test mode or non-aarch64 platforms, return 64 bytes
             64_u64
         }
     }
