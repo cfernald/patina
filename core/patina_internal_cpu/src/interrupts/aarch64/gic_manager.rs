@@ -15,6 +15,7 @@ use patina::{read_sysreg, write_sysreg};
 const MPIDR_AFFINITY_MASK: u64 = 0x0000_00ff_00ff_ffff;
 
 // Create basic enum for GIC version
+#[allow(dead_code)]
 #[derive(PartialEq)]
 pub enum GicVersion {
     ArmGicV2 = 2,
@@ -26,6 +27,7 @@ pub fn get_current_el() -> u64 {
     read_sysreg!(CurrentEL)
 }
 
+#[allow(dead_code)]
 fn get_control_system_reg_enable() -> u64 {
     let current_el = get_current_el();
     match current_el {
@@ -35,6 +37,7 @@ fn get_control_system_reg_enable() -> u64 {
     }
 }
 
+#[allow(dead_code)]
 fn set_control_system_reg_enable(icc_sre: u64) -> u64 {
     let current_el = get_current_el();
     match current_el {
@@ -50,6 +53,7 @@ fn set_control_system_reg_enable(icc_sre: u64) -> u64 {
     get_control_system_reg_enable()
 }
 
+#[allow(dead_code)]
 fn get_system_gic_version() -> GicVersion {
     let pfr0_el1 = read_sysreg!(ID_AA64PFR0_EL1);
 

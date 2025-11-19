@@ -1158,6 +1158,7 @@ pub(crate) unsafe fn reset_allocators() {
 
 #[cfg(test)]
 #[coverage(off)]
+#[cfg(target_arch = "x86_64")] // Issue #1071
 mod tests {
 
     use crate::{
