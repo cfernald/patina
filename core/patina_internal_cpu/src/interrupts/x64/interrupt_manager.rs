@@ -13,6 +13,7 @@ use patina::{
     error::EfiError,
     pi::protocols::cpu_arch::EfiSystemContext,
 };
+#[cfg(target_arch = "x86_64")]
 use patina_mtrr::Mtrr;
 use patina_paging::{PageTable, PagingType};
 use patina_stacktrace::{StackFrame, StackTrace};
@@ -201,10 +202,13 @@ unsafe fn dump_pte(cr2: u64, cr3: u64, paging_type: PagingType) {
     }
 
     // we don't carry the caching attributes in the page table, so get them from the MTRRs
-    let mtrr = patina_mtrr::create_mtrr_lib(0);
-    log::error!("");
-    log::error!("MTRR Cache Attribute: {}", mtrr.get_memory_attribute(cr2));
-    log::error!("");
+    #[cfg(target_arch = "x86_64")]
+    {
+        let mtrr = patina_mtrr::create_mtrr_lib(0);
+        log::error!("");
+        log::error!("MTRR Cache Attribute: {}", mtrr.get_memory_attribute(cr2));
+        log::error!("");
+    }
 }
 
 #[coverage(off)]

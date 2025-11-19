@@ -17,7 +17,7 @@ mod interrupt_manager;
 #[cfg(not(test))]
 use patina::{read_sysreg, write_sysreg};
 
-#[cfg(not(test))]
+#[allow(unused)]
 pub use interrupt_manager::InterruptsAarch64;
 
 pub type ExceptionContextAArch64 = r_efi::protocols::debug_support::SystemContextAArch64;
@@ -57,39 +57,39 @@ impl super::EfiExceptionStackTrace for ExceptionContextAArch64 {
     }
 }
 
+#[coverage(off)]
 #[allow(unused)]
 pub fn enable_interrupts() {
-    #[cfg(all(not(test), target_arch = "aarch64"))]
-    {
-        write_sysreg!(reg daifclr, imm 0x02, "isb sy");
-    }
-    #[cfg(not(target_arch = "aarch64"))]
-    {
-        unimplemented!()
+    cfg_if::cfg_if! {
+        if #[cfg(all(not(test), target_arch = "aarch64"))]  {
+            write_sysreg!(reg daifclr, imm 0x02, "isb sy");
+        } else {
+            unimplemented!()
+        }
     }
 }
 
+#[coverage(off)]
 #[allow(unused)]
 pub fn disable_interrupts() {
-    #[cfg(all(not(test), target_arch = "aarch64"))]
-    {
-        write_sysreg!(reg daifset, imm 0x02, "isb sy");
-    }
-    #[cfg(not(target_arch = "aarch64"))]
-    {
-        unimplemented!()
+    cfg_if::cfg_if! {
+        if #[cfg(all(not(test), target_arch = "aarch64"))]  {
+            write_sysreg!(reg daifset, imm 0x02, "isb sy");
+        } else {
+            unimplemented!()
+        }
     }
 }
 
+#[coverage(off)]
 #[allow(unused)]
 pub fn get_interrupt_state() -> Result<bool, EfiError> {
-    #[cfg(all(not(test), target_arch = "aarch64"))]
-    {
-        let daif = read_sysreg!(daif);
-        Ok(daif & 0x80 == 0)
-    }
-    #[cfg(not(target_arch = "aarch64"))]
-    {
-        Err(EfiError::Unsupported)
+    cfg_if::cfg_if! {
+        if #[cfg(all(not(test), target_arch = "aarch64"))]  {
+            let daif = read_sysreg!(daif);
+            Ok(daif & 0x80 == 0)
+        } else {
+            Err(EfiError::Unsupported)
+        }
     }
 }
