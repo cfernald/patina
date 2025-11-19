@@ -67,47 +67,43 @@ impl InterruptsAarch64 {
 impl InterruptManager for InterruptsAarch64 {}
 
 fn enable_fiq() {
-    #[cfg(all(not(test), target_arch = "aarch64"))]
-    {
-        write_sysreg!(reg daifclr, imm 0x01, "isb sy");
-    }
-    #[cfg(not(target_arch = "aarch64"))]
-    {
-        unimplemented!()
+    cfg_if::cfg_if! {
+        if #[cfg(all(not(test), target_arch = "aarch64"))]  {
+            write_sysreg!(reg daifclr, imm 0x01, "isb sy");
+        } else {
+            unimplemented!()
+        }
     }
 }
 
 fn disable_fiq() {
-    #[cfg(all(not(test), target_arch = "aarch64"))]
-    {
-        write_sysreg!(reg daifset, imm 0x01, "isb sy");
-    }
-    #[cfg(not(target_arch = "aarch64"))]
-    {
-        unimplemented!()
+    cfg_if::cfg_if! {
+        if #[cfg(all(not(test), target_arch = "aarch64"))]  {
+            write_sysreg!(reg daifset, imm 0x01, "isb sy");
+        } else {
+            unimplemented!()
+        }
     }
 }
 
 fn get_fiq_state() -> Result<bool, EfiError> {
-    #[cfg(all(not(test), target_arch = "aarch64"))]
-    {
-        let daif = read_sysreg!(daif);
-        Ok(daif & 0x40 == 0)
-    }
-    #[cfg(not(target_arch = "aarch64"))]
-    {
-        Err(EfiError::Unsupported)
+    cfg_if::cfg_if! {
+        if #[cfg(all(not(test), target_arch = "aarch64"))]  {
+            let daif = read_sysreg!(daif);
+            Ok(daif & 0x40 == 0)
+        } else {
+            Err(EfiError::Unsupported)
+        }
     }
 }
 
 fn enable_async_abort() {
-    #[cfg(all(not(test), target_arch = "aarch64"))]
-    {
-        write_sysreg!(reg daifclr, imm 0x04, "isb sy");
-    }
-    #[cfg(not(target_arch = "aarch64"))]
-    {
-        unimplemented!()
+    cfg_if::cfg_if! {
+        if #[cfg(all(not(test), target_arch = "aarch64"))]  {
+            write_sysreg!(reg daifclr, imm 0x04, "isb sy");
+        } else {
+            unimplemented!()
+        }
     }
 }
 
@@ -206,10 +202,15 @@ extern "efiapi" fn synchronous_exception_handler(_exception_type: isize, context
 }
 
 fn dump_pte(far: u64) {
-    #[cfg(all(not(test), target_arch = "aarch64"))]
-    let ttbr0_el2 = read_sysreg!(ttbr0_el2);
-    #[cfg(not(target_arch = "aarch64"))]
-    let ttbr0_el2 = 0;
+    #[allow(clippy::needless_late_init)]
+    let ttbr0_el2;
+    cfg_if::cfg_if! {
+        if #[cfg(all(not(test), target_arch = "aarch64"))]  {
+            ttbr0_el2 = read_sysreg!(ttbr0_el2)
+        } else {
+            ttbr0_el2 = 0u64;
+        }
+    }
 
     // SAFETY: TTBR0 must be valid as it is the current page table base.
     if let Ok(pt) = unsafe {

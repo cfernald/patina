@@ -280,6 +280,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_arch = "x86_64")] // Issue #1071
     fn test_memory_attributes_table_generation() {
         with_locked_state(|| {
             // Create a vector to store the allocated pages
