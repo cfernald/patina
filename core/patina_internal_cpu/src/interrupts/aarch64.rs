@@ -57,6 +57,7 @@ impl super::EfiExceptionStackTrace for ExceptionContextAArch64 {
     }
 }
 
+#[coverage(off)]
 #[allow(unused)]
 pub fn enable_interrupts() {
     cfg_if::cfg_if! {
@@ -68,6 +69,7 @@ pub fn enable_interrupts() {
     }
 }
 
+#[coverage(off)]
 #[allow(unused)]
 pub fn disable_interrupts() {
     cfg_if::cfg_if! {
@@ -79,6 +81,7 @@ pub fn disable_interrupts() {
     }
 }
 
+#[coverage(off)]
 #[allow(unused)]
 pub fn get_interrupt_state() -> Result<bool, EfiError> {
     cfg_if::cfg_if! {

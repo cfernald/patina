@@ -66,6 +66,7 @@ impl InterruptsAarch64 {
 
 impl InterruptManager for InterruptsAarch64 {}
 
+#[coverage(off)]
 fn enable_fiq() {
     cfg_if::cfg_if! {
         if #[cfg(all(not(test), target_arch = "aarch64"))]  {
@@ -76,6 +77,7 @@ fn enable_fiq() {
     }
 }
 
+#[coverage(off)]
 fn disable_fiq() {
     cfg_if::cfg_if! {
         if #[cfg(all(not(test), target_arch = "aarch64"))]  {
@@ -86,6 +88,7 @@ fn disable_fiq() {
     }
 }
 
+#[coverage(off)]
 fn get_fiq_state() -> Result<bool, EfiError> {
     cfg_if::cfg_if! {
         if #[cfg(all(not(test), target_arch = "aarch64"))]  {
@@ -97,6 +100,7 @@ fn get_fiq_state() -> Result<bool, EfiError> {
     }
 }
 
+#[coverage(off)]
 fn enable_async_abort() {
     cfg_if::cfg_if! {
         if #[cfg(all(not(test), target_arch = "aarch64"))]  {
@@ -107,6 +111,7 @@ fn enable_async_abort() {
     }
 }
 
+#[coverage(off)]
 fn initialize_exception() -> Result<(), EfiError> {
     // Set the stack pointer for EL0 to be used for synchronous exceptions
     #[cfg(all(not(test), target_arch = "aarch64"))]
@@ -202,11 +207,13 @@ extern "efiapi" fn synchronous_exception_handler(_exception_type: isize, context
 }
 
 fn dump_pte(far: u64) {
+    // Needed because attributes on expressions are not stable.
+    // https://github.com/rust-lang/rust/issues/15701
     #[allow(clippy::needless_late_init)]
     let ttbr0_el2;
     cfg_if::cfg_if! {
         if #[cfg(all(not(test), target_arch = "aarch64"))]  {
-            ttbr0_el2 = read_sysreg!(ttbr0_el2)
+            ttbr0_el2 = read_sysreg!(ttbr0_el2);
         } else {
             ttbr0_el2 = 0u64;
         }
