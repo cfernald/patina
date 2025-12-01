@@ -107,7 +107,7 @@
 
 mod arch;
 mod dbg_target;
-#[coverage(off)]
+#[coverage(off)] // The debugger needs integration test infrastructure. Disabling coverage until this is completed.
 mod debugger;
 mod memory;
 mod system;
