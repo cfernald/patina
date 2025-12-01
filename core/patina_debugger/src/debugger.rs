@@ -34,6 +34,9 @@ use crate::{
 /// Length of the static buffer used for GDB communication.
 const GDB_BUFF_LEN: usize = 0x2000;
 
+/// A default GDB stop packet used when entering the debugger.
+const GDB_STOP_PACKET: &str = "$T05thread:01;#07";
+
 #[cfg(not(feature = "alloc"))]
 static GDB_BUFFER: [u8; GDB_BUFF_LEN] = [0; GDB_BUFF_LEN];
 
@@ -171,7 +174,6 @@ impl<T: SerialIO> PatinaDebugger<T> {
         };
 
         let mut target = PatinaTarget::new(exception_info, &self.system_state);
-        let timer: &dyn ArchTimerFunctionality = debug.timer.ok_or(DebugError::NotInitialized)?;
         let timeout = match debug.initial_breakpoint {
             true => {
                 debug.initial_breakpoint = false;
@@ -212,10 +214,12 @@ impl<T: SerialIO> PatinaDebugger<T> {
             // Always start with a stop code if starting from idle. This may be because this is the initial breakpoint
             // or because the initial breakpoint timed out. This is not to spec, but is a useful hint to the client
             // that a break has occurred. This allows the debugger to reconnect on scenarios like reboots.
-            let _ = inner.borrow_conn().write_all("$T05thread:01;#07".as_bytes());
+            let _ = inner.borrow_conn().write_all(GDB_STOP_PACKET.as_bytes());
 
             // Until some traffic is received, wait for the timeout before entering the state machine.
-            if timeout != 0 {
+            if timeout != 0
+                && let Some(timer) = debug.timer
+            {
                 let frequency = timer.perf_frequency();
                 let initial_count = timer.cpu_count();
                 loop {
@@ -298,7 +302,7 @@ impl<T: SerialIO> Debugger for PatinaDebugger<T> {
     fn initialize(
         &'static self,
         interrupt_manager: &mut dyn InterruptManager,
-        timer: &'static dyn ArchTimerFunctionality,
+        timer: Option<&'static dyn ArchTimerFunctionality>,
     ) {
         if !self.enabled.load(Ordering::Relaxed) {
             log::info!("Debugger is disabled.");
@@ -328,7 +332,14 @@ impl<T: SerialIO> Debugger for PatinaDebugger<T> {
                     internal.gdb_buffer = unsafe { Some(&*(GDB_BUFFER.as_ptr() as *mut [u8; GDB_BUFF_LEN])) };
                 }
             }
-            internal.timer = Some(timer);
+
+            if timer.is_none() && self.initial_break_timeout != 0 {
+                log::warn!(
+                    "Debugger initialized with an initial break timeout but no timer service. Ignoring timeout."
+                );
+            }
+
+            internal.timer = timer;
             internal.initial_breakpoint = true;
         }
 

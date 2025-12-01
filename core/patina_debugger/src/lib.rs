@@ -55,7 +55,7 @@
 //! fn start() {
 //!     // Initialize the debugger. This will cause a debug break because of the
 //!     // initial break configuration set above.
-//!     patina_debugger::initialize(&mut Interrupts::default(), &ExampleTimer);
+//!     patina_debugger::initialize(&mut Interrupts::default(), Some(&ExampleTimer));
 //!
 //!     // Notify the debugger of a module load.
 //!     patina_debugger::notify_module_load("module.efi", 0x420000, 0x10000);
@@ -152,7 +152,7 @@ trait Debugger: Sync {
     fn initialize(
         &'static self,
         interrupt_manager: &mut dyn InterruptManager,
-        timer: &'static dyn ArchTimerFunctionality,
+        timer: Option<&'static dyn ArchTimerFunctionality>,
     );
 
     /// Checks if the debugger is enabled.
@@ -210,7 +210,8 @@ pub fn set_debugger<T: SerialIO>(debugger: &'static PatinaDebugger<T>) {
 /// Initializes the debugger. This will install the debugger into the exception
 /// handlers using the provided interrupt manager. This routine may invoke a debug
 /// break depending on configuration.
-pub fn initialize(interrupt_manager: &mut dyn InterruptManager, timer: &'static dyn ArchTimerFunctionality) {
+#[coverage(off)] // Initializing the debugger requires integration testing infrastructure. Disabling coverage until this is completed.
+pub fn initialize(interrupt_manager: &mut dyn InterruptManager, timer: Option<&'static dyn ArchTimerFunctionality>) {
     if let Some(debugger) = DEBUGGER.get() {
         debugger.initialize(interrupt_manager, timer);
     }
