@@ -435,6 +435,146 @@ impl UefiArchRegs for Aarch64CoreRegs {
         context.fpsr = self.fpcr;
         context.spsr = self.cpsr as u64;
     }
+
+    fn read_single_from_context(
+        context: &ExceptionContext,
+        reg_id: <super::SystemArch as gdbstub::arch::Arch>::RegId,
+        buf: &mut [u8],
+    ) -> Result<usize, ()> {
+        match reg_id {
+            Aarch64CoreRegId::Gpr(n) => {
+                let value = match n {
+                    0 => context.x0,
+                    1 => context.x1,
+                    2 => context.x2,
+                    3 => context.x3,
+                    4 => context.x4,
+                    5 => context.x5,
+                    6 => context.x6,
+                    7 => context.x7,
+                    8 => context.x8,
+                    9 => context.x9,
+                    10 => context.x10,
+                    11 => context.x11,
+                    12 => context.x12,
+                    13 => context.x13,
+                    14 => context.x14,
+                    15 => context.x15,
+                    16 => context.x16,
+                    17 => context.x17,
+                    18 => context.x18,
+                    19 => context.x19,
+                    20 => context.x20,
+                    21 => context.x21,
+                    22 => context.x22,
+                    23 => context.x23,
+                    24 => context.x24,
+                    25 => context.x25,
+                    26 => context.x26,
+                    27 => context.x27,
+                    28 => context.x28,
+                    _ => return Err(()),
+                };
+                let bytes = value.to_le_bytes();
+                buf[..8].copy_from_slice(&bytes);
+                Ok(8)
+            }
+            Aarch64CoreRegId::Fp => {
+                let bytes = context.fp.to_le_bytes();
+                buf[..8].copy_from_slice(&bytes);
+                Ok(8)
+            }
+            Aarch64CoreRegId::Lr => {
+                let bytes = context.lr.to_le_bytes();
+                buf[..8].copy_from_slice(&bytes);
+                Ok(8)
+            }
+            Aarch64CoreRegId::Sp => {
+                let bytes = context.sp.to_le_bytes();
+                buf[..8].copy_from_slice(&bytes);
+                Ok(8)
+            }
+            Aarch64CoreRegId::Elr => {
+                let bytes = context.elr.to_le_bytes();
+                buf[..8].copy_from_slice(&bytes);
+                Ok(8)
+            }
+            Aarch64CoreRegId::Fpsr => {
+                let bytes = context.fpsr.to_le_bytes();
+                buf[..8].copy_from_slice(&bytes);
+                Ok(8)
+            }
+            Aarch64CoreRegId::Spsr => {
+                let bytes = (context.spsr as u32).to_le_bytes();
+                buf[..4].copy_from_slice(&bytes);
+                Ok(4)
+            }
+        }
+    }
+
+    fn write_single_to_context(
+        context: &mut ExceptionContext,
+        reg_id: <super::SystemArch as gdbstub::arch::Arch>::RegId,
+        buf: &[u8],
+    ) -> Result<(), ()> {
+        match reg_id {
+            Aarch64CoreRegId::Gpr(n) => {
+                let value = u64::from_le_bytes(buf.try_into().map_err(|_| ())?);
+                match n {
+                    0 => context.x0 = value,
+                    1 => context.x1 = value,
+                    2 => context.x2 = value,
+                    3 => context.x3 = value,
+                    4 => context.x4 = value,
+                    5 => context.x5 = value,
+                    6 => context.x6 = value,
+                    7 => context.x7 = value,
+                    8 => context.x8 = value,
+                    9 => context.x9 = value,
+                    10 => context.x10 = value,
+                    11 => context.x11 = value,
+                    12 => context.x12 = value,
+                    13 => context.x13 = value,
+                    14 => context.x14 = value,
+                    15 => context.x15 = value,
+                    16 => context.x16 = value,
+                    17 => context.x17 = value,
+                    18 => context.x18 = value,
+                    19 => context.x19 = value,
+                    20 => context.x20 = value,
+                    21 => context.x21 = value,
+                    22 => context.x22 = value,
+                    23 => context.x23 = value,
+                    24 => context.x24 = value,
+                    25 => context.x25 = value,
+                    26 => context.x26 = value,
+                    27 => context.x27 = value,
+                    28 => context.x28 = value,
+                    _ => return Err(()),
+                }
+            }
+            Aarch64CoreRegId::Fp => {
+                context.fp = u64::from_le_bytes(buf.try_into().map_err(|_| ())?);
+            }
+            Aarch64CoreRegId::Lr => {
+                context.lr = u64::from_le_bytes(buf.try_into().map_err(|_| ())?);
+            }
+            Aarch64CoreRegId::Sp => {
+                context.sp = u64::from_le_bytes(buf.try_into().map_err(|_| ())?);
+            }
+            Aarch64CoreRegId::Elr => {
+                context.elr = u64::from_le_bytes(buf.try_into().map_err(|_| ())?);
+            }
+            Aarch64CoreRegId::Fpsr => {
+                context.fpsr = u64::from_le_bytes(buf.try_into().map_err(|_| ())?);
+            }
+            Aarch64CoreRegId::Spsr => {
+                context.spsr = u32::from_le_bytes(buf.try_into().map_err(|_| ())?) as u64;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug)]

@@ -256,8 +256,8 @@ pub struct X64CoreRegs {
     pub eflags: u64,
     /// Segment registers: CS, SS, DS, ES, FS, GS
     pub segments: [u32; 6],
-    /// Control registers: CR0, CR2, CR3, CR4
-    pub control: [u64; 4],
+    /// Control registers: CR0, CR2, CR3, CR4, CR8
+    pub control: [u64; 5],
     /// FPU internal registers
     pub fpu: [u32; 7],
     /// FPU registers: FOP +  ST0 through ST7
@@ -371,7 +371,7 @@ impl UefiArchRegs for X64CoreRegs {
                 context.fs as u32,
                 context.gs as u32,
             ],
-            control: [context.cr0, context.cr2, context.cr3, context.cr4],
+            control: [context.cr0, context.cr2, context.cr3, context.cr4, context.cr8],
             fpu: [0; 7],
             st: [[0; 10]; 9],
         }
@@ -409,6 +409,146 @@ impl UefiArchRegs for X64CoreRegs {
         context.cr2 = self.control[1];
         context.cr3 = self.control[2];
         context.cr4 = self.control[3];
+        context.cr8 = self.control[4];
+    }
+
+    fn read_single_from_context(
+        context: &ExceptionContext,
+        reg_id: <super::SystemArch as gdbstub::arch::Arch>::RegId,
+        buf: &mut [u8],
+    ) -> Result<usize, ()> {
+        match reg_id {
+            X64CoreRegId::Gpr(index) => {
+                let value = match index {
+                    0 => context.rax,
+                    1 => context.rbx,
+                    2 => context.rcx,
+                    3 => context.rdx,
+                    4 => context.rsi,
+                    5 => context.rdi,
+                    6 => context.rbp,
+                    7 => context.rsp,
+                    8 => context.r8,
+                    9 => context.r9,
+                    10 => context.r10,
+                    11 => context.r11,
+                    12 => context.r12,
+                    13 => context.r13,
+                    14 => context.r14,
+                    15 => context.r15,
+                    _ => return Err(()),
+                };
+                let bytes = value.to_le_bytes();
+                buf[..8].copy_from_slice(&bytes);
+                Ok(8)
+            }
+            X64CoreRegId::Rip => {
+                let bytes = context.rip.to_le_bytes();
+                buf[..8].copy_from_slice(&bytes);
+                Ok(8)
+            }
+            X64CoreRegId::Eflags => {
+                let bytes = context.rflags.to_le_bytes();
+                buf[..8].copy_from_slice(&bytes);
+                Ok(8)
+            }
+            X64CoreRegId::Segment(index) => {
+                let value = match index {
+                    0 => context.cs as u32,
+                    1 => context.ss as u32,
+                    2 => context.ds as u32,
+                    3 => context.es as u32,
+                    4 => context.fs as u32,
+                    5 => context.gs as u32,
+                    _ => return Err(()),
+                };
+                let bytes = value.to_le_bytes();
+                buf[..4].copy_from_slice(&bytes);
+                Ok(4)
+            }
+            X64CoreRegId::Control(index) => {
+                let value = match index {
+                    0 => context.cr0,
+                    1 => context.cr2,
+                    2 => context.cr3,
+                    3 => context.cr4,
+                    4 => context.cr8,
+                    _ => return Err(()),
+                };
+                let bytes = value.to_le_bytes();
+                buf[..8].copy_from_slice(&bytes);
+                Ok(8)
+            }
+            X64CoreRegId::Fpu(_) => {
+                buf[..4].fill(0);
+                Ok(4)
+            }
+            X64CoreRegId::St(_) => {
+                buf[..10].fill(0);
+                Ok(10)
+            }
+        }
+    }
+
+    fn write_single_to_context(
+        context: &mut ExceptionContext,
+        reg_id: <super::SystemArch as gdbstub::arch::Arch>::RegId,
+        buf: &[u8],
+    ) -> Result<(), ()> {
+        match reg_id {
+            X64CoreRegId::Gpr(index) => {
+                let value = u64::from_le_bytes(buf.try_into().map_err(|_| ())?);
+                match index {
+                    0 => context.rax = value,
+                    1 => context.rbx = value,
+                    2 => context.rcx = value,
+                    3 => context.rdx = value,
+                    4 => context.rsi = value,
+                    5 => context.rdi = value,
+                    6 => context.rbp = value,
+                    7 => context.rsp = value,
+                    8 => context.r8 = value,
+                    9 => context.r9 = value,
+                    10 => context.r10 = value,
+                    11 => context.r11 = value,
+                    12 => context.r12 = value,
+                    13 => context.r13 = value,
+                    14 => context.r14 = value,
+                    15 => context.r15 = value,
+                    _ => return Err(()),
+                };
+            }
+            X64CoreRegId::Rip => context.rip = u64::from_le_bytes(buf.try_into().map_err(|_| ())?),
+            X64CoreRegId::Eflags => context.rflags = u64::from_le_bytes(buf.try_into().map_err(|_| ())?),
+            X64CoreRegId::Segment(index) => {
+                let value = u32::from_le_bytes(buf.try_into().map_err(|_| ())?);
+                match index {
+                    0 => context.cs = value as u64,
+                    1 => context.ss = value as u64,
+                    2 => context.ds = value as u64,
+                    3 => context.es = value as u64,
+                    4 => context.fs = value as u64,
+                    5 => context.gs = value as u64,
+                    _ => return Err(()),
+                }
+            }
+            X64CoreRegId::Control(index) => {
+                let value = u64::from_le_bytes(buf.try_into().map_err(|_| ())?);
+                match index {
+                    0 => context.cr0 = value,
+                    1 => context.cr2 = value,
+                    2 => context.cr3 = value,
+                    3 => context.cr4 = value,
+                    4 => context.cr8 = value,
+                    _ => return Err(()),
+                }
+            }
+            X64CoreRegId::Fpu(_) | X64CoreRegId::St(_) => {
+                // Do nothing.
+            }
+        }
+
+        Ok(())
     }
 }
 
