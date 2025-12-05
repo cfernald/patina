@@ -295,8 +295,8 @@ pub struct Aarch64CoreRegs {
     pub sp: u64,
     /// Instruction pointer
     pub pc: u64,
-    /// Floating point control
-    pub fpcr: u64,
+    /// Floating point status
+    pub fpsr: u64,
     /// PE status
     pub cpsr: u32,
 }
@@ -323,7 +323,7 @@ impl Registers for Aarch64CoreRegs {
 
         write_bytes!(&self.sp.to_le_bytes());
         write_bytes!(&self.pc.to_le_bytes());
-        write_bytes!(&self.fpcr.to_le_bytes());
+        write_bytes!(&self.fpsr.to_le_bytes());
         write_bytes!(&self.cpsr.to_le_bytes());
     }
 
@@ -349,7 +349,7 @@ impl Registers for Aarch64CoreRegs {
 
         self.sp = read!(u64);
         self.pc = read!(u64);
-        self.fpcr = read!(u64);
+        self.fpsr = read!(u64);
         self.cpsr = read!(u32);
         Ok(())
     }
@@ -393,7 +393,7 @@ impl UefiArchRegs for Aarch64CoreRegs {
             ],
             sp: context.sp,
             pc: context.elr,
-            fpcr: context.fpsr,
+            fpsr: context.fpsr,
             cpsr: context.spsr as u32,
         }
     }
@@ -432,7 +432,7 @@ impl UefiArchRegs for Aarch64CoreRegs {
         context.lr = self.regs[30];
         context.sp = self.sp;
         context.elr = self.pc;
-        context.fpsr = self.fpcr;
+        context.fpsr = self.fpsr;
         context.spsr = self.cpsr as u64;
     }
 
