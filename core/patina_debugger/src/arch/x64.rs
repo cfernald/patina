@@ -417,68 +417,58 @@ impl UefiArchRegs for X64CoreRegs {
         reg_id: <super::SystemArch as gdbstub::arch::Arch>::RegId,
         buf: &mut [u8],
     ) -> Result<usize, ()> {
+        macro_rules! read_field {
+            ($value:expr) => {{
+                let size = core::mem::size_of_val(&$value);
+                let bytes = $value.to_le_bytes();
+                buf[..size].copy_from_slice(&bytes);
+                Ok(bytes.len())
+            }};
+        }
+
         match reg_id {
-            X64CoreRegId::Gpr(index) => {
-                let value = match index {
-                    0 => context.rax,
-                    1 => context.rbx,
-                    2 => context.rcx,
-                    3 => context.rdx,
-                    4 => context.rsi,
-                    5 => context.rdi,
-                    6 => context.rbp,
-                    7 => context.rsp,
-                    8 => context.r8,
-                    9 => context.r9,
-                    10 => context.r10,
-                    11 => context.r11,
-                    12 => context.r12,
-                    13 => context.r13,
-                    14 => context.r14,
-                    15 => context.r15,
-                    _ => return Err(()),
-                };
-                let bytes = value.to_le_bytes();
-                buf[..8].copy_from_slice(&bytes);
-                Ok(8)
-            }
+            X64CoreRegId::Gpr(index) => match index {
+                0 => read_field!(context.rax),
+                1 => read_field!(context.rbx),
+                2 => read_field!(context.rcx),
+                3 => read_field!(context.rdx),
+                4 => read_field!(context.rsi),
+                5 => read_field!(context.rdi),
+                6 => read_field!(context.rbp),
+                7 => read_field!(context.rsp),
+                8 => read_field!(context.r8),
+                9 => read_field!(context.r9),
+                10 => read_field!(context.r10),
+                11 => read_field!(context.r11),
+                12 => read_field!(context.r12),
+                13 => read_field!(context.r13),
+                14 => read_field!(context.r14),
+                15 => read_field!(context.r15),
+                _ => Err(()),
+            },
             X64CoreRegId::Rip => {
-                let bytes = context.rip.to_le_bytes();
-                buf[..8].copy_from_slice(&bytes);
-                Ok(8)
+                read_field!(context.rip)
             }
             X64CoreRegId::Eflags => {
-                let bytes = context.rflags.to_le_bytes();
-                buf[..8].copy_from_slice(&bytes);
-                Ok(8)
+                read_field!(context.rflags)
             }
-            X64CoreRegId::Segment(index) => {
-                let value = match index {
-                    0 => context.cs as u32,
-                    1 => context.ss as u32,
-                    2 => context.ds as u32,
-                    3 => context.es as u32,
-                    4 => context.fs as u32,
-                    5 => context.gs as u32,
-                    _ => return Err(()),
-                };
-                let bytes = value.to_le_bytes();
-                buf[..4].copy_from_slice(&bytes);
-                Ok(4)
-            }
-            X64CoreRegId::Control(index) => {
-                let value = match index {
-                    0 => context.cr0,
-                    1 => context.cr2,
-                    2 => context.cr3,
-                    3 => context.cr4,
-                    4 => context.cr8,
-                    _ => return Err(()),
-                };
-                let bytes = value.to_le_bytes();
-                buf[..8].copy_from_slice(&bytes);
-                Ok(8)
-            }
+            X64CoreRegId::Segment(index) => match index {
+                0 => read_field!(context.cs as u32),
+                1 => read_field!(context.ss as u32),
+                2 => read_field!(context.ds as u32),
+                3 => read_field!(context.es as u32),
+                4 => read_field!(context.fs as u32),
+                5 => read_field!(context.gs as u32),
+                _ => Err(()),
+            },
+            X64CoreRegId::Control(index) => match index {
+                0 => read_field!(context.cr0),
+                1 => read_field!(context.cr2),
+                2 => read_field!(context.cr3),
+                3 => read_field!(context.cr4),
+                4 => read_field!(context.cr8),
+                _ => Err(()),
+            },
             X64CoreRegId::Fpu(_) => {
                 buf[..4].fill(0);
                 Ok(4)
@@ -495,54 +485,55 @@ impl UefiArchRegs for X64CoreRegs {
         reg_id: <super::SystemArch as gdbstub::arch::Arch>::RegId,
         buf: &[u8],
     ) -> Result<(), ()> {
+        macro_rules! write_field {
+            ($field:expr, $field_type:ty) => {{
+                let size = core::mem::size_of::<$field_type>();
+                let value = <$field_type>::from_le_bytes(buf[0..size].try_into().map_err(|_| ())?);
+                $field = value.into();
+            }};
+        }
+
         match reg_id {
             X64CoreRegId::Gpr(index) => {
-                let value = u64::from_le_bytes(buf.try_into().map_err(|_| ())?);
                 match index {
-                    0 => context.rax = value,
-                    1 => context.rbx = value,
-                    2 => context.rcx = value,
-                    3 => context.rdx = value,
-                    4 => context.rsi = value,
-                    5 => context.rdi = value,
-                    6 => context.rbp = value,
-                    7 => context.rsp = value,
-                    8 => context.r8 = value,
-                    9 => context.r9 = value,
-                    10 => context.r10 = value,
-                    11 => context.r11 = value,
-                    12 => context.r12 = value,
-                    13 => context.r13 = value,
-                    14 => context.r14 = value,
-                    15 => context.r15 = value,
+                    0 => write_field!(context.rax, u64),
+                    1 => write_field!(context.rbx, u64),
+                    2 => write_field!(context.rcx, u64),
+                    3 => write_field!(context.rdx, u64),
+                    4 => write_field!(context.rsi, u64),
+                    5 => write_field!(context.rdi, u64),
+                    6 => write_field!(context.rbp, u64),
+                    7 => write_field!(context.rsp, u64),
+                    8 => write_field!(context.r8, u64),
+                    9 => write_field!(context.r9, u64),
+                    10 => write_field!(context.r10, u64),
+                    11 => write_field!(context.r11, u64),
+                    12 => write_field!(context.r12, u64),
+                    13 => write_field!(context.r13, u64),
+                    14 => write_field!(context.r14, u64),
+                    15 => write_field!(context.r15, u64),
                     _ => return Err(()),
                 };
             }
             X64CoreRegId::Rip => context.rip = u64::from_le_bytes(buf.try_into().map_err(|_| ())?),
             X64CoreRegId::Eflags => context.rflags = u64::from_le_bytes(buf.try_into().map_err(|_| ())?),
-            X64CoreRegId::Segment(index) => {
-                let value = u32::from_le_bytes(buf.try_into().map_err(|_| ())?);
-                match index {
-                    0 => context.cs = value as u64,
-                    1 => context.ss = value as u64,
-                    2 => context.ds = value as u64,
-                    3 => context.es = value as u64,
-                    4 => context.fs = value as u64,
-                    5 => context.gs = value as u64,
-                    _ => return Err(()),
-                }
-            }
-            X64CoreRegId::Control(index) => {
-                let value = u64::from_le_bytes(buf.try_into().map_err(|_| ())?);
-                match index {
-                    0 => context.cr0 = value,
-                    1 => context.cr2 = value,
-                    2 => context.cr3 = value,
-                    3 => context.cr4 = value,
-                    4 => context.cr8 = value,
-                    _ => return Err(()),
-                }
-            }
+            X64CoreRegId::Segment(index) => match index {
+                0 => write_field!(context.cs, u32),
+                1 => write_field!(context.ss, u32),
+                2 => write_field!(context.ds, u32),
+                3 => write_field!(context.es, u32),
+                4 => write_field!(context.fs, u32),
+                5 => write_field!(context.gs, u32),
+                _ => return Err(()),
+            },
+            X64CoreRegId::Control(index) => match index {
+                0 => write_field!(context.cr0, u64),
+                1 => write_field!(context.cr2, u64),
+                2 => write_field!(context.cr3, u64),
+                3 => write_field!(context.cr4, u64),
+                4 => write_field!(context.cr8, u64),
+                _ => return Err(()),
+            },
             X64CoreRegId::Fpu(_) | X64CoreRegId::St(_) => {
                 // Do nothing.
             }

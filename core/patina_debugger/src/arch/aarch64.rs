@@ -441,73 +441,65 @@ impl UefiArchRegs for Aarch64CoreRegs {
         reg_id: <super::SystemArch as gdbstub::arch::Arch>::RegId,
         buf: &mut [u8],
     ) -> Result<usize, ()> {
+        macro_rules! read_field {
+            ($value:expr) => {{
+                let size = core::mem::size_of_val(&$value);
+                let bytes = $value.to_le_bytes();
+                buf[..size].copy_from_slice(&bytes);
+                Ok(bytes.len())
+            }};
+        }
+
         match reg_id {
-            Aarch64CoreRegId::Gpr(n) => {
-                let value = match n {
-                    0 => context.x0,
-                    1 => context.x1,
-                    2 => context.x2,
-                    3 => context.x3,
-                    4 => context.x4,
-                    5 => context.x5,
-                    6 => context.x6,
-                    7 => context.x7,
-                    8 => context.x8,
-                    9 => context.x9,
-                    10 => context.x10,
-                    11 => context.x11,
-                    12 => context.x12,
-                    13 => context.x13,
-                    14 => context.x14,
-                    15 => context.x15,
-                    16 => context.x16,
-                    17 => context.x17,
-                    18 => context.x18,
-                    19 => context.x19,
-                    20 => context.x20,
-                    21 => context.x21,
-                    22 => context.x22,
-                    23 => context.x23,
-                    24 => context.x24,
-                    25 => context.x25,
-                    26 => context.x26,
-                    27 => context.x27,
-                    28 => context.x28,
-                    _ => return Err(()),
-                };
-                let bytes = value.to_le_bytes();
-                buf[..8].copy_from_slice(&bytes);
-                Ok(8)
-            }
+            Aarch64CoreRegId::Gpr(n) => match n {
+                0 => read_field!(context.x0),
+                1 => read_field!(context.x1),
+                2 => read_field!(context.x2),
+                3 => read_field!(context.x3),
+                4 => read_field!(context.x4),
+                5 => read_field!(context.x5),
+                6 => read_field!(context.x6),
+                7 => read_field!(context.x7),
+                8 => read_field!(context.x8),
+                9 => read_field!(context.x9),
+                10 => read_field!(context.x10),
+                11 => read_field!(context.x11),
+                12 => read_field!(context.x12),
+                13 => read_field!(context.x13),
+                14 => read_field!(context.x14),
+                15 => read_field!(context.x15),
+                16 => read_field!(context.x16),
+                17 => read_field!(context.x17),
+                18 => read_field!(context.x18),
+                19 => read_field!(context.x19),
+                20 => read_field!(context.x20),
+                21 => read_field!(context.x21),
+                22 => read_field!(context.x22),
+                23 => read_field!(context.x23),
+                24 => read_field!(context.x24),
+                25 => read_field!(context.x25),
+                26 => read_field!(context.x26),
+                27 => read_field!(context.x27),
+                28 => read_field!(context.x28),
+                _ => Err(()),
+            },
             Aarch64CoreRegId::Fp => {
-                let bytes = context.fp.to_le_bytes();
-                buf[..8].copy_from_slice(&bytes);
-                Ok(8)
+                read_field!(context.fp)
             }
             Aarch64CoreRegId::Lr => {
-                let bytes = context.lr.to_le_bytes();
-                buf[..8].copy_from_slice(&bytes);
-                Ok(8)
+                read_field!(context.lr)
             }
             Aarch64CoreRegId::Sp => {
-                let bytes = context.sp.to_le_bytes();
-                buf[..8].copy_from_slice(&bytes);
-                Ok(8)
+                read_field!(context.sp)
             }
             Aarch64CoreRegId::Elr => {
-                let bytes = context.elr.to_le_bytes();
-                buf[..8].copy_from_slice(&bytes);
-                Ok(8)
+                read_field!(context.elr)
             }
             Aarch64CoreRegId::Fpsr => {
-                let bytes = context.fpsr.to_le_bytes();
-                buf[..8].copy_from_slice(&bytes);
-                Ok(8)
+                read_field!(context.fpsr)
             }
             Aarch64CoreRegId::Spsr => {
-                let bytes = (context.spsr as u32).to_le_bytes();
-                buf[..4].copy_from_slice(&bytes);
-                Ok(4)
+                read_field!(context.spsr as u32)
             }
         }
     }
@@ -517,56 +509,61 @@ impl UefiArchRegs for Aarch64CoreRegs {
         reg_id: <super::SystemArch as gdbstub::arch::Arch>::RegId,
         buf: &[u8],
     ) -> Result<(), ()> {
+        macro_rules! write_field {
+            ($field:expr, $field_type:ty) => {{
+                let size = core::mem::size_of::<$field_type>();
+                let value = <$field_type>::from_le_bytes(buf[0..size].try_into().map_err(|_| ())?);
+                $field = value;
+            }};
+        }
+
         match reg_id {
-            Aarch64CoreRegId::Gpr(n) => {
-                let value = u64::from_le_bytes(buf.try_into().map_err(|_| ())?);
-                match n {
-                    0 => context.x0 = value,
-                    1 => context.x1 = value,
-                    2 => context.x2 = value,
-                    3 => context.x3 = value,
-                    4 => context.x4 = value,
-                    5 => context.x5 = value,
-                    6 => context.x6 = value,
-                    7 => context.x7 = value,
-                    8 => context.x8 = value,
-                    9 => context.x9 = value,
-                    10 => context.x10 = value,
-                    11 => context.x11 = value,
-                    12 => context.x12 = value,
-                    13 => context.x13 = value,
-                    14 => context.x14 = value,
-                    15 => context.x15 = value,
-                    16 => context.x16 = value,
-                    17 => context.x17 = value,
-                    18 => context.x18 = value,
-                    19 => context.x19 = value,
-                    20 => context.x20 = value,
-                    21 => context.x21 = value,
-                    22 => context.x22 = value,
-                    23 => context.x23 = value,
-                    24 => context.x24 = value,
-                    25 => context.x25 = value,
-                    26 => context.x26 = value,
-                    27 => context.x27 = value,
-                    28 => context.x28 = value,
-                    _ => return Err(()),
-                }
-            }
+            Aarch64CoreRegId::Gpr(n) => match n {
+                0 => write_field!(context.x0, u64),
+                1 => write_field!(context.x1, u64),
+                2 => write_field!(context.x2, u64),
+                3 => write_field!(context.x3, u64),
+                4 => write_field!(context.x4, u64),
+                5 => write_field!(context.x5, u64),
+                6 => write_field!(context.x6, u64),
+                7 => write_field!(context.x7, u64),
+                8 => write_field!(context.x8, u64),
+                9 => write_field!(context.x9, u64),
+                10 => write_field!(context.x10, u64),
+                11 => write_field!(context.x11, u64),
+                12 => write_field!(context.x12, u64),
+                13 => write_field!(context.x13, u64),
+                14 => write_field!(context.x14, u64),
+                15 => write_field!(context.x15, u64),
+                16 => write_field!(context.x16, u64),
+                17 => write_field!(context.x17, u64),
+                18 => write_field!(context.x18, u64),
+                19 => write_field!(context.x19, u64),
+                20 => write_field!(context.x20, u64),
+                21 => write_field!(context.x21, u64),
+                22 => write_field!(context.x22, u64),
+                23 => write_field!(context.x23, u64),
+                24 => write_field!(context.x24, u64),
+                25 => write_field!(context.x25, u64),
+                26 => write_field!(context.x26, u64),
+                27 => write_field!(context.x27, u64),
+                28 => write_field!(context.x28, u64),
+                _ => return Err(()),
+            },
             Aarch64CoreRegId::Fp => {
-                context.fp = u64::from_le_bytes(buf.try_into().map_err(|_| ())?);
+                write_field!(context.fp, u64);
             }
             Aarch64CoreRegId::Lr => {
-                context.lr = u64::from_le_bytes(buf.try_into().map_err(|_| ())?);
+                write_field!(context.lr, u64);
             }
             Aarch64CoreRegId::Sp => {
-                context.sp = u64::from_le_bytes(buf.try_into().map_err(|_| ())?);
+                write_field!(context.sp, u64);
             }
             Aarch64CoreRegId::Elr => {
-                context.elr = u64::from_le_bytes(buf.try_into().map_err(|_| ())?);
+                write_field!(context.elr, u64);
             }
             Aarch64CoreRegId::Fpsr => {
-                context.fpsr = u64::from_le_bytes(buf.try_into().map_err(|_| ())?);
+                write_field!(context.fpsr, u64);
             }
             Aarch64CoreRegId::Spsr => {
                 context.spsr = u32::from_le_bytes(buf.try_into().map_err(|_| ())?) as u64;
