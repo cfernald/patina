@@ -98,14 +98,14 @@ pub trait UefiArchRegs: Sized {
     }
 
     // Reads a single register from a UEFI context structure.
-    fn read_single_from_context(
+    fn read_register_from_context(
         context: &ExceptionContext,
         reg_id: <SystemArch as gdbstub::arch::Arch>::RegId,
         buf: &mut [u8],
     ) -> Result<usize, ()>;
 
     // Writes a single register to a UEFI context structure.
-    fn write_single_to_context(
+    fn write_register_to_context(
         context: &mut ExceptionContext,
         reg_id: <SystemArch as gdbstub::arch::Arch>::RegId,
         buf: &[u8],

@@ -412,7 +412,7 @@ impl UefiArchRegs for X64CoreRegs {
         context.cr8 = self.control[4];
     }
 
-    fn read_single_from_context(
+    fn read_register_from_context(
         context: &ExceptionContext,
         reg_id: <super::SystemArch as gdbstub::arch::Arch>::RegId,
         buf: &mut [u8],
@@ -421,7 +421,7 @@ impl UefiArchRegs for X64CoreRegs {
             ($value:expr) => {{
                 let size = core::mem::size_of_val(&$value);
                 let bytes = $value.to_le_bytes();
-                buf[..size].copy_from_slice(&bytes);
+                buf.get_mut(0..size).ok_or(())?.copy_from_slice(&bytes);
                 Ok(bytes.len())
             }};
         }
@@ -480,7 +480,7 @@ impl UefiArchRegs for X64CoreRegs {
         }
     }
 
-    fn write_single_to_context(
+    fn write_register_to_context(
         context: &mut ExceptionContext,
         reg_id: <super::SystemArch as gdbstub::arch::Arch>::RegId,
         buf: &[u8],
@@ -488,7 +488,7 @@ impl UefiArchRegs for X64CoreRegs {
         macro_rules! write_field {
             ($field:expr, $field_type:ty) => {{
                 let size = core::mem::size_of::<$field_type>();
-                let value = <$field_type>::from_le_bytes(buf[0..size].try_into().map_err(|_| ())?);
+                let value = <$field_type>::from_le_bytes(buf.get(0..size).ok_or(())?.try_into().map_err(|_| ())?);
                 $field = value.into();
             }};
         }

@@ -183,7 +183,7 @@ impl SingleRegisterAccess<()> for PatinaTarget {
         reg_id: <Self::Arch as gdbstub::arch::Arch>::RegId,
         buf: &mut [u8],
     ) -> TargetResult<usize, Self> {
-        <Self::Arch as gdbstub::arch::Arch>::Registers::read_single_from_context(
+        <Self::Arch as gdbstub::arch::Arch>::Registers::read_register_from_context(
             &self.exception_info.context,
             reg_id,
             buf,
@@ -197,7 +197,7 @@ impl SingleRegisterAccess<()> for PatinaTarget {
         reg_id: <Self::Arch as gdbstub::arch::Arch>::RegId,
         val: &[u8],
     ) -> TargetResult<(), Self> {
-        <Self::Arch as gdbstub::arch::Arch>::Registers::write_single_to_context(
+        <Self::Arch as gdbstub::arch::Arch>::Registers::write_register_to_context(
             &mut self.exception_info.context,
             reg_id,
             val,
