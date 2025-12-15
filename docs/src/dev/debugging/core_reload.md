@@ -35,7 +35,7 @@ useful for early core debugging, though caution should be used as debugger excep
 
 The core reload feature requires a large amount of rapid data transfer between the host and the device. Depending on the
 UART implementation and support for flow control, this has the potential to overflow hardware FIFO.
-(`ComToTcpServer.py`)[https://github.com/microsoft/uefi_debug_tools/blob/main/Scripts/ComToTcpServer.py]
+[`ComToTcpServer.py`](https://github.com/microsoft/uefi_debug_tools/blob/main/Scripts/ComToTcpServer.py)
 has some artificial rate limiting to attempt to prevent this, but it may not work for all devices. If the FIFO fills and
 bits are dropped, this can cause corrupted packets or worse hard-hangs as the GDB stub awaits more data that was dropped.
 If these occur, consider changing the settings in `ComToTcpServer.py` (if used) and/or implementing flow control.
