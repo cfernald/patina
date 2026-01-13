@@ -1236,7 +1236,6 @@ pub(crate) unsafe fn reset_allocators() {
 
 #[cfg(test)]
 #[coverage(off)]
-#[cfg(target_arch = "x86_64")] // Issue #1071
 mod tests {
 
     use crate::{
@@ -1303,7 +1302,7 @@ mod tests {
             ));
 
             // Required memory allocation hob for stack
-            let mut stack_base_address = 0xEB000;
+            let mut stack_base_address = 0x1EB000;
             stack_base_address = (physical_hob_list as u64).wrapping_add(stack_base_address);
             let stack_hob = Hob::MemoryAllocation(&patina::pi::hob::MemoryAllocation {
                 header: patina::pi::hob::header::Hob {
@@ -1353,7 +1352,7 @@ mod tests {
             hob_list.discover_hobs(physical_hob_list);
 
             // Create a stack HOB at an address NOT in the GCD (such as 0xEB000)
-            let stack_base_address = 0xEB000;
+            let stack_base_address = 0x1EB000;
             let stack_pages = 0x20;
 
             let stack_hob = Hob::MemoryAllocation(&patina::pi::hob::MemoryAllocation {
@@ -1382,9 +1381,10 @@ mod tests {
     #[test]
     fn init_memory_support_should_process_resource_allocations() {
         test_support::with_global_lock(|| {
-            // 4 MiB of test memory is required because allocator expansion during initialization
-            // may need to handle large allocations for memory buckets and HOBs.
-            let physical_hob_list = build_test_hob_list(0x400000);
+            // 16 MiB of test memory is required because allocator expansion during initialization
+            // may need to handle large allocations for memory buckets and HOBs as well as
+            // accounting for minimum granularity requirements.
+            let physical_hob_list = build_test_hob_list(0x1000000);
             unsafe {
                 GCD.reset();
                 gcd::init_gcd(physical_hob_list);
@@ -1396,7 +1396,7 @@ mod tests {
             hob_list.discover_hobs(physical_hob_list);
 
             // Required memory allocation hob for stack
-            let mut stack_base_address = 0xEB000;
+            let mut stack_base_address = 0x1EB000;
             stack_base_address = (physical_hob_list as u64).wrapping_add(stack_base_address);
 
             let stack_hob = Hob::MemoryAllocation(&patina::pi::hob::MemoryAllocation {
@@ -1436,11 +1436,25 @@ mod tests {
             {
                 let allocator = allocators.get_allocator(*memory_type).unwrap();
 
-                if *memory_type == efi::BOOT_SERVICES_DATA {
-                    assert_eq!(allocator.stats().claimed_pages, 3);
-                } else {
-                    assert_eq!(allocator.stats().claimed_pages, 1);
-                }
+                let granularity = match *memory_type {
+                    efi::RESERVED_MEMORY_TYPE
+                    | efi::RUNTIME_SERVICES_CODE
+                    | efi::RUNTIME_SERVICES_DATA
+                    | efi::ACPI_MEMORY_NVS => RUNTIME_PAGE_ALLOCATION_GRANULARITY,
+                    _ => DEFAULT_PAGE_ALLOCATION_GRANULARITY,
+                };
+
+                let expected_pages = match *memory_type {
+                    efi::BOOT_SERVICES_DATA => 3, // Stack + build_test_hob_list allocation
+                    _ => granularity / patina::base::SIZE_4KB,
+                };
+
+                let claimed = allocator.stats().claimed_pages;
+                assert_eq!(
+                    claimed, expected_pages,
+                    "For memory type {:?}: expected {}, got {}",
+                    memory_type, expected_pages, claimed
+                );
             }
 
             // Locate stack hob.

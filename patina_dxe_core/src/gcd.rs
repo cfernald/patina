@@ -707,7 +707,7 @@ mod tests {
 
     use super::*;
 
-    const MEM_SIZE: u64 = 0x200000;
+    const MEM_SIZE: u64 = 0x1000000;
 
     fn with_locked_state<F: Fn() + std::panic::RefUnwindSafe>(f: F) {
         test_support::with_global_lock(|| {
@@ -736,7 +736,7 @@ mod tests {
 
         init_gcd(physical_hob_list);
         assert!(free_memory_start >= mem_base && free_memory_start < mem_base + MEM_SIZE);
-        assert!(free_memory_size <= 0x100000);
+        assert!(free_memory_size <= 0x1000000);
         let mut descriptors: Vec<MemorySpaceDescriptor> = Vec::with_capacity(GCD.memory_descriptor_count() + 10);
         GCD.get_memory_descriptors(&mut descriptors).expect("get_memory_descriptors failed.");
         assert!(
@@ -756,7 +756,7 @@ mod tests {
             .unwrap();
         descriptors
             .iter()
-            .find(|x| x.base_address == mem_base + 0xF0000 && x.memory_type == GcdMemoryType::Reserved)
+            .find(|x| x.base_address == mem_base + 0x1F0000 && x.memory_type == GcdMemoryType::Reserved)
             .unwrap();
         //Note: resource descriptors 3 & are merged into a single contiguous region in GCD, so no separate entry exists.
         //So verify the length of the entry encompasses both.
