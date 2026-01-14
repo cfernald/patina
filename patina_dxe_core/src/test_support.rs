@@ -211,7 +211,7 @@ pub(crate) fn with_global_lock<F: Fn() + std::panic::RefUnwindSafe>(f: F) -> Res
 
 /// Allocates a chunk of memory of the specified size from the system allocator.
 ///
-/// The memory allocated with be 64Kb aligned to simplify alignment requirements such
+/// The memory allocated will be 64Kb aligned to simplify alignment requirements such
 /// as AArch64 runtime memory.
 ///
 /// ## Safety
