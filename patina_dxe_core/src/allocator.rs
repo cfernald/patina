@@ -1302,7 +1302,7 @@ mod tests {
             ));
 
             // Required memory allocation hob for stack
-            let mut stack_base_address = 0x1EB000;
+            let mut stack_base_address = 0x18B000;
             stack_base_address = (physical_hob_list as u64).wrapping_add(stack_base_address);
             let stack_hob = Hob::MemoryAllocation(&patina::pi::hob::MemoryAllocation {
                 header: patina::pi::hob::header::Hob {
@@ -1351,8 +1351,8 @@ mod tests {
             let mut hob_list = HobList::default();
             hob_list.discover_hobs(physical_hob_list);
 
-            // Create a stack HOB at an address NOT in the GCD (such as 0xEB000)
-            let stack_base_address = 0x1EB000;
+            // Create a stack HOB at an address NOT in the GCD (such as 0x18B000)
+            let stack_base_address = 0x18B000;
             let stack_pages = 0x20;
 
             let stack_hob = Hob::MemoryAllocation(&patina::pi::hob::MemoryAllocation {
@@ -1381,10 +1381,9 @@ mod tests {
     #[test]
     fn init_memory_support_should_process_resource_allocations() {
         test_support::with_global_lock(|| {
-            // 16 MiB of test memory is required because allocator expansion during initialization
-            // may need to handle large allocations for memory buckets and HOBs as well as
-            // accounting for minimum granularity requirements.
-            let physical_hob_list = build_test_hob_list(0x1000000);
+            // 4 MiB of test memory is required because allocator expansion during initialization
+            // may need to handle large allocations for memory buckets and HOBs.
+            let physical_hob_list = build_test_hob_list(0x400000);
             unsafe {
                 GCD.reset();
                 gcd::init_gcd(physical_hob_list);
@@ -1396,7 +1395,7 @@ mod tests {
             hob_list.discover_hobs(physical_hob_list);
 
             // Required memory allocation hob for stack
-            let mut stack_base_address = 0x1EB000;
+            let mut stack_base_address = 0x18B000;
             stack_base_address = (physical_hob_list as u64).wrapping_add(stack_base_address);
 
             let stack_hob = Hob::MemoryAllocation(&patina::pi::hob::MemoryAllocation {

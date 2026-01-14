@@ -288,6 +288,7 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
     // SAFETY: Test code - allocates memory for the test HOB list.
     let mem = unsafe { get_memory(mem_size as usize) };
     let mem_base = mem.as_mut_ptr() as u64;
+    assert!(mem_size >= 0x1B0000);
 
     // Build a test HOB list that describes memory layout as follows:
     //
@@ -295,9 +296,9 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
     // HobList:      offset base+0              HOBS
     // Empty:        offset base+HobListSize    N/A
     // SystemMemory  offset base+0x0E0000       SystemMemory (resource_descriptor1)
-    // Reserved      offset base+0x1F0000       Untested SystemMemory (resource_descriptor2)
-    // FreeMemory    offset base+0x200000       FreeMemory (phit)
-    // End           offset base+0x300000       ************
+    // Reserved      offset base+0x190000       Untested SystemMemory (resource_descriptor2)
+    // FreeMemory    offset base+0x1A0000       FreeMemory (phit)
+    // End           offset base+mem_size       ************
     //
     // The test HOB list will also include resource descriptor hobs that describe MMIO/IO as follows:
     // MMIO at 0x10000000 size 0x1000000 (resource_descriptor3)
@@ -312,6 +313,11 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
     // Allocation Hob for MMIO space at 0x10000000 for 0x2000 bytes. A Firmware Volume HOB located in the FirmwareDevice
     // region at 0x10000000
     //
+    // The system memory is of length 0xB0000 bytes. This includes 0xA0000 for the regular allocations plus 0x10000 for
+    // potential stack allocations. 0xA0000 bytes allows for each memory type to be aligned up to 64kb. Really, only
+    // 0x70000 bytes is needed for that in the current layout of allocation hobs, but leaving room provides flexibility
+    // for future changes.
+    //
     let phit = hob::PhaseHandoffInformationTable {
         header: header::Hob {
             r#type: hob::HANDOFF,
@@ -323,7 +329,7 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
         memory_top: mem_base + mem_size,
         memory_bottom: mem_base,
         free_memory_top: mem_base + mem_size,
-        free_memory_bottom: mem_base + 0x200000,
+        free_memory_bottom: mem_base + 0x1A0000,
         end_of_hob_list: mem_base
             + core::mem::size_of::<hob::PhaseHandoffInformationTable>() as u64
             + core::mem::size_of::<hob::Cpu>() as u64
@@ -351,7 +357,7 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
             resource_type: hob::EFI_RESOURCE_SYSTEM_MEMORY,
             resource_attribute: hob::TESTED_MEMORY_ATTRIBUTES | hob::EFI_RESOURCE_ATTRIBUTE_WRITE_BACK_CACHEABLE,
             physical_start: mem_base + 0xE0000,
-            resource_length: 0x110000,
+            resource_length: 0xB0000,
         },
         attributes: efi::MEMORY_WB,
     };
@@ -366,7 +372,7 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
             owner: efi::Guid::from_fields(0, 0, 0, 0, 0, &[0u8; 6]),
             resource_type: hob::EFI_RESOURCE_SYSTEM_MEMORY,
             resource_attribute: hob::INITIALIZED_MEMORY_ATTRIBUTES | hob::EFI_RESOURCE_ATTRIBUTE_WRITE_BACK_CACHEABLE,
-            physical_start: mem_base + 0x1F0000,
+            physical_start: mem_base + 0x190000,
             resource_length: 0x10000,
         },
         attributes: efi::MEMORY_WB,
