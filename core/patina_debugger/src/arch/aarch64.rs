@@ -60,6 +60,8 @@ impl DebuggerArch for Aarch64Arch {
 
     #[inline(always)]
     fn breakpoint() {
+        // SAFETY: Executing breakpoint instruction will cause an exception, this has
+        // no direct impact on safety invariants.
         unsafe {
             asm!("brk 0", options(nostack));
         }
@@ -208,6 +210,7 @@ impl DebuggerArch for Aarch64Arch {
         // reboot through PSCI SYSTEM_RESET
         // this directly loads a value into x0, but this is safe here because we are rebooting anyway
         // so this doesn't matter if we clobber x0
+        // SAFETY: This will cause a system reset, so no further code will be executed.
         unsafe {
             asm!("ldr x0, =0x84000009", "smc 0");
         }
@@ -216,6 +219,10 @@ impl DebuggerArch for Aarch64Arch {
     fn get_page_table() -> Result<Self::PageTable, ()> {
         // TODO: Check for EL1?
         let ttbr0_el2 = read_sysreg!(ttbr0_el2);
+
+        // SAFETY: We are creating from the existing page table root, so the
+        // page tables should be a valid structure. Using PageAllocatorStub
+        // ensures that no allocations are attempted.
         unsafe {
             patina_paging::aarch64::AArch64PageTable::from_existing(
                 ttbr0_el2,

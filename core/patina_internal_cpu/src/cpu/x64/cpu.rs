@@ -154,7 +154,7 @@ impl Cpu for EfiCpuX64 {
                 self.asm_wbinvd();
                 Ok(())
             }
-            CpuFlushType::EFiCpuFlushTypeInvalidate => {
+            CpuFlushType::EfiCpuFlushTypeInvalidate => {
                 self.asm_invd();
                 Ok(())
             }
@@ -210,7 +210,7 @@ mod tests {
 
         let start: efi::PhysicalAddress = 0;
         let length: u64 = 0;
-        let flush_type: CpuFlushType = CpuFlushType::EFiCpuFlushTypeInvalidate;
+        let flush_type: CpuFlushType = CpuFlushType::EfiCpuFlushTypeInvalidate;
         assert_eq!(x64_cpu_init.flush_data_cache(start, length, flush_type), Ok(()));
 
         let start: efi::PhysicalAddress = 0;
