@@ -453,6 +453,7 @@ impl<P: PlatformInfo> Core<P> {
         patina_debugger::initialize(
             &mut interrupt_manager,
             Some(Box::leak(Box::new(cpu::PerfTimer::with_frequency(P::CpuInfo::perf_timer_frequency().unwrap_or(0))))),
+            Some(self.hob_list()),
         );
 
         #[cfg(feature = "debugger_reload")]

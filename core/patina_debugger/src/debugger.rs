@@ -19,7 +19,7 @@ use gdbstub::{
     conn::{Connection, ConnectionExt},
     stub::{GdbStubBuilder, SingleThreadStopReason, state_machine::GdbStubStateMachine},
 };
-use patina::{component::service::perf_timer::ArchTimerFunctionality, serial::SerialIO};
+use patina::{component::service::perf_timer::ArchTimerFunctionality, pi::hob::HobList, serial::SerialIO};
 use patina_internal_cpu::interrupts::{ExceptionType, HandlerType, InterruptHandler, InterruptManager};
 use spin::Mutex;
 
@@ -164,10 +164,13 @@ impl<T: SerialIO> PatinaDebugger<T> {
     /// Allows runtime enablement of the debugger. This should be called before the Patina
     /// core is invoked.
     ///
-    /// Enabled - Whether the debugger is enabled, and will install itself into the system.
+    /// ## Important
     ///
-    pub fn enable(&self, enabled: bool) {
-        self.enabled.store(enabled, Ordering::Relaxed);
+    /// Enabling the debugger is a insecure operation that can allow arbitrary code execution. Callers should take care
+    /// to ensure that dynamic enablement of the debugger is properly protected and measured.
+    ///
+    pub fn enable(&self) {
+        self.enabled.store(true, Ordering::Relaxed);
     }
 
     /// Enters the debugger from an exception.
@@ -321,7 +324,11 @@ impl<T: SerialIO> Debugger for PatinaDebugger<T> {
         &'static self,
         interrupt_manager: &mut dyn InterruptManager,
         timer: Option<&'static dyn ArchTimerFunctionality>,
+        hobs: Option<&HobList>,
     ) {
+        // Check for a debugger configuration hob and consume it if it exists.
+        if let Some(hobs) = hobs {}
+
         if !self.enabled.load(Ordering::Relaxed) {
             log::info!("Debugger is disabled.");
             return;

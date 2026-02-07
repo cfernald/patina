@@ -111,6 +111,7 @@ mod arch;
 mod dbg_target;
 #[coverage(off)] // The debugger needs integration test infrastructure. Disabling coverage until this is completed.
 mod debugger;
+pub mod hob;
 mod memory;
 mod system;
 mod transport;
@@ -121,7 +122,7 @@ pub use debugger::PatinaDebugger;
 
 #[cfg(not(test))]
 use arch::{DebuggerArch, SystemArch};
-use patina::{component::service::perf_timer::ArchTimerFunctionality, serial::SerialIO};
+use patina::{component::service::perf_timer::ArchTimerFunctionality, pi::hob::HobList, serial::SerialIO};
 use patina_internal_cpu::interrupts::{ExceptionContext, InterruptManager};
 
 /// Global instance of the debugger.
@@ -158,6 +159,7 @@ trait Debugger: Sync {
         &'static self,
         interrupt_manager: &mut dyn InterruptManager,
         timer: Option<&'static dyn ArchTimerFunctionality>,
+        hobs: Option<&HobList>,
     );
 
     /// Checks if the debugger is enabled.
@@ -223,9 +225,9 @@ pub fn set_debugger<T: SerialIO>(debugger: &'static PatinaDebugger<T>) {
 /// handlers using the provided interrupt manager. This routine may invoke a debug
 /// break depending on configuration.
 #[coverage(off)] // Initializing the debugger requires integration testing infrastructure. Disabling coverage until this is completed.
-pub fn initialize(interrupt_manager: &mut dyn InterruptManager, timer: Option<&'static dyn ArchTimerFunctionality>) {
+pub fn initialize(interrupt_manager: &mut dyn InterruptManager, timer: Option<&'static dyn ArchTimerFunctionality>, hobs: Option<&HobList>) {
     if let Some(debugger) = DEBUGGER.get() {
-        debugger.initialize(interrupt_manager, timer);
+        debugger.initialize(interrupt_manager, timer, hobs);
     }
 }
 
