@@ -19,6 +19,7 @@ use r_efi::efi;
 
 use crate::{memory_log, protocol::AdvancedLoggerProtocol};
 
+#[coverage(off)]
 #[patina_test]
 fn adv_logger_test(bs: StandardBootServices) -> patina::test::Result {
     const DIRECT_STR: &str = "adv_logger_test: Direct log message!!!";
@@ -67,9 +68,8 @@ fn adv_logger_test(bs: StandardBootServices) -> patina::test::Result {
     }
 
     for entry in log_info.iter() {
-        let log_str = core::str::from_utf8(entry.get_message());
-        u_assert!(log_str.is_ok(), "adv_logger_test: Failed to convert log entry to string.");
-        let log_str = log_str.unwrap();
+        // skip any messages that aren't valid UTF-8, we only care about the messages we just logged
+        let Ok(log_str) = core::str::from_utf8(entry.get_message()) else { continue };
 
         if log_str.contains(DIRECT_STR) {
             direct_found = true;
