@@ -60,6 +60,12 @@ fn adv_logger_test(bs: StandardBootServices) -> patina::test::Result {
     let log_info = log.unwrap();
     let mut direct_found = false;
     let mut protocol_found = false;
+
+    // Check if direct info logs have been explicitly disabled, if so just ignore the direct message checks.
+    if log::STATIC_MAX_LEVEL < log::LevelFilter::Info {
+        direct_found = true;
+    }
+
     for entry in log_info.iter() {
         let log_str = core::str::from_utf8(entry.get_message());
         u_assert!(log_str.is_ok(), "adv_logger_test: Failed to convert log entry to string.");
