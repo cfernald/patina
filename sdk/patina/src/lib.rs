@@ -40,6 +40,7 @@ pub mod base;
 pub mod boot_services;
 #[cfg(any(test, feature = "alloc"))]
 pub mod component;
+#[cfg(any(test, feature = "alloc"))]
 pub mod device_path;
 #[cfg(any(test, feature = "alloc"))]
 pub mod driver_binding;
