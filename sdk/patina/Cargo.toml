@@ -66,12 +66,12 @@ trybuild = { version = "1.0", features = ["diff"] }
 
 [features]
 core = ['alloc']
-std = []
+std = ['alloc']
 doc = ['alloc']
 alloc = []
 mockall = ["dep:mockall", "std"]
 global_allocator = []
-default = []
+default = ['alloc']
 # Opting in to the `enable_patina_tests` feature requires registering at least one test
 # with the `#[patina_test]` attribute. Otherwise, a linker crash or failure will
 # occur!
