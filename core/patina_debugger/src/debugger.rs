@@ -27,7 +27,7 @@ use crate::{
     DebugError, Debugger, DebuggerLoggingPolicy, ExceptionInfo,
     arch::{DebuggerArch, SystemArch},
     dbg_target::PatinaTarget,
-    system::SystemState,
+    system::{SystemState, SystemStateTrait},
     transport::{LoggingSuspender, SerialConnection},
 };
 
@@ -397,8 +397,8 @@ impl<T: SerialIO> Debugger for PatinaDebugger<T> {
 
         let breakpoint = {
             let mut state = self.system_state.lock();
-            state.modules.add_module(module_name, address, length);
-            state.modules.check_module_breakpoints(module_name)
+            state.add_module(module_name, address, length);
+            state.check_module_breakpoints(module_name)
         };
 
         if breakpoint {
@@ -422,6 +422,7 @@ impl<T: SerialIO> Debugger for PatinaDebugger<T> {
         }
     }
 
+    #[cfg(feature = "alloc")]
     fn add_monitor_command(
         &'static self,
         command: &'static str,
