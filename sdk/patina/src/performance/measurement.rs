@@ -281,10 +281,10 @@ where
             fbpt.lock().add_record(record)?;
         }
         KnownPerfId::ModuleDbStart
-        | KnownPerfId::ModuleDbEnd
         | KnownPerfId::ModuleDbSupportStart
         | KnownPerfId::ModuleDbSupportEnd
-        | KnownPerfId::ModuleDbStopStart => {
+        | KnownPerfId::ModuleDbStopStart
+        | KnownPerfId::ModuleDbStopEnd => {
             let module_handle = caller_identifier.as_handle().ok_or(EfiError::InvalidParameter)?;
             let Ok(guid) = get_module_guid_from_handle(boot_services, module_handle) else {
                 log::error!("Performance: Could not find the guid for module handle: {module_handle:?}");
@@ -293,10 +293,10 @@ where
             let record = GuidQwordEventRecord::new(perf_id, 0, timestamp, guid, address as u64);
             fbpt.lock().add_record(record)?;
         }
-        KnownPerfId::ModuleDbStopEnd => {
+        KnownPerfId::ModuleDbEnd => {
             let module_handle = caller_identifier.as_handle().ok_or(EfiError::InvalidParameter)?;
             let Ok(guid) = get_module_guid_from_handle(boot_services, module_handle) else {
-                log::error!("Performance Lib: Could not find the guid for module handle: {module_handle:?}");
+                log::error!("Performance: Could not find the guid for module handle: {module_handle:?}");
                 return Err(EfiError::InvalidParameter.into());
             };
             let module_name = "";
