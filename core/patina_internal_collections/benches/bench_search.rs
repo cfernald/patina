@@ -29,7 +29,7 @@
 //!
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use patina_internal_collections::{Bst, Rbt, SortedSlice, node_size};
-use rand::Rng;
+use rand::RngExt;
 use ruint::Uint;
 use std::{collections::HashSet, hash::Hash, mem::size_of};
 
@@ -40,12 +40,12 @@ type U384 = Uint<384, 6>;
 
 fn random_numbers<D>(min: D, max: D) -> Vec<D>
 where
-    D: Copy + Eq + std::cmp::PartialOrd + Hash + rand::distributions::uniform::SampleUniform,
+    D: Copy + Eq + std::cmp::PartialOrd + Hash + rand::distr::uniform::SampleUniform,
 {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut nums: HashSet<D> = HashSet::new();
     while nums.len() < MAX_SIZE {
-        let num: D = rng.gen_range(min..=max);
+        let num: D = rng.random_range(min..=max);
         nums.insert(num);
     }
     nums.into_iter().collect()

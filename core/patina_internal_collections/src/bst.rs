@@ -900,7 +900,10 @@ mod tests {
 mod fuzz_tests {
     extern crate std;
     use crate::{Bst, node_size};
-    use rand::{Rng, seq::SliceRandom};
+    use rand::{
+        RngExt,
+        seq::{IndexedRandom, SliceRandom},
+    };
     use std::{collections::HashSet, vec::Vec};
 
     const BST_MAX_SIZE: usize = 4096;
@@ -910,14 +913,14 @@ mod fuzz_tests {
         for _ in 0..100 {
             let mut mem = [0; BST_MAX_SIZE * node_size::<i32>()];
             let mut bst: Bst<i32> = Bst::with_capacity(&mut mem);
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             let min = 1;
             let max = 100_000;
 
             let mut random_numbers = HashSet::new();
 
             while random_numbers.len() < BST_MAX_SIZE {
-                let num = rng.gen_range(min..=max);
+                let num = rng.random_range(min..=max);
                 random_numbers.insert(num);
             }
 
@@ -942,13 +945,13 @@ mod fuzz_tests {
     fn fuzz_search() {
         let mut mem = [0; BST_MAX_SIZE * node_size::<i32>()];
         let mut bst: Bst<i32> = Bst::with_capacity(&mut mem);
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let min = 50_000;
         let max = 100_000;
 
         let mut random_numbers = HashSet::new();
         while random_numbers.len() < BST_MAX_SIZE {
-            let num = rng.gen_range(min..=max);
+            let num = rng.random_range(min..=max);
             random_numbers.insert(num);
         }
 
@@ -968,9 +971,9 @@ mod fuzz_tests {
 
         // Search for numbers that do not exist in the tree
         for _ in 0..100_000 {
-            let to_search = rng.gen_bool(0.5);
+            let to_search = rng.random_bool(0.5);
             let random_number =
-                if to_search { rng.gen_range(0..=min - 1) } else { rng.gen_range(max + 1..=max + 50_000) };
+                if to_search { rng.random_range(0..=min - 1) } else { rng.random_range(max + 1..=max + 50_000) };
             assert!(bst.get(&random_number).is_none());
         }
     }
@@ -979,13 +982,13 @@ mod fuzz_tests {
     fn fuzz_delete() {
         let mut mem = [0; BST_MAX_SIZE * node_size::<i32>()];
         let mut bst: Bst<i32> = Bst::with_capacity(&mut mem);
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let min = 1;
         let max = 100_000;
 
         let mut random_numbers = HashSet::new();
         while random_numbers.len() < BST_MAX_SIZE {
-            let num = rng.gen_range(min..=max);
+            let num = rng.random_range(min..=max);
             random_numbers.insert(num);
         }
 
