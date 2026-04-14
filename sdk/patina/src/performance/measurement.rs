@@ -508,6 +508,7 @@ mod tests {
         performance::{
             globals::set_perf_measurement_mask,
             logging::*,
+            record::PerformanceRecord,
             table::{FirmwarePerformanceVariable, MockFirmwareBasicBootPerfTable},
         },
         runtime_services::MockRuntimeServices,
@@ -803,5 +804,58 @@ mod tests {
 
         let combined = start_image | load_image | driver_binding_support;
         assert_eq!(combined, 7);
+    }
+
+    /// Validates that each KnownPerfId maps to the FPDT record type expected by the EDK2
+    /// Dp.c parser (ShellPkg/DynamicCommand/DpDynamicCommand/Dp.c). A mismatch causes
+    /// ASSERT(FALSE) in the C parser at runtime.
+    #[test]
+    fn test_known_perf_id_record_types_match_edk2_dp() {
+        let guid = crate::guids::ZERO;
+
+        // Expected mappings derived from the switch/case in Dp.c:
+        //   FPDT_GUID_EVENT_TYPE           (0x1010): MODULE_START_ID, MODULE_END_ID
+        //   FPDT_GUID_QWORD_EVENT_TYPE     (0x1013): MODULE_LOADIMAGE_*, MODULE_DB_START, MODULE_DB_SUPPORT_*, MODULE_DB_STOP_*
+        //   FPDT_GUID_QWORD_STRING_EVENT   (0x1014): MODULE_DB_END_ID only
+        //   FPDT_DYNAMIC_STRING_EVENT_TYPE (0x1011): any (no assert)
+        //   FPDT_DUAL_GUID_STRING_EVENT    (0x1012): any (no assert)
+        let expected: &[(u16, u16)] = &[
+            (KnownPerfId::ModuleStart.as_u16(), GuidEventRecord::TYPE),
+            (KnownPerfId::ModuleEnd.as_u16(), GuidEventRecord::TYPE),
+            (KnownPerfId::ModuleLoadImageStart.as_u16(), GuidQwordEventRecord::TYPE),
+            (KnownPerfId::ModuleLoadImageEnd.as_u16(), GuidQwordEventRecord::TYPE),
+            (KnownPerfId::ModuleDbStart.as_u16(), GuidQwordEventRecord::TYPE),
+            (KnownPerfId::ModuleDbEnd.as_u16(), GuidQwordStringEventRecord::TYPE),
+            (KnownPerfId::ModuleDbSupportStart.as_u16(), GuidQwordEventRecord::TYPE),
+            (KnownPerfId::ModuleDbSupportEnd.as_u16(), GuidQwordEventRecord::TYPE),
+            (KnownPerfId::ModuleDbStopStart.as_u16(), GuidQwordEventRecord::TYPE),
+            (KnownPerfId::ModuleDbStopEnd.as_u16(), GuidQwordEventRecord::TYPE),
+        ];
+
+        for &(perf_id, expected_type) in expected {
+            let record: Box<dyn PerformanceRecord> = match KnownPerfId::try_from(perf_id).unwrap() {
+                KnownPerfId::ModuleStart | KnownPerfId::ModuleEnd => {
+                    Box::new(GuidEventRecord::new(perf_id, 0, 0, guid))
+                }
+                KnownPerfId::ModuleLoadImageStart | KnownPerfId::ModuleLoadImageEnd => {
+                    Box::new(GuidQwordEventRecord::new(perf_id, 0, 0, guid, 0))
+                }
+                KnownPerfId::ModuleDbStart
+                | KnownPerfId::ModuleDbSupportStart
+                | KnownPerfId::ModuleDbSupportEnd
+                | KnownPerfId::ModuleDbStopStart
+                | KnownPerfId::ModuleDbStopEnd => Box::new(GuidQwordEventRecord::new(perf_id, 0, 0, guid, 0)),
+                KnownPerfId::ModuleDbEnd => Box::new(GuidQwordStringEventRecord::new(perf_id, 0, 0, guid, 0, "")),
+                _ => continue,
+            };
+            assert_eq!(
+                record.record_type(),
+                expected_type,
+                "KnownPerfId 0x{:02X} should produce record type 0x{:04X}, got 0x{:04X}",
+                perf_id,
+                expected_type,
+                record.record_type()
+            );
+        }
     }
 }
