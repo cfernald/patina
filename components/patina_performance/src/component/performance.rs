@@ -23,7 +23,8 @@ use patina::{
     guids::PERFORMANCE_PROTOCOL,
     performance::{
         globals::{get_static_state, set_load_image_count, set_perf_measurement_mask, set_static_state},
-        measurement::{PerformanceProperty, event_callback},
+        logging::{perf_cross_module_begin, perf_cross_module_end},
+        measurement::{PerformanceProperty, create_performance_measurement, event_callback},
         record::{
             GenericPerformanceRecord, PerformanceRecordHeader,
             hob::{HobPerformanceData, HobPerformanceDataExtractor},
@@ -170,6 +171,12 @@ impl Performance {
                 )),
             )?
         };
+
+        // This is not ideal. This PEI end and DXE begin are way too late into DXE phase. However, this cannot be
+        // improved without integrating performance earlier, and mostly likely merging into the core.
+        let dxe_core_guid = patina::guids::DXE_CORE.into_inner();
+        perf_cross_module_end("PEI", &dxe_core_guid, create_performance_measurement);
+        perf_cross_module_begin("DXE", &dxe_core_guid, create_performance_measurement);
 
         Ok(())
     }
