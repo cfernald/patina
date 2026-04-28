@@ -20,7 +20,7 @@ use crate::interrupts::{
 };
 
 cfg_if::cfg_if! {
-    if #[cfg(all(not(test), target_arch = "aarch64"))] {
+    if #[cfg(not(test))] {
         use core::arch::global_asm;
         use patina::{read_sysreg, write_sysreg};
         use crate::interrupts::aarch64::gic_manager::get_current_el;
@@ -67,7 +67,7 @@ impl InterruptManager for InterruptsAarch64 {}
 #[coverage(off)]
 fn enable_fiq() {
     cfg_if::cfg_if! {
-        if #[cfg(all(not(test), target_arch = "aarch64"))]  {
+        if #[cfg(not(test))]  {
             write_sysreg!(reg daifclr, imm 0x01, "isb sy");
         } else {
             unimplemented!()
@@ -78,7 +78,7 @@ fn enable_fiq() {
 #[coverage(off)]
 fn disable_fiq() {
     cfg_if::cfg_if! {
-        if #[cfg(all(not(test), target_arch = "aarch64"))]  {
+        if #[cfg(not(test))]  {
             write_sysreg!(reg daifset, imm 0x01, "isb sy");
         } else {
             unimplemented!()
@@ -89,7 +89,7 @@ fn disable_fiq() {
 #[coverage(off)]
 fn get_fiq_state() -> Result<bool, EfiError> {
     cfg_if::cfg_if! {
-        if #[cfg(all(not(test), target_arch = "aarch64"))]  {
+        if #[cfg(not(test))]  {
             let daif = read_sysreg!(daif);
             Ok(daif & 0x40 == 0)
         } else {
@@ -101,7 +101,7 @@ fn get_fiq_state() -> Result<bool, EfiError> {
 #[coverage(off)]
 fn enable_async_abort() {
     cfg_if::cfg_if! {
-        if #[cfg(all(not(test), target_arch = "aarch64"))]  {
+        if #[cfg(not(test))]  {
             write_sysreg!(reg daifclr, imm 0x04, "isb sy");
         } else {
             unimplemented!()
@@ -112,7 +112,7 @@ fn enable_async_abort() {
 #[coverage(off)]
 fn initialize_exception() -> Result<(), EfiError> {
     // Set the stack pointer for EL0 to be used for synchronous exceptions
-    #[cfg(all(not(test), target_arch = "aarch64"))]
+    #[cfg(not(test))]
     {
         // SAFETY: We are using the address of a symbol defined in assembly as the stack pointer for EL0.
         let mut sp_el0_reg = unsafe { &sp_el0_end as *const _ as u64 };
@@ -125,7 +125,7 @@ fn initialize_exception() -> Result<(), EfiError> {
     }
 
     // Program VBar
-    #[cfg(all(not(test), target_arch = "aarch64"))]
+    #[cfg(not(test))]
     {
         // SAFETY: We are using the address of the exception handlers as the vector base address.
         let vec_base = unsafe { &exception_handlers_start as *const _ as u64 };

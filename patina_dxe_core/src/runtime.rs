@@ -46,26 +46,28 @@ impl RuntimeData {
 
         // SAFETY: The protocol is identified by it's GUID and should be a valid
         //         pointer to a EFI_RUNTIME_ARCH_PROTOCOL structure.
+        //         Raw pointers are used throughout to avoid creating aliasing &mut references
+        //         when the list is empty (where prev == &mut image_head).
         unsafe {
             // Update the image links
-            let mut prev = &mut (*self.runtime_arch_ptr).image_head;
+            let mut prev: *mut _ = ptr::addr_of_mut!((*self.runtime_arch_ptr).image_head);
             for entry in self.runtime_images.iter_mut() {
-                prev.forward_link = (&mut entry.link) as *mut _;
-                entry.link.back_link = prev as *mut _;
-                prev = &mut entry.link;
+                (*prev).forward_link = ptr::addr_of_mut!(entry.link);
+                entry.link.back_link = prev;
+                prev = ptr::addr_of_mut!(entry.link);
             }
-            prev.forward_link = &mut (*self.runtime_arch_ptr).image_head as *mut _;
-            (*self.runtime_arch_ptr).image_head.back_link = prev as *mut _;
+            (*prev).forward_link = ptr::addr_of_mut!((*self.runtime_arch_ptr).image_head);
+            (*self.runtime_arch_ptr).image_head.back_link = prev;
 
             // Update the event links
-            let mut prev = &mut (*self.runtime_arch_ptr).event_head;
+            let mut prev: *mut _ = ptr::addr_of_mut!((*self.runtime_arch_ptr).event_head);
             for entry in self.runtime_events.iter_mut() {
-                prev.forward_link = (&mut entry.link) as *mut _;
-                entry.link.back_link = prev as *mut _;
-                prev = &mut entry.link;
+                (*prev).forward_link = ptr::addr_of_mut!(entry.link);
+                entry.link.back_link = prev;
+                prev = ptr::addr_of_mut!(entry.link);
             }
-            prev.forward_link = &mut (*self.runtime_arch_ptr).event_head as *mut _;
-            (*self.runtime_arch_ptr).event_head.back_link = prev as *mut _;
+            (*prev).forward_link = ptr::addr_of_mut!((*self.runtime_arch_ptr).event_head);
+            (*self.runtime_arch_ptr).event_head.back_link = prev;
         }
     }
 }

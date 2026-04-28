@@ -229,7 +229,7 @@ pub trait BootServices {
                 notify_tpl,
                 mem::transmute::<
                     Option<extern "efiapi" fn(*mut c_void, T)>,
-                    extern "efiapi" fn(*mut c_void, *mut <T as c_ptr::CPtr<'_>>::Type),
+                    Option<extern "efiapi" fn(*mut c_void, *mut <T as c_ptr::CPtr<'_>>::Type)>,
                 >(notify_function),
                 notify_context.into_ptr() as *mut <T as CPtr>::Type,
                 event_group,
@@ -246,7 +246,7 @@ pub trait BootServices {
         &self,
         event_type: EventType,
         notify_tpl: Tpl,
-        notify_function: EventNotifyCallback<*mut T>,
+        notify_function: Option<EventNotifyCallback<*mut T>>,
         notify_context: *mut T,
         event_group: &'static efi::Guid,
     ) -> Result<efi::Event, efi::Status>;
@@ -523,10 +523,10 @@ pub trait BootServices {
             }
             Some(i) => Ok(i),
             None => {
-                static ZERO_SIZE_TYPE: () = ();
-                // SAFETY: Zero-sized types (ZSTs) don't require valid memory addresses.
-                // ZERO_SIZE_TYPE provides a stable address for the cast to maintain type safety.
-                Ok(unsafe { (ptr::addr_of!(ZERO_SIZE_TYPE) as *mut T).as_mut().unwrap() })
+                // SAFETY: T is a ZST (size == 0). NonNull::dangling() returns a well-aligned,
+                // non-null pointer. For ZSTs, reads/writes are zero-sized accesses. Each call
+                // produces its own reference, avoiding aliasing violations.
+                Ok(unsafe { NonNull::<T>::dangling().as_mut() })
             }
         }
     }
@@ -606,10 +606,10 @@ pub trait BootServices {
             }
             Some(i) => Ok(i),
             None => {
-                static ZERO_SIZE_TYPE: () = ();
-                // SAFETY: Zero-sized types (ZSTs) don't require valid memory addresses.
-                // ZERO_SIZE_TYPE provides a stable address for the cast to maintain type safety.
-                Ok(unsafe { (ptr::addr_of!(ZERO_SIZE_TYPE) as *mut T).as_mut().unwrap() })
+                // SAFETY: T is a ZST (size == 0). NonNull::dangling() returns a well-aligned,
+                // non-null pointer. For ZSTs, reads/writes are zero-sized accesses. Each call
+                // produces its own reference, avoiding aliasing violations.
+                Ok(unsafe { NonNull::<T>::dangling().as_mut() })
             }
         }
     }
@@ -746,10 +746,10 @@ pub trait BootServices {
             }
             Some(i) => Ok(i),
             None => {
-                static ZERO_SIZE_TYPE: () = ();
-                // SAFETY: Zero-sized types (ZSTs) don't require valid memory addresses.
-                // ZERO_SIZE_TYPE provides a stable address for the cast to maintain type safety.
-                Ok(unsafe { (ptr::addr_of!(ZERO_SIZE_TYPE) as *mut T).as_mut().unwrap() })
+                // SAFETY: T is a ZST (size == 0). NonNull::dangling() returns a well-aligned,
+                // non-null pointer. For ZSTs, reads/writes are zero-sized accesses. Each call
+                // produces its own reference, avoiding aliasing violations.
+                Ok(unsafe { NonNull::<T>::dangling().as_mut() })
             }
         }
     }
@@ -1029,7 +1029,7 @@ impl BootServices for StandardBootServices {
         &self,
         event_type: EventType,
         notify_tpl: Tpl,
-        notify_function: EventNotifyCallback<*mut T>,
+        notify_function: Option<EventNotifyCallback<*mut T>>,
         notify_context: *mut T,
         event_group: &'static efi::Guid,
     ) -> Result<efi::Event, efi::Status> {
@@ -1041,10 +1041,9 @@ impl BootServices for StandardBootServices {
             notify_tpl.into(),
             // Safety: Transmuting function pointer types with matching ABIs and compatible signatures.
             // Both are extern "efiapi" callbacks - the generic parameter T is erased to c_void for FFI.
-            // Wrapping in Option as the UEFI interface expects an optional callback.
             unsafe {
                 mem::transmute::<
-                    extern "efiapi" fn(*mut c_void, *mut T),
+                    Option<extern "efiapi" fn(*mut c_void, *mut T)>,
                     Option<extern "efiapi" fn(*mut c_void, *mut c_void)>,
                 >(notify_function)
             },

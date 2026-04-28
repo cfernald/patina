@@ -4,6 +4,7 @@
     " Copyright (c) Microsoft Corporation.\n\n",
 )]
 #![no_std]
+#![deny(missing_docs)]
 #![feature(coverage_attribute)]
 extern crate alloc;
 

@@ -178,7 +178,10 @@ impl<P: PlatformInfo> FvProtocolData<P> {
             bytes_to_read = block_size.saturating_sub(offset);
         }
 
-        let lba_start = (physical_address as usize).saturating_add(lba_base_addr).saturating_add(offset) as *mut u8;
+        let lba_start = (physical_address as usize)
+            .checked_add(lba_base_addr)
+            .and_then(|addr| addr.checked_add(offset))
+            .ok_or(EfiError::InvalidParameter)? as *mut u8;
         // SAFETY: lba_start is calculated from the base address of a valid FV, plus an offset and offset+num_bytes.
         // consistency of this data is guaranteed by checks on instantiation of the VolumeRef.
         // The FV data is expected to be 'static (i.e. permanently mapped) for the lifetime of the system.

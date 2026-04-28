@@ -195,24 +195,12 @@ pub(crate) fn smbios_record_derive(item: TokenStream) -> TokenStream {
             },
         )
     } else {
-        (
-            quote! {
-                fn string_pool(&self) -> &[alloc::string::String] {
-                    &[]
-                }
-
-                fn string_pool_mut(&mut self) -> &mut alloc::vec::Vec<alloc::string::String> {
-                    // Return a dummy mutable reference - this should never be used
-                    static mut EMPTY: alloc::vec::Vec<alloc::string::String> = alloc::vec::Vec::new();
-                    unsafe { &mut EMPTY }
-                }
-            },
-            quote! {
-                fn validate(&self) -> core::result::Result<(), #crate_path::error::SmbiosError> {
-                    Ok(())
-                }
-            },
+        return syn::Error::new(
+            record.item.span(),
+            "Missing #[string_pool] field. All SMBIOS records must have a `#[string_pool] pub string_pool: Vec<String>` field \
+             for trait conformance, even if the record has no strings (use an empty Vec).",
         )
+        .to_compile_error();
     };
 
     // Generate serialize_strings helper
@@ -384,6 +372,24 @@ mod tests {
         // Non-[u8; N] arrays are serialized via IntoBytes, not copied directly
         assert!(!output_str.contains("compile_error"));
         assert!(output_str.contains("IntoBytes"));
+    }
+
+    #[test]
+    fn test_missing_string_pool_field() {
+        let input = quote! {
+            #[derive(SmbiosRecord)]
+            #[smbios(record_type = 0x80)]
+            pub struct TestRecord {
+                pub header: SmbiosTableHeader,
+                pub field: u8,
+            }
+        };
+
+        let output = smbios_record_derive(input);
+        let output_str = output.to_string();
+        // Should error about missing string_pool field
+        assert!(output_str.contains("compile_error"));
+        assert!(output_str.contains("string_pool"));
     }
 
     #[test]

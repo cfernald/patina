@@ -9,5 +9,5 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 
-#[path = "patina_mm_integration/mod.rs"]
+#[path = "patina_mm_integration/tests_root.rs"]
 mod patina_mm_integration;

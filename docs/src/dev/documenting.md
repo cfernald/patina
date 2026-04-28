@@ -215,10 +215,10 @@ Function documentation should be available for functions of a public type (assoc
 and any public functions. At least one example is required for each function in addition to the
 other sections mentioned below.
 
-Do not provide an arguments section, the name and type of the argument should make it self-evident.
-
-Do not provide a Returns section, this should be captured in the longer description and the return
-type makes the possible return value self-evident.
+An "arguments and "return" section should only be provided in circumstances where it clarifies
+ambiguity in the function signature. In most cases, the code should be written in such a way that
+normal Rust conventions make the arguments and return type self-evident so that the documentation
+can focus on describing the behavior of the function and any non-obvious details.
 
 ```rust
 # extern crate goblin;

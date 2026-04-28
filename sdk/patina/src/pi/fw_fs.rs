@@ -14,7 +14,7 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 //!
-use core::{fmt, mem, num::Wrapping, slice};
+use core::{fmt, mem, num::Wrapping, ptr, slice};
 
 pub mod ffs;
 pub mod fv;
@@ -183,8 +183,8 @@ impl<'a> FirmwareVolume<'a> {
             Err(efi::Status::INVALID_PARAMETER)?;
         }
 
-        // SAFETY: Buffer size was validated to contain the full Header
-        let fv_header = unsafe { &*(buffer.as_ptr() as *const fv::Header) };
+        // SAFETY: Buffer size was validated to contain the full Header.
+        let fv_header = unsafe { ptr::read_unaligned(buffer.as_ptr() as *const fv::Header) };
 
         // signature: must be ASCII '_FVH'
         if fv_header.signature != u32::from_le_bytes(*b"_FVH") {

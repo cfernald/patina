@@ -354,27 +354,16 @@ impl<T: ?Sized + 'static> Deref for Service<T> {
             if let Some(service) = service.downcast_ref() {
                 service
             } else {
-                // Using core::hint::unreachable_unchecked() here results in the compiler optimizing away this entire
-                // code path, and will result in UB if the path is reached. This code path truly is unreachable as we
-                // (as patina developers) control all ways of instantiating a Service type.
+                // All construction paths (mock, from, initialize) guarantee that the downcast will succeed.
+                // unreachable! is used here instead of unreachable_unchecked to avoid UB if this invariant is
+                // ever violated (e.g., via the public From<&'static dyn Any> impl with a mismatched type).
                 //
-                // The performance impact of using this over unreachable! or panic! is about 25% improved performance
-                // in benchmarks.
-                //
-                // # SAFETY
-                // - The `Service` type tightly couples the underlying type to the `dyn Any` type for downcasting.
-                // - All ways of instantiating a `Service` type are tightly controlled to ensure that this downcast is
-                //   valid and will never fail including:
-                //   - The `mock` function, which requires a `Box<dyn T>` which is then manually leaked, ensuring the
-                //     underlying type is always available and the correct type.
-                //   - The `from` function, which is passed data from `Storage`, that is guaranteed to be the correct
-                //     type as it is generated via the `IntoService` macro and out of the hands of the user.
-                //   - The `initialize` function, which consumes another `Service` type, which has the same guarantees
-                //     as above.
-                // - If the Service is uninitialized, it will panic at the normal unreachable! macro call below.
-                // SAFETY: Service value was validated to be initialized in the Some(v) match arm.
-                // unreachable_unchecked provides optimizer hints for the impossible None case.
-                unsafe { core::hint::unreachable_unchecked() }
+                // However, this is a potential point for performance improvement in the future as the component
+                // infrastructure evolves and the number of components increases.
+                unreachable!(
+                    "Service downcast failed — this indicates a type mismatch in Service<{}> construction",
+                    core::any::type_name::<T>()
+                )
             }
         } else {
             // We use unreachable! here instead of panic! as this provides compiler hints to the optimizer. We cannot

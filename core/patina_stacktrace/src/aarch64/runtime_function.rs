@@ -88,8 +88,8 @@ impl<'a> RuntimeFunction<'a> {
                 [exception_table_rva as usize..(exception_table_rva + exception_table_size) as usize]
                 .chunks(core::mem::size_of::<u32>() * 2) // 2 u32
                 .map(|ele| {
-                    let func_start_rva = ele.read32(0).unwrap(); // unwrap() will work validated above
-                    let unwind_info = ele.read32(4).unwrap(); // unwrap() will work validated above
+                    let func_start_rva = ele.read32(0).expect("chunk is 8 bytes, offset 0 is valid");
+                    let unwind_info = ele.read32(4).expect("chunk is 8 bytes, offset 4 is valid");
 
                     let flag = unwind_info & 0x3;
 
@@ -102,7 +102,7 @@ impl<'a> RuntimeFunction<'a> {
                         0 => {
                             let xdata_rva = unwind_info as usize;
                             let xdata_header = &pe.bytes[xdata_rva..xdata_rva + 4];
-                            let xdata_header = xdata_header.read32(0).unwrap();
+                            let xdata_header = xdata_header.read32(0).expect("xdata header slice is 4 bytes");
                             (xdata_header & 0x3FFFF) * 4
                         }
                         // Packed unwind data used with a single prolog and epilog

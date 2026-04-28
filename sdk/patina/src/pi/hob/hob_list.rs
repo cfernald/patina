@@ -311,6 +311,11 @@ impl<'a> HobList<'a> {
                 }
             }
             let next_hob = hob_header as usize + current_header.length as usize;
+            // Guard against malformed HOBs: length must advance past the header to avoid infinite
+            // loops, and the addition must not overflow the address space.
+            if (current_header.length as usize) < mem::size_of::<header::Hob>() || next_hob < hob_header as usize {
+                break;
+            }
             hob_header = next_hob as *const header::Hob;
         }
     }

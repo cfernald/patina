@@ -803,7 +803,7 @@ where
             if node_is_left_child && sibling.right().is_black() {
                 sibling.left().set_black();
                 sibling.set_red();
-                if let Some(subtree_root) = Self::rotate_right(sibling.unwrap())
+                if let Some(subtree_root) = Self::rotate_right(sibling.expect("sibling must exist in case 5"))
                     && subtree_root.parent().is_none()
                 {
                     root.set(subtree_root.as_mut_ptr());
@@ -813,7 +813,7 @@ where
             } else if !node_is_left_child && sibling.left().is_black() {
                 sibling.right().set_black();
                 sibling.set_red();
-                if let Some(subtree_root) = Self::rotate_left(sibling.unwrap())
+                if let Some(subtree_root) = Self::rotate_left(sibling.expect("sibling must exist in case 5"))
                     && subtree_root.parent().is_none()
                 {
                     root.set(subtree_root.as_mut_ptr());
@@ -830,7 +830,7 @@ where
             node.parent().set_black();
             if node_is_left_child {
                 sibling.right().set_black();
-                if let Some(subtree_root) = Self::rotate_left(node.parent().unwrap())
+                if let Some(subtree_root) = Self::rotate_left(node.parent().expect("node must have parent in case 6"))
                     && subtree_root.parent().is_none()
                 {
                     root.set(subtree_root.as_mut_ptr());
@@ -838,7 +838,7 @@ where
                 }
             } else {
                 sibling.left().set_black();
-                if let Some(subtree_root) = Self::rotate_right(node.parent().unwrap())
+                if let Some(subtree_root) = Self::rotate_right(node.parent().expect("node must have parent in case 6"))
                     && subtree_root.parent().is_none()
                 {
                     root.set(subtree_root.as_mut_ptr());

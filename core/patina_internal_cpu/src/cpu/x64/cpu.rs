@@ -17,6 +17,8 @@ use patina::{
 };
 use r_efi::efi;
 
+pub const CACHE_WRITEBACK_GRANULE: u32 = 4; // Using 4 bytes following precedence set by Tianocore
+
 /// Struct to implement X64 Cpu Init.
 ///
 /// This struct cannot be used directly. It replaces the `EfiCpu` struct when compiling for the x86_64 architecture.
@@ -62,28 +64,24 @@ impl EfiCpuX64 {
     }
 
     fn initialize_gdt(&self) {
-        #[cfg(all(not(test), target_arch = "x86_64"))]
+        #[cfg(not(test))]
         gdt::init();
     }
 
     // X64 related asm functions
     fn asm_wbinvd(&self) {
-        #[cfg(all(not(test), target_arch = "x86_64"))]
-        {
-            // SAFETY: The caller is expected to ensure that they want to write back and invalidate the cache
-            unsafe {
-                asm!("wbinvd");
-            }
+        #[cfg(not(test))]
+        // SAFETY: The caller is expected to ensure that they want to write back and invalidate the cache
+        unsafe {
+            asm!("wbinvd");
         }
     }
 
     fn asm_invd(&self) {
-        #[cfg(all(not(test), target_arch = "x86_64"))]
-        {
-            // SAFETY: The caller is expected to ensure that they want to invalidate the cache without writing back
-            unsafe {
-                asm!("invd");
-            }
+        #[cfg(not(test))]
+        // SAFETY: The caller is expected to ensure that they want to invalidate the cache without writing back
+        unsafe {
+            asm!("invd");
         }
     }
 
@@ -96,12 +94,10 @@ impl EfiCpuX64 {
     // This routine only does bare-metal hardware access, so no coverage.
     #[coverage(off)]
     pub fn sleep() {
-        #[cfg(all(not(test), target_arch = "x86_64"))]
-        {
-            // SAFETY: The caller is expected to ensure that they want to halt the CPU until the next interrupt
-            unsafe {
-                asm!("hlt");
-            }
+        #[cfg(not(test))]
+        // SAFETY: The caller is expected to ensure that they want to halt the CPU until the next interrupt
+        unsafe {
+            asm!("hlt");
         }
     }
 
@@ -110,7 +106,7 @@ impl EfiCpuX64 {
     }
 
     fn initialize_fpu(&self) {
-        #[cfg(all(not(test), target_arch = "x86_64"))]
+        #[cfg(not(test))]
         // SAFETY: This assembly writes only hard coded values to CR4 register, and MMX and FPU control words. No
         // inputs are used that could violate memory safety.
         unsafe {
@@ -172,6 +168,11 @@ impl Cpu for EfiCpuX64 {
         let timer_value = self.asm_read_tsc(); // Assuming asm_read_tsc is defined elsewhere
 
         Ok((timer_value, self.timer_period))
+    }
+
+    #[coverage(off)]
+    fn cache_writeback_granule(&self) -> u32 {
+        CACHE_WRITEBACK_GRANULE
     }
 }
 

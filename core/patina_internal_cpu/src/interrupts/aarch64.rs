@@ -78,7 +78,7 @@ impl super::EfiExceptionStackTrace for ExceptionContextAArch64 {
 #[allow(unused)]
 pub fn enable_interrupts() {
     cfg_if::cfg_if! {
-        if #[cfg(all(not(test), target_arch = "aarch64"))]  {
+        if #[cfg(not(test))]  {
             write_sysreg!(reg daifclr, imm 0x02, "isb sy");
         } else {
             unimplemented!()
@@ -90,7 +90,7 @@ pub fn enable_interrupts() {
 #[allow(unused)]
 pub fn disable_interrupts() {
     cfg_if::cfg_if! {
-        if #[cfg(all(not(test), target_arch = "aarch64"))]  {
+        if #[cfg(not(test))]  {
             write_sysreg!(reg daifset, imm 0x02, "isb sy");
         } else {
             unimplemented!()
@@ -102,7 +102,7 @@ pub fn disable_interrupts() {
 #[allow(unused)]
 pub fn get_interrupt_state() -> Result<bool, EfiError> {
     cfg_if::cfg_if! {
-        if #[cfg(all(not(test), target_arch = "aarch64"))]  {
+        if #[cfg(not(test))]  {
             let daif = read_sysreg!(daif);
             Ok(daif & 0x80 == 0)
         } else {

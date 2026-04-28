@@ -37,6 +37,7 @@
 //!
 
 #![cfg_attr(all(not(feature = "std"), not(test), not(feature = "mockall")), no_std)]
+#![deny(missing_docs)]
 #![feature(coverage_attribute)]
 #![feature(allocator_api)]
 

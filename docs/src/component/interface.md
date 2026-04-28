@@ -83,14 +83,19 @@ reference the `Param` trait's [Type Implementations][patina] for a complete list
 in the function interface of a component.
 
 <!-- markdownlint-disable -->
-| Param                        | Description                                                                                                                       |
-|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| Config\<T\>                  | An immutable config value that will only be available once the underlying data has been locked.                                   |
-| ConfigMut\<T\>               | A mutable config value that will only be available while the underlying data is unlocked.                                         |
-| Hob\<T\>                     | A parsed, immutable, GUID HOB (Hand-Off Block) that is automatically parsed and registered.                                       |
-| Service\<T\>                 | A wrapper for producing and consuming services of a particular interface, `T`, that is agnostic to the underlying implementation. |
-| (P1, P2, ...)                | A Tuple where each entry implements `Param`. Useful when you need more parameters than the current parameter limit.               |
-| Option\<P\>                  | An Option, where P implements `Param`. Affects each param type differently. See [Option](#optionp) section for more details.       |
+| Param                        | Available When                   | Description                                                                                                       |
+|------------------------------|----------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| Config\<T\>                  | After config is locked           | An immutable config value that will only be available once the underlying data has been locked.                   |
+| ConfigMut\<T\>               | While config is unlocked         | A mutable config value that will only be available while the underlying data is unlocked.                         |
+| Hob\<T\>                     | If GUID HOB exists in HOB list   | A parsed, immutable, GUID HOB (Hand-Off Block) that is automatically parsed and registered.                       |
+| Service\<T\>                 | After service is registered      | A wrapper for producing and consuming services of a particular interface, `T`, that is agnostic to the underlying implementation. |
+| Commands                     | Always                           | A deferred command queue for registering services and configs without conflicting with other params. See [Commands](#commands) section. |
+| Handle                       | After image handle is set        | The DXE Core's image handle. See [Handle](#handle) section.                                                       |
+| StandardBootServices         | After boot services init         | UEFI Boot Services access. See [StandardBootServices](#standardbootservices) section.                             |
+| StandardRuntimeServices      | After runtime services init      | UEFI Runtime Services access. See [StandardRuntimeServices](#standardruntimeservices) section.                    |
+| &Storage / &mut Storage      | Always                           | Direct storage access. Conflicts with `Config`/`ConfigMut` params. See [Storage Access](#storage-access) section. |
+| (P1, P2, ...)                | When all inner params available  | A Tuple where each entry implements `Param`. Useful when you need more parameters than the current parameter limit. |
+| Option\<P\>                  | Immediately                      | An Option, where P implements `Param`. Affects each param type differently. See [Option](#optionp) section.       |
 <!-- markdownlint-enable -->
 
 ``` admonish warning
@@ -190,6 +195,93 @@ allows them stash it for their own needs post component execution.
 ```
 
 This type comes with a `mock(...)` method to make unit testing simple.
+
+### Commands
+
+`Commands` is a deferred command queue that allows a component to register services and configuration values without
+conflicting with other parameters like `Config<T>` or `ConfigMut<T>`. Instead of modifying `Storage` directly during
+component execution, the changes are queued and applied after the component finishes.
+
+```rust
+# extern crate patina;
+use patina::{
+    component::{component, params::Commands},
+    error::Result,
+};
+
+# struct MyServiceImpl;
+# use patina::component::service::IntoService;
+# #[derive(Debug, IntoService)]
+# #[service(dyn core::fmt::Debug)]
+# struct DebugService;
+
+pub struct MyComponent;
+
+#[component]
+impl MyComponent {
+    fn entry_point(self, mut cmds: Commands) -> Result<()> {
+        cmds.add_config(42i32);
+        cmds.add_service(DebugService);
+        Ok(())
+    }
+}
+```
+
+A `mock()` method is available to simplify writing unit tests.
+
+### Handle
+
+`Handle` provides the DXE Core's image handle for use cases when it is needed.
+
+```admonish warning
+This handle is the DXE Core's image handle, shared across all components. It should not be used as a
+`DriverBindingHandle` in `EFI_DRIVER_BINDING_PROTOCOL`, as multiple components sharing the same agent handle will
+conflict with protocol open/close tracking in the UEFI driver model.
+```
+
+`Handle` implements `Deref` to the underlying `r_efi::efi::Handle`, so it can be dereferenced directly.
+
+This type comes with a `mock(...)` method to make unit testing simple.
+
+### StandardBootServices
+
+`StandardBootServices` provides immutable access to UEFI Boot Services functions. It is available once boot services
+have been initialized. Each component receives its own cloned instance.
+
+```rust
+# extern crate patina;
+use patina::{
+    boot_services::StandardBootServices,
+    component::component,
+    error::Result,
+};
+
+pub struct MyComponent;
+
+#[component]
+impl MyComponent {
+    fn entry_point(self, bs: StandardBootServices) -> Result<()> {
+        // Use boot services functions...
+        Ok(())
+    }
+}
+```
+
+### StandardRuntimeServices
+
+`StandardRuntimeServices` provides immutable access to UEFI Runtime Services functions. It is available once runtime
+services have been initialized, which typically occurs later in the boot process than boot services.
+
+### Storage Access
+
+`&Storage` and `&mut Storage` provide direct access to the component storage. They have some conflict rules:
+
+- `&Storage` conflicts with `ConfigMut<T>` and `&mut Storage`.
+- `&mut Storage` conflicts with `Config<T>`, `ConfigMut<T>`, `&Storage`, and other `&mut Storage` parameters.
+
+Because of these conflicts, prefer using `Commands` for registering services and configs, and use the typed `Config<T>`
+/ `ConfigMut<T>` / `Service<T>` parameters for reading values. Direct storage access is only needed for advanced use
+cases.
 
 ### Option\<P\>
 

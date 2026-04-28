@@ -90,9 +90,9 @@ impl<'a> RuntimeFunction<'a> {
             .chunks(core::mem::size_of::<u32>() * 3) // 3 u32
             .map(|ele| {
                 (
-                    ele.read32(0).unwrap(), // start_rva - unwrap() will work validated above
-                    ele.read32(4).unwrap(), // end_rva - unwrap() will work validated above
-                    ele.read32(8).unwrap(), // unwindinfo_rva - unwrap() will work validated above
+                    ele.read32(0).expect("chunk is 12 bytes, offset 0 is valid"),
+                    ele.read32(4).expect("chunk is 12 bytes, offset 4 is valid"),
+                    ele.read32(8).expect("chunk is 12 bytes, offset 8 is valid"),
                 )
             })
             .find(|ele| ele.0 <= rip_rva && rip_rva < ele.1)
