@@ -1803,9 +1803,9 @@ mod tests {
                 core::ptr::null_mut(),
                 Some(image.as_slice()),
             );
-            // Check for either load error or unsupported. On aarch64, goblin will report parse
-            // the resources as well and fail due to the invalidate directory table size and
-            // unsupported will be returned.
+            // Check for either load error or unsupported. On aarch64, goblin will parse
+            // the resources section as well and fail due to the invalidate directory table size,
+            // returning unsupported.
             assert!(matches!(
                 status,
                 Err(ImageStatus::LoadError(EfiError::LoadError)) | Err(ImageStatus::LoadError(EfiError::Unsupported))
