@@ -1804,7 +1804,7 @@ mod tests {
                 Some(image.as_slice()),
             );
             // Check for either load error or unsupported. On aarch64, goblin will parse
-            // the resources section as well and fail due to the invalidate directory table size,
+            // the resources section as well and fail due to the invalid directory table size,
             // returning unsupported.
             assert!(matches!(
                 status,
