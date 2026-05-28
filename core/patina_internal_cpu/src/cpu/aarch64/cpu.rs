@@ -29,13 +29,24 @@ impl EfiCpuAarch64 {
     }
 
     // AArch64 related cache functions
-    fn cache_range_operation(&self, _start: efi::PhysicalAddress, _length: u64, _op: CpuFlushType) {
-        let cacheline_alignment = self.data_cache_line_len() - 1;
-        let mut aligned_addr = _start - (_start & cacheline_alignment);
-        let end_addr = _start + _length;
+    fn cache_range_operation(&self, start: efi::PhysicalAddress, length: u64, op: CpuFlushType) {
+        if length == 0 {
+            return;
+        }
 
-        loop {
-            match _op {
+        let cacheline_size = self.data_cache_line_len();
+        let cacheline_mask = cacheline_size - 1;
+        let mut aligned_addr = start & !cacheline_mask;
+        let end_addr = match start.checked_add(length) {
+            Some(end_addr) => end_addr,
+            None => {
+                debug_assert!(false, "Cache range overflow");
+                return;
+            }
+        };
+
+        while aligned_addr < end_addr {
+            match op {
                 CpuFlushType::EfiCpuFlushTypeWriteBack => self.clean_data_entry_by_mva(aligned_addr),
                 CpuFlushType::EfiCpuFlushTypeInvalidate => self.invalidate_data_cache_entry_by_mva(aligned_addr),
                 CpuFlushType::EfiCpuFlushTypeWriteBackInvalidate => {
@@ -43,9 +54,9 @@ impl EfiCpuAarch64 {
                 }
             }
 
-            aligned_addr += cacheline_alignment;
-            if aligned_addr >= end_addr {
-                break;
+            match aligned_addr.checked_add(cacheline_size) {
+                Some(next) => aligned_addr = next,
+                None => break,
             }
         }
 
