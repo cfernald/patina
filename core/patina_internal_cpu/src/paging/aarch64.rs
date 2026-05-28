@@ -10,9 +10,19 @@
 //!
 use patina_paging::{MemoryAttributes, PageTable, PagingType, PtError, aarch64::AArch64PageTable};
 
-use crate::paging::{CacheAttributeValue, PatinaPageTable};
+use crate::{
+    cpu::aarch64::flush_data_cache_range,
+    paging::{CacheAttributeValue, PatinaPageTable},
+};
+use patina::pi::protocols::cpu_arch::CpuFlushType;
 use patina_paging::page_allocator::PageAllocator;
 use r_efi::efi;
+
+/// Memory attributes that indicate cached mappings (writeback or write-through).
+const CACHED_ATTRS: MemoryAttributes = MemoryAttributes::Writeback.union(MemoryAttributes::WriteThrough);
+
+/// Memory attributes that indicate uncached mappings (uncached or write-combining).
+const UNCACHED_ATTRS: MemoryAttributes = MemoryAttributes::Uncached.union(MemoryAttributes::WriteCombining);
 
 /// The aarch64 paging implementation. It acts as a bridge between the EFI CPU
 /// Architecture Protocol and the aarch64 paging implementation.
@@ -49,6 +59,21 @@ where
 
     fn dump_page_tables(&self, address: u64, size: u64) -> Result<(), PtError> {
         self.paging.dump_page_tables(address, size)
+    }
+
+    fn handle_cacheability_change(
+        &self,
+        address: u64,
+        size: u64,
+        old_cache_attributes: MemoryAttributes,
+        new_cache_attributes: MemoryAttributes,
+    ) {
+        // If the region was previously cached (WB/WT) and is now uncached (UC/WC),
+        // clean and invalidate the data cache for the range so that any dirty lines
+        // are written back to memory before subsequent accesses bypass the cache.
+        if old_cache_attributes.intersects(CACHED_ATTRS) && new_cache_attributes.intersects(UNCACHED_ATTRS) {
+            flush_data_cache_range(address, size, CpuFlushType::EfiCpuFlushTypeWriteBackInvalidate);
+        }
     }
 }
 
@@ -147,5 +172,11 @@ mod tests {
         let result = paging.query_memory_region(0x1000, 0x1000);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), MemoryAttributes::Writeback | MemoryAttributes::Uncached);
+    }
+
+    #[test]
+    fn test_handle_cacheability_change() {
+        let paging = EfiCpuPagingAArch64 { paging: MockPageTable::new() };
+        paging.handle_cacheability_change(0x1000, 0x1000, MemoryAttributes::Writeback, MemoryAttributes::Uncached);
     }
 }

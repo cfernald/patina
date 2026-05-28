@@ -173,6 +173,15 @@ impl PatinaPageTable for MockPageTable {
         // No-op for testing
         Ok(())
     }
+
+    fn handle_cacheability_change(
+        &self,
+        _address: u64,
+        _size: u64,
+        _old_cache_attributes: MemoryAttributes,
+        _new_cache_attributes: MemoryAttributes,
+    ) {
+    }
 }
 
 // SAFETY: MockPageTable uses interior mutability for test-only state and is not shared across threads in tests.
@@ -238,6 +247,16 @@ impl PatinaPageTable for MockPageTableWrapper {
 
     fn dump_page_tables(&self, address: u64, size: u64) -> Result<(), PtError> {
         self.inner.borrow().dump_page_tables(address, size)
+    }
+
+    fn handle_cacheability_change(
+        &self,
+        address: u64,
+        size: u64,
+        old_cache_attributes: MemoryAttributes,
+        new_cache_attributes: MemoryAttributes,
+    ) {
+        self.inner.borrow().handle_cacheability_change(address, size, old_cache_attributes, new_cache_attributes)
     }
 }
 

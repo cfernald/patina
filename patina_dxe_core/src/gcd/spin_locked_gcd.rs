@@ -2132,6 +2132,16 @@ impl SpinLockedGcd {
                         if let Some(old_cache_attrs) = old_cache_attributes
                             && old_cache_attrs != new_cache_attributes
                         {
+                            // Some cache maintenance may be required after all attributes have been applied to clean
+                            // up any stale cache entries before the memory is accessed. This is done after the attributes
+                            // were applied to ensure no new unexpected cache lines are created.
+                            page_table.handle_cacheability_change(
+                                base_address as u64,
+                                len as u64,
+                                old_cache_attrs,
+                                new_cache_attributes,
+                            );
+
                             // in this case, we had caching attributes for this region and they do not match the newly
                             // set attributes
                             log::trace!(

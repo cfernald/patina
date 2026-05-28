@@ -51,6 +51,15 @@ where
     fn dump_page_tables(&self, _address: u64, _size: u64) -> Result<(), PtError> {
         Ok(())
     }
+
+    fn handle_cacheability_change(
+        &self,
+        _address: u64,
+        _size: u64,
+        _old_cache_attributes: MemoryAttributes,
+        _new_cache_attributes: MemoryAttributes,
+    ) {
+    }
 }
 
 /// Used to specify that this architecture paging implementation is not supported.

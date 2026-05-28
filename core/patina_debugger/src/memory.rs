@@ -193,6 +193,13 @@ mod tests {
             fn install_page_table(&mut self) -> Result<(), PtError>;
             fn query_memory_region(&self, address: u64, size: u64) -> Result<MemoryAttributes, (PtError, CacheAttributeValue)>;
             fn dump_page_tables(&self, address: u64, size: u64) -> Result<(), PtError>;
+            fn handle_cacheability_change(
+                &self,
+                address: u64,
+                size: u64,
+                old_cache_attributes: MemoryAttributes,
+                new_cache_attributes: MemoryAttributes,
+            );
         }
     }
 

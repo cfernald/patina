@@ -6,7 +6,7 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 //!
-use crate::cpu::Cpu;
+use crate::cpu::{Cpu, aarch64::cache};
 #[cfg(not(test))]
 use core::arch::asm;
 use patina::{
@@ -28,87 +28,6 @@ impl EfiCpuAarch64 {
         Ok(())
     }
 
-    // AArch64 related cache functions
-    fn cache_range_operation(&self, start: efi::PhysicalAddress, length: u64, op: CpuFlushType) {
-        if length == 0 {
-            return;
-        }
-
-        let cacheline_size = self.data_cache_line_len();
-        let cacheline_mask = cacheline_size - 1;
-        let mut aligned_addr = start & !cacheline_mask;
-        let end_addr = match start.checked_add(length) {
-            Some(end_addr) => end_addr,
-            None => {
-                debug_assert!(false, "Cache range overflow");
-                return;
-            }
-        };
-
-        while aligned_addr < end_addr {
-            match op {
-                CpuFlushType::EfiCpuFlushTypeWriteBack => self.clean_data_entry_by_mva(aligned_addr),
-                CpuFlushType::EfiCpuFlushTypeInvalidate => self.invalidate_data_cache_entry_by_mva(aligned_addr),
-                CpuFlushType::EfiCpuFlushTypeWriteBackInvalidate => {
-                    self.clean_and_invalidate_data_entry_by_mva(aligned_addr)
-                }
-            }
-
-            match aligned_addr.checked_add(cacheline_size) {
-                Some(next) => aligned_addr = next,
-                None => break,
-            }
-        }
-
-        #[cfg(not(test))]
-        // we have a data barrier after all cache lines have had the operation performed on them as an optimization
-        // SAFETY: a data barrier has no impact on safety invariants.
-        unsafe {
-            asm!("dsb sy", options(nostack));
-        }
-    }
-
-    fn clean_data_entry_by_mva(&self, _mva: efi::PhysicalAddress) {
-        #[cfg(not(test))]
-        // SAFETY: Cleaning the data cache has no impact on safety invariants.
-        unsafe {
-            asm!("dc cvac, {}", in(reg) _mva, options(nostack, preserves_flags));
-        }
-    }
-
-    fn invalidate_data_cache_entry_by_mva(&self, _mva: efi::PhysicalAddress) {
-        #[cfg(not(test))]
-        // SAFETY: Invalidating the data cache does not impact safety checks. It
-        // does have the potential to corrupt memory if used incorrectly, but the caller is
-        // expected to ensure that they are using this function correctly.
-        unsafe {
-            asm!("dc ivac, {}", in(reg) _mva, options(nostack, preserves_flags));
-        }
-    }
-
-    fn clean_and_invalidate_data_entry_by_mva(&self, _mva: efi::PhysicalAddress) {
-        #[cfg(not(test))]
-        // SAFETY: Cleaning and invalidating the data cache does not impact safety invariants.
-        unsafe {
-            asm!("dc civac, {}", in(reg) _mva, options(nostack, preserves_flags));
-        }
-    }
-
-    fn data_cache_line_len(&self) -> u64 {
-        #[cfg(test)]
-        let ctr_el0 = 0x0004_0000; // Provides line size of 64 in test mode
-
-        #[cfg(not(test))]
-        // SAFETY: Reading ctr_el0 has no impact on safety invariants
-        let ctr_el0 = unsafe {
-            let ctr_el0: u64;
-            asm!("mrs {}, ctr_el0", out(reg) ctr_el0);
-            ctr_el0
-        };
-
-        4 << ((ctr_el0 >> 16) & 0xf)
-    }
-
     /// Causes the CPU to enter a low power state until the next interrupt.
     // This routine only does bare-metal hardware access, so no coverage.
     #[coverage(off)]
@@ -128,7 +47,7 @@ impl Cpu for EfiCpuAarch64 {
         length: u64,
         flush_type: CpuFlushType,
     ) -> Result<(), EfiError> {
-        self.cache_range_operation(start, length, flush_type);
+        cache::flush_data_cache_range(start, length, flush_type);
         Ok(())
     }
 

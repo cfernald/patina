@@ -94,6 +94,16 @@ where
     fn dump_page_tables(&self, address: u64, size: u64) -> Result<(), PtError> {
         self.paging.dump_page_tables(address, size)
     }
+
+    fn handle_cacheability_change(
+        &self,
+        _address: u64,
+        _size: u64,
+        _old_cache_attributes: MemoryAttributes,
+        _new_cache_attributes: MemoryAttributes,
+    ) {
+        // Cache consistency is already handled by the MTRR library. No further action is needed.
+    }
 }
 
 fn apply_caching_attributes<M: Mtrr>(
@@ -277,5 +287,11 @@ mod tests {
         let result = paging.query_memory_region(0x1000, 0x1000);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), MemoryAttributes::Writeback | MemoryAttributes::Uncached);
+    }
+
+    #[test]
+    fn test_handle_cacheability_change() {
+        let paging = EfiCpuPagingX64 { paging: MockPageTable::new(), mtrr: MockMtrr::new() };
+        paging.handle_cacheability_change(0x1000, 0x1000, MemoryAttributes::Writeback, MemoryAttributes::Uncached);
     }
 }

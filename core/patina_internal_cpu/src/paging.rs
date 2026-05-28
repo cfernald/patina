@@ -103,4 +103,20 @@ pub trait PatinaPageTable {
     /// * `address` - The memory address to map.
     /// * `size` - The memory size to map.
     fn dump_page_tables(&self, address: u64, size: u64) -> Result<(), PtError>;
+
+    /// Function to handle a change in the cacheability of a memory region.
+    /// This function is called when the cacheability of a memory region changes.
+    ///
+    /// ## Arguments
+    /// * `address` - The memory address of the region.
+    /// * `size` - The size of the region.
+    /// * `old_cache_attributes` - The old cache attributes for the region.
+    /// * `new_cache_attributes` - The new cache attributes for the region.
+    fn handle_cacheability_change(
+        &self,
+        address: u64,
+        size: u64,
+        old_cache_attributes: MemoryAttributes,
+        new_cache_attributes: MemoryAttributes,
+    );
 }

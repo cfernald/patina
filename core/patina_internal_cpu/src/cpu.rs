@@ -18,7 +18,7 @@ use patina::{
 use r_efi::efi;
 
 #[cfg(target_arch = "aarch64")]
-mod aarch64;
+pub(crate) mod aarch64;
 #[cfg(not(target_os = "uefi"))]
 mod stub;
 #[cfg(target_arch = "x86_64")]
