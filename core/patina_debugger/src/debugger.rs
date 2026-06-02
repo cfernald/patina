@@ -77,8 +77,8 @@ where
     exception_types: &'static [usize],
     /// Controls what the debugger does with logging.
     log_policy: DebuggerLoggingPolicy,
-    /// Whether initializing the transport should be skipped.
-    no_transport_init: bool,
+    /// Whether the transport will be initialized.
+    transport_init: bool,
     /// Debugger enabled state.
     enabled: AtomicBool,
     /// Debugger Initialized state
@@ -120,7 +120,7 @@ impl<T: SerialIO> PatinaDebugger<T> {
         PatinaDebugger {
             transport,
             log_policy: DebuggerLoggingPolicy::SuspendLogging,
-            no_transport_init: false,
+            transport_init: false,
             exception_types: SystemArch::DEFAULT_EXCEPTION_TYPES,
             enabled: AtomicBool::new(false),
             initialized: AtomicBool::new(false),
@@ -156,8 +156,21 @@ impl<T: SerialIO> PatinaDebugger<T> {
 
     /// Prevents the debugger from initializing the transport. This is suggested in
     /// cases where the transport is shared with the logging device.
-    pub const fn without_transport_init(mut self) -> Self {
-        self.no_transport_init = true;
+    ///
+    /// ## DEPRECATED
+    ///
+    /// The transport is no longer initialized by default. This function has no effect and is deprecated. It will be
+    /// removed in a future version.
+    ///
+    #[deprecated(note = "This function has no effect and is deprecated. It will be removed in a future version.")]
+    pub const fn without_transport_init(self) -> Self {
+        self
+    }
+
+    /// Enables the debugger to initialize the transport. This is typically only required if the transport is not shared
+    /// with the logging device. Initializing the transport when it is shared may lead to unexpected behavior.
+    pub const fn with_transport_init(mut self, init: bool) -> Self {
+        self.transport_init = init;
         self
     }
 
@@ -343,7 +356,7 @@ impl<T: SerialIO> Debugger for PatinaDebugger<T> {
         log::info!("Initializing debugger.");
 
         // Initialize the underlying transport.
-        if !self.no_transport_init {
+        if self.transport_init {
             self.transport.init();
         }
 
