@@ -1845,6 +1845,10 @@ mod tests {
     #[test]
     fn test_init_driver_services() {
         with_locked_state(|| {
+            // SAFETY: Test code only - initializing test infrastructure within the global test lock.
+            unsafe {
+                test_support::init_test_gcd(None);
+            }
             let mut st = EfiSystemTable::allocate_new_table();
             init_driver_services(&mut st);
 
