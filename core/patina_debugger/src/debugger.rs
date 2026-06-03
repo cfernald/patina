@@ -154,23 +154,25 @@ impl<T: SerialIO> PatinaDebugger<T> {
         self
     }
 
-    /// Prevents the debugger from initializing the transport. This is suggested in
-    /// cases where the transport is shared with the logging device.
+    /// Deprecated API that previously prevented the debugger from initializing the transport. This is now the default
+    /// behavior and so this function now has no effect and should not be used. This will be removed in a future version.
     ///
     /// ## DEPRECATED
     ///
     /// The transport is no longer initialized by default. This function has no effect and is deprecated. It will be
-    /// removed in a future version.
+    /// removed in a future version. For implementations that require transport initialization, use `with_transport_init`.
     ///
-    #[deprecated(note = "This function has no effect and is deprecated. It will be removed in a future version.")]
+    #[deprecated(
+        note = "This function has no effect and is deprecated. It will be removed in a future version. This call may be safely removed."
+    )]
     pub const fn without_transport_init(self) -> Self {
         self
     }
 
     /// Enables the debugger to initialize the transport. This is typically only required if the transport is not shared
     /// with the logging device. Initializing the transport when it is shared may lead to unexpected behavior.
-    pub const fn with_transport_init(mut self, init: bool) -> Self {
-        self.transport_init = init;
+    pub const fn with_transport_init(mut self) -> Self {
+        self.transport_init = true;
         self
     }
 

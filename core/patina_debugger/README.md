@@ -44,8 +44,8 @@ The self-hosted debugger is lightweight and tightly integrated with Patina, offe
 ## Platform Integration
 
 1. Instantiate a `PatinaDebugger` with the platform UART configuration (for example, `Uart16550::Io { base: 0x3F8 }`).
-2. Apply any policy overrides such as `.with_force_enable`, `.with_log_policy`, or `.without_transport_init` when
-   logging shares the transport.
+2. Apply any policy overrides such as `.with_force_enable`, `.with_log_policy`, or `.with_transport_init` when
+   if the debugger must initialize the transport.
 3. Register the debugger using `patina_debugger::set_debugger(&DEBUGGER)` before the Patina DXE Core starts dispatching
    components.
 4. Call `patina_debugger::initialize(&mut interrupt_manager)` during platform bring-up so the core installs exception
@@ -79,7 +79,8 @@ In addition, active examples are available in the
 
 Instantiate the static `PatinaDebugger` struct to match your device. The main configuration is
 setting the debugger transport, usually a serial port. If only one serial port is available, it may
-be shared with logging. In this case use `without_transport_init()` to avoid port contention.
+be shared with logging. The the debugger uses a separate transport `with_transport_init` ensures the
+debugger will call initialize for the `SerialIO` implementation.
 
 Example setup:
 
@@ -92,7 +93,6 @@ const _ENABLE_DEBUGGER: bool = false;
 #[cfg(feature = "build_debugger")]
 static DEBUGGER: patina_debugger::PatinaDebugger<UartPl011> =
     patina_debugger::PatinaDebugger::new(UartPl011::new(0x6000_0000))
-        .without_transport_init()
         .with_force_enabled(_ENABLE_DEBUGGER);
 ```
 
