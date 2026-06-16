@@ -177,6 +177,7 @@ words:
   - rdmsr
   - rdram
   - rdtsc
+  - reborrow
   - reentrancy
   - regsvr
   - relia
@@ -223,7 +224,11 @@ words:
   - variadics
   - vcvarsamd
   - vcvarsarm
+  - virtio
+  - virtq
+  - virtqueue
   - vlvesa
+  - vring
   - vtable
   - wakeup
   - wasip

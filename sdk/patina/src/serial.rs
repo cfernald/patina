@@ -20,6 +20,7 @@ pub trait SerialIO: Sync {
 }
 
 pub mod uart;
+pub mod virtio;
 
 #[cfg(feature = "std")]
 mod std;
