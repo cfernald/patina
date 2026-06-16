@@ -9,6 +9,10 @@
 //! Portions Copyright 2023 The arm-gic Authors.
 //! arm-gic is dual-licensed under Apache 2.0 and MIT terms.
 
+pub(super) struct AArch64;
+
+impl super::ArchSupport for AArch64 {}
+
 /// Reads and returns the value of the given aarch64 system register.
 #[macro_export]
 macro_rules! read_sysreg {
@@ -126,4 +130,19 @@ macro_rules! write_sysreg {
             }
         }
     };
+}
+
+impl super::Interrupts for AArch64 {
+    fn enable_interrupts() {
+        write_sysreg!(reg daifclr, imm 0x02, "isb sy");
+    }
+
+    fn disable_interrupts() {
+        write_sysreg!(reg daifset, imm 0x02, "isb sy");
+    }
+
+    fn interrupts_enabled() -> bool {
+        let daif = read_sysreg!(daif);
+        daif & 0x80 == 0
+    }
 }
