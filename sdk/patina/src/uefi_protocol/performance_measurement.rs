@@ -17,7 +17,7 @@ use core::{
 
 use r_efi::efi;
 
-use crate::{performance::measurement::CallerIdentifier, uefi_protocol::ProtocolInterface};
+use crate::uefi_protocol::ProtocolInterface;
 
 /// GUID for the EDKII Performance Measurement Protocol.
 pub const EDKII_PERFORMANCE_MEASUREMENT_PROTOCOL_GUID: crate::BinaryGuid =
@@ -49,17 +49,6 @@ pub type CreateMeasurementUefi = unsafe extern "efiapi" fn(
     identifier: u32,
     attribute: PerfAttribute,
 ) -> efi::Status;
-
-/// Function to log performance record with event description and a timestamp.
-pub type CreateMeasurement = fn(
-    caller_identifier: CallerIdentifier,
-    guid: Option<&efi::Guid>,
-    string: Option<&str>,
-    ticker: u64,
-    address: usize,
-    identifier: u16,
-    attribute: PerfAttribute,
-) -> Result<(), crate::performance::error::Error>;
 
 /// EDKII defined Performance Measurement Protocol structure.
 pub struct EdkiiPerformanceMeasurement {
