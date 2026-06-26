@@ -1,6 +1,8 @@
 //! Patina Performance Protocol
 //!
-//! Defines the interface for the performance measurement UEFI protocol.
+//! Defines the interface for the performance measurement UEFI protocol. The protocol is produced by this component;
+//! the actual record building and state tracking is delegated to the [`PerformanceMeasurement`] service owned by the
+//! DXE Core.
 //!
 //! ## License
 //!
@@ -10,25 +12,71 @@
 //!
 
 use core::{
+    cell::OnceCell,
     ffi::{CStr, c_char, c_void},
     sync::atomic::{AtomicBool, Ordering},
 };
 
 use alloc::string::ToString;
 use patina::{
+    component::service::{Service, performance::PerformanceMeasurement},
     performance::{
         error::Error,
-        measurement::{CallerIdentifier, create_performance_measurement},
+        measurement::CallerIdentifier,
         record::known::{KnownPerfId, KnownPerfToken},
     },
     uefi_protocol::performance_measurement::PerfAttribute,
 };
 use r_efi::efi;
 
+/// Global holder for the performance service so the C-ABI protocol function can reach it.
+///
+/// The EDK II Performance Measurement protocol exposes a bare `extern "efiapi"` function pointer that cannot capture
+/// the injected [`Service`]. The service is therefore stashed here once during component initialization and read back
+/// by [`create_performance_measurement_efiapi`].
+struct ServiceHolder {
+    service: OnceCell<Service<dyn PerformanceMeasurement>>,
+    initializing: AtomicBool,
+}
+
+// SAFETY: All writes go through `set`, which is serialized by the `initializing` flag. Reads via `get` only observe a
+// fully-initialized value. `Service` is itself `Send + Sync`.
+unsafe impl Sync for ServiceHolder {}
+
+impl ServiceHolder {
+    const fn new() -> Self {
+        Self { service: OnceCell::new(), initializing: AtomicBool::new(false) }
+    }
+
+    fn set(&self, service: Service<dyn PerformanceMeasurement>) -> Result<(), &'static str> {
+        if self.initializing.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+            let result = self.service.set(service).map_err(|_| "Performance service already set");
+            self.initializing.store(false, Ordering::Release);
+            return result;
+        }
+        Err("Performance service is currently being set elsewhere")
+    }
+
+    fn get(&self) -> Option<&Service<dyn PerformanceMeasurement>> {
+        if !self.initializing.load(Ordering::Acquire) { self.service.get() } else { None }
+    }
+}
+
+static PERF_SERVICE: ServiceHolder = ServiceHolder::new();
+
+/// Registers the performance service used by the EDK II Performance Measurement protocol function.
+///
+/// ## Errors
+///
+/// Returns an error string if the service was already registered.
+pub(crate) fn set_performance_service(service: Service<dyn PerformanceMeasurement>) -> Result<(), &'static str> {
+    PERF_SERVICE.set(service)
+}
+
 #[cfg_attr(coverage_nightly, coverage(off))]
 // EDK II Performance Measurement Protocol implementation.
 //
-/// Skip coverage as this function is tested via the generic version, (_create_performance_measurement).
+/// Skip coverage as the record-building logic it delegates to is tested in the DXE Core service.
 ///
 /// # Safety
 /// `string` must be a valid C string pointer.
@@ -83,15 +131,13 @@ pub(crate) unsafe extern "efiapi" fn create_performance_measurement_efiapi(
             None => return efi::Status::INVALID_PARAMETER,
         }
     };
-    match create_performance_measurement(
-        caller_identifier,
-        guid,
-        string.as_deref(),
-        ticker,
-        address,
-        perf_id,
-        attribute,
-    ) {
+
+    let Some(service) = PERF_SERVICE.get() else {
+        log::error!("Performance: create_performance_measurement_efiapi called before service registration.");
+        return efi::Status::NOT_READY;
+    };
+
+    match service.create_measurement(caller_identifier, guid, string.as_deref(), ticker, address, perf_id, attribute) {
         Ok(_) => efi::Status::SUCCESS,
         Err(Error::OutOfResources) => {
             static HAS_BEEN_LOGGED: AtomicBool = AtomicBool::new(false);
