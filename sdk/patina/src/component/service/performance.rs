@@ -9,8 +9,6 @@
 use r_efi::efi;
 
 use crate::{
-    boot_services::StandardBootServices,
-    component::service::{Service, perf_timer::ArchTimerFunctionality},
     performance::{
         Measurement,
         error::Error,
@@ -47,6 +45,15 @@ pub trait PerformanceMeasurement: Send + Sync {
         perf_id: u16,
         attribute: PerfAttribute,
     ) -> Result<(), Error>;
+
+    /// Adds an already-formed generic performance record to the FBPT.
+    fn add_generic_record(&self, record: GenericPerformanceRecord<&[u8]>) -> Result<(), Error>;
+
+    /// Returns the number of bytes that must be allocated to publish the Firmware Basic Boot Performance Table.
+    fn published_table_size(&self) -> Result<usize, Error>;
+
+    /// Serializes the tracked records into the caller-provided `buffer` and puts the table into a published state.
+    fn publish_table(&self, buffer: &'static mut [u8]) -> Result<(), Error>;
 
     /// Begins performance measurement of start image in core.
     fn perf_image_start_begin(&self, module_handle: efi::Handle) {

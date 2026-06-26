@@ -9,8 +9,6 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 pub mod error;
-pub mod globals;
-pub mod logging;
 pub mod measurement;
 pub mod record;
 pub mod table;

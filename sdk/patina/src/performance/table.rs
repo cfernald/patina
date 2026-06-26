@@ -15,15 +15,11 @@ use alloc::vec::Vec;
 use core::{
     fmt::Debug,
     marker::Sized,
-    mem, ptr, slice,
+    mem, ptr,
     sync::atomic::{AtomicPtr, Ordering},
 };
 
 use crate::{
-    base::UEFI_PAGE_SIZE,
-    boot_services::{BootServices, allocation::AllocType},
-    efi_types::EfiMemoryType,
-    error::EfiError,
     performance::{
         self,
         error::Error,
@@ -54,13 +50,11 @@ pub trait FirmwareBasicBootPerfTable: Sized {
     #[cfg_attr(test, mockall::concretize)]
     fn add_record<T: PerformanceRecord>(&mut self, record: T) -> Result<(), Error>;
 
-    /// Report table allocate new space of memory and move the table to a specific place so it can be found later, the address where the table is allocated is returned.
-    /// Additional memory is allocated so the table can still grow in the future step.
-    fn report_table<B: BootServices + 'static>(
-        &mut self,
-        address: Option<usize>,
-        boot_services: &B,
-    ) -> Result<usize, Error>;
+    /// Returns the number of bytes that must be allocated to publish the table.
+    fn published_table_size(&self) -> usize;
+
+    /// Returns [`Error::BufferTooSmall`] if `buffer` is not large enough to hold the table.
+    fn publish_table(&mut self, buffer: &'static mut [u8]) -> Result<usize, Error>;
 }
 
 /// Firmware Basic Boot Performance Table (FBPT)
@@ -105,41 +99,6 @@ impl FBPT {
         + performance::record::PERFORMANCE_RECORD_HEADER_SIZE
         + FirmwareBasicBootPerfDataRecord::data_size()
     }
-
-    fn allocate_table_buffer(
-        &self,
-        previous_address: Option<usize>,
-        boot_services: &impl BootServices,
-    ) -> Result<&'static mut [u8], EfiError> {
-        let allocation_size = Self::size_of_empty_table() + self.other_records.size() + PUBLISHED_FBPT_EXTRA_SPACE;
-        let allocation_nb_page = allocation_size.div_ceil(UEFI_PAGE_SIZE);
-        let allocation_size = allocation_nb_page * UEFI_PAGE_SIZE;
-
-        let address = previous_address
-            .and_then(|address| {
-                boot_services
-                    .allocate_pages(AllocType::Address(address), EfiMemoryType::ReservedMemoryType, allocation_nb_page)
-                    .ok()
-            })
-            .map_or_else(
-                || {
-                    // Allocate at a new address if no address found or if the previous address
-                    // allocation failed. `AllocType::MaxAddress` requests any physical address
-                    // below the given bound (u32::MAX = 4 GiB). The firmware chooses the actual
-                    // address, so no specific physical address is supplied by the caller and the
-                    // safety contract of `allocate_pages` is trivially satisfied.
-                    boot_services.allocate_pages(
-                        AllocType::MaxAddress(u32::MAX as usize),
-                        EfiMemoryType::ReservedMemoryType,
-                        allocation_nb_page,
-                    )
-                },
-                Result::Ok,
-            )? as *mut u8;
-
-        // SAFETY: the allocation at this address was of size `allocation_size`
-        Ok(unsafe { slice::from_raw_parts_mut(address, allocation_size) })
-    }
 }
 
 impl FirmwareBasicBootPerfTable for FBPT {
@@ -162,26 +121,22 @@ impl FirmwareBasicBootPerfTable for FBPT {
         Ok(())
     }
 
-    fn report_table<B: BootServices + 'static>(
-        &mut self,
-        address: Option<usize>,
-        boot_services: &B,
-    ) -> Result<usize, Error> {
-        let fbpt_buffer = self.allocate_table_buffer(address, boot_services)?;
+    fn published_table_size(&self) -> usize {
+        Self::size_of_empty_table() + self.other_records.size() + PUBLISHED_FBPT_EXTRA_SPACE
+    }
 
-        self.fbpt_address = fbpt_buffer.as_ptr() as usize;
+    fn publish_table(&mut self, buffer: &'static mut [u8]) -> Result<usize, Error> {
+        self.fbpt_address = buffer.as_ptr() as usize;
 
         let mut offset = 0;
-        fbpt_buffer.gwrite(Self::SIGNATURE, &mut offset).map_err(|_| Error::BufferTooSmall)?;
-        // SAFETY: `allocate_table_buffer` ensures the `fbpt_buffer` is large enough to hold the FBPT structure.
-        let length_ptr = unsafe { fbpt_buffer.as_ptr().byte_add(offset) } as *mut u32;
-        fbpt_buffer.gwrite(*self.length(), &mut offset).map_err(|_| Error::BufferTooSmall)?;
-        FirmwareBasicBootPerfDataRecord::new()
-            .write_into(fbpt_buffer, &mut offset)
-            .map_err(|_| Error::BufferTooSmall)?;
+        buffer.gwrite(Self::SIGNATURE, &mut offset).map_err(|_| Error::BufferTooSmall)?;
+        // SAFETY: The caller guarantees `buffer` is at least `published_table_size()` bytes.
+        let length_ptr = unsafe { buffer.as_ptr().byte_add(offset) } as *mut u32;
+        buffer.gwrite(*self.length(), &mut offset).map_err(|_| Error::BufferTooSmall)?;
+        FirmwareBasicBootPerfDataRecord::new().write_into(buffer, &mut offset).map_err(|_| Error::BufferTooSmall)?;
 
         debug_assert_eq!(Self::size_of_empty_table(), offset);
-        self.other_records.report(fbpt_buffer.get_mut(offset..).ok_or(Error::BufferTooSmall)?)?;
+        self.other_records.report(buffer.get_mut(offset..).ok_or(Error::BufferTooSmall)?)?;
 
         self._length.1.store(length_ptr, Ordering::Relaxed);
         Ok(self.fbpt_address)
@@ -310,7 +265,6 @@ mod tests {
     use scroll::Pread;
 
     use crate::{
-        boot_services::MockBootServices,
         performance::{
             record::{
                 GenericPerformanceRecord, PERFORMANCE_RECORD_HEADER_SIZE,
@@ -367,27 +321,16 @@ mod tests {
     }
 
     #[test]
-    fn test_reporting_fbpt_with_previous_address() {
-        let memory_buffer = Vec::<u8>::with_capacity(1000);
-        let address = memory_buffer.as_ptr() as usize;
-
-        let mut boot_services = MockBootServices::new();
-        boot_services
-            .expect_allocate_pages()
-            .once()
-            .withf(move |alloc_type, memory_type, _| {
-                assert_eq!(&AllocType::Address(address), alloc_type);
-                assert_eq!(&EfiMemoryType::ReservedMemoryType, memory_type);
-                true
-            })
-            .returning(move |_, _, _| Ok(address));
+    fn test_serialize_into() {
+        let buffer: &'static mut [u8] = alloc::boxed::Box::leak(alloc::vec![0u8; 1000].into_boxed_slice());
+        let address = buffer.as_ptr() as usize;
 
         let mut fbpt = FBPT::new();
         let guid = crate::guids::ZERO;
         fbpt.add_record(GuidEventRecord::new(1, 0, 10, guid)).unwrap();
         fbpt.add_record(DynamicStringEventRecord::new(1, 0, 10, guid, "test")).unwrap();
 
-        fbpt.report_table(Some(address), &boot_services).unwrap();
+        fbpt.publish_table(buffer).unwrap();
         assert_eq!(address, fbpt.fbpt_address);
 
         fbpt.add_record(DualGuidStringEventRecord::new(1, 0, 10, guid, guid, "test")).unwrap();
@@ -424,55 +367,29 @@ mod tests {
     }
 
     #[test]
-    fn test_reporting_fbpt_without_previous_address() {
-        let memory_buffer = Vec::<u8>::with_capacity(1000);
-        let address = memory_buffer.as_ptr() as usize;
-
-        let mut boot_services = MockBootServices::new();
-        boot_services
-            .expect_allocate_pages()
-            .once()
-            .withf(move |alloc_type, memory_type, _| {
-                assert_eq!(&AllocType::MaxAddress(u32::MAX as usize), alloc_type);
-                assert_eq!(&EfiMemoryType::ReservedMemoryType, memory_type);
-                true
-            })
-            .returning(move |_, _, _| Ok(address));
-
+    fn test_published_table_size() {
         let mut fbpt = FBPT::new();
+        let empty_size = fbpt.published_table_size();
+
         let guid = crate::guids::ZERO;
         fbpt.add_record(GuidEventRecord::new(1, 0, 10, guid)).unwrap();
         fbpt.add_record(DynamicStringEventRecord::new(1, 0, 10, guid, "test")).unwrap();
 
-        fbpt.report_table(None, &boot_services).unwrap();
-        assert_eq!(address, fbpt.fbpt_address());
-
-        fbpt.add_record(DualGuidStringEventRecord::new(1, 0, 10, guid, guid, "test")).unwrap();
-        fbpt.add_record(GuidQwordEventRecord::new(1, 0, 10, guid, 64)).unwrap();
-        fbpt.add_record(GuidQwordStringEventRecord::new(1, 0, 10, guid, 64, "test")).unwrap();
+        // The required publishing size grows by exactly the size of the buffered records.
+        assert_eq!(empty_size + fbpt.perf_records().size(), fbpt.published_table_size());
     }
 
     #[test]
     fn test_performance_table_well_written_in_memory() {
-        let memory_buffer = Vec::<u8>::with_capacity(1000);
-        let address = memory_buffer.as_ptr() as usize;
-
-        let mut boot_services = MockBootServices::new();
-        boot_services
-            .expect_allocate_pages()
-            .once()
-            .withf(move |_, memory_type, _| {
-                assert_eq!(&EfiMemoryType::ReservedMemoryType, memory_type);
-                true
-            })
-            .returning(move |_, _, _| Ok(address));
+        let buffer: &'static mut [u8] = alloc::boxed::Box::leak(alloc::vec![0u8; 1000].into_boxed_slice());
+        let address = buffer.as_ptr() as usize;
 
         let mut fbpt = FBPT::new();
         let guid = crate::guids::ZERO;
         fbpt.add_record(GuidEventRecord::new(1, 0, 10, guid)).unwrap();
         fbpt.add_record(DynamicStringEventRecord::new(1, 0, 10, guid, "test")).unwrap();
 
-        fbpt.report_table(Some(address), &boot_services).unwrap();
+        fbpt.publish_table(buffer).unwrap();
         assert_eq!(address, fbpt.fbpt_address());
 
         fbpt.add_record(DualGuidStringEventRecord::new(1, 0, 10, guid, guid, "test")).unwrap();
