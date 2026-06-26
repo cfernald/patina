@@ -87,6 +87,7 @@ mod memory_bin;
 mod memory_manager;
 mod misc_boot_services;
 mod pecoff;
+mod performance;
 mod pi_dispatcher;
 mod protocol_db;
 mod protocols;
@@ -476,6 +477,7 @@ impl<P: PlatformInfo> Core<P> {
         component_dispatcher.add_service(dxe_dispatch_service::CoreDxeDispatch::new(self));
         component_dispatcher
             .add_service(cpu::PerfTimer::with_frequency(P::CpuInfo::perf_timer_frequency().unwrap_or(0)));
+        component_dispatcher.add_service(performance::CorePerformance);
 
         relocated_hob_list
     }
@@ -541,6 +543,10 @@ impl<P: PlatformInfo> Core<P> {
         let boot_services = StandardBootServices::new(st.boot_services().as_mut_ptr());
         let runtime_services = StandardRuntimeServices::new(st.runtime_services().as_mut_ptr());
         drop(st_guard);
+
+        // Provide the core performance service with the platform timer frequency. The core owns its timer and table,
+        // so it needs no boot services for this.
+        performance::CorePerformance::init(P::CpuInfo::perf_timer_frequency().unwrap_or(0));
 
         self.component_dispatcher.lock().set_boot_services(boot_services);
         self.component_dispatcher.lock().set_runtime_services(runtime_services);
