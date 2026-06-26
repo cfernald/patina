@@ -15,6 +15,7 @@ use patina::{
     component::service::{IntoService, perf_timer::ArchTimerFunctionality, performance::PerformanceMeasurement},
     error::EfiError,
     performance::{
+        Measurement,
         error::Error,
         measurement::CallerIdentifier,
         record::{
@@ -39,14 +40,16 @@ use r_efi::{
 
 static LOAD_IMAGE_COUNT: AtomicU32 = AtomicU32::new(0);
 static PERF_MEASUREMENT_MASK: AtomicU32 = AtomicU32::new(0);
-/// Performance timer frequency in Hz. A value of `0` means the architecture-specific frequency is auto-detected.
 static PERF_FREQUENCY: AtomicU64 = AtomicU64::new(0);
-
-/// The Firmware Basic Boot Performance Table guarded by a TPL mutex.
-///
-/// The table is the only mutable state owned by the service. It is created at compile time using the core's TPL-aware
-/// mutex, so the service needs no boot services instance to manage it.
 static PERFORMANCE_TABLE: TplMutex<FBPT> = TplMutex::new(efi::TPL_NOTIFY, FBPT::new(), "PerformanceTableLock");
+
+macro_rules! gate_measurement {
+    ($measurement:expr) => {
+        if PERF_MEASUREMENT_MASK.load(Ordering::Relaxed) & $measurement as u32 == 0 {
+            return;
+        }
+    };
+}
 
 /// Performance measurement service owned by the DXE Core.
 ///
@@ -65,13 +68,165 @@ impl CorePerformance {
     pub(crate) fn init(frequency: u64) {
         PERF_FREQUENCY.store(frequency, Ordering::Relaxed);
     }
+
+    /// Begins performance measurement of start image in core.
+    pub(crate) fn perf_image_start_begin(&self, module_handle: efi::Handle) {
+        gate_measurement!(Measurement::StartImage);
+        let _ = self.create_measurement(
+            CallerIdentifier::Handle(module_handle),
+            None,
+            None,
+            0,
+            0,
+            KnownPerfId::ModuleStart.as_u16(),
+            PerfAttribute::PerfEntry,
+        );
+    }
+
+    /// Ends performance measurement of start image in core.
+    pub(crate) fn perf_image_start_end(&self, image_handle: efi::Handle) {
+        gate_measurement!(Measurement::StartImage);
+        let _ = self.create_measurement(
+            CallerIdentifier::Handle(image_handle),
+            None,
+            None,
+            0,
+            0,
+            KnownPerfId::ModuleEnd.as_u16(),
+            PerfAttribute::PerfEntry,
+        );
+    }
+
+    /// Begins performance measurement of load image in core.
+    pub(crate) fn perf_load_image_begin(&self, module_handle: efi::Handle) {
+        gate_measurement!(Measurement::LoadImage);
+        let _ = self.create_measurement(
+            CallerIdentifier::Handle(module_handle),
+            None,
+            None,
+            0,
+            0,
+            KnownPerfId::ModuleLoadImageStart.as_u16(),
+            PerfAttribute::PerfEntry,
+        );
+    }
+
+    /// Ends performance measurement of load image in core.
+    pub(crate) fn perf_load_image_end(&self, module_handle: efi::Handle) {
+        gate_measurement!(Measurement::LoadImage);
+        let _ = self.create_measurement(
+            CallerIdentifier::Handle(module_handle),
+            None,
+            None,
+            0,
+            0,
+            KnownPerfId::ModuleLoadImageEnd.as_u16(),
+            PerfAttribute::PerfEntry,
+        );
+    }
+
+    /// Begins performance measurement of driver binding support in the core.
+    pub(crate) fn perf_driver_binding_support_begin(
+        &self,
+        driver_binding_handle: efi::Handle,
+        controller_handle: efi::Handle,
+    ) {
+        gate_measurement!(Measurement::DriverBindingSupport);
+        let _ = self.create_measurement(
+            CallerIdentifier::Handle(driver_binding_handle),
+            None,
+            None,
+            0,
+            controller_handle as usize,
+            KnownPerfId::ModuleDbSupportStart.as_u16(),
+            PerfAttribute::PerfEntry,
+        );
+    }
+
+    /// Ends performance measurement of driver binding support in the core.
+    pub(crate) fn perf_driver_binding_support_end(
+        &self,
+        driver_binding_handle: efi::Handle,
+        controller_handle: efi::Handle,
+    ) {
+        gate_measurement!(Measurement::DriverBindingSupport);
+        let _ = self.create_measurement(
+            CallerIdentifier::Handle(driver_binding_handle),
+            None,
+            None,
+            0,
+            controller_handle as usize,
+            KnownPerfId::ModuleDbSupportEnd.as_u16(),
+            PerfAttribute::PerfEntry,
+        );
+    }
+
+    /// Begins performance measurement of driver binding start in the core.
+    pub(crate) fn perf_driver_binding_start_begin(
+        &self,
+        driver_binding_handle: efi::Handle,
+        controller_handle: efi::Handle,
+    ) {
+        gate_measurement!(Measurement::DriverBindingStart);
+        let _ = self.create_measurement(
+            CallerIdentifier::Handle(driver_binding_handle),
+            None,
+            None,
+            0,
+            controller_handle as usize,
+            KnownPerfId::ModuleDbStart.as_u16(),
+            PerfAttribute::PerfEntry,
+        );
+    }
+
+    /// Ends performance measurement of driver binding start in the core.
+    pub(crate) fn perf_driver_binding_start_end(
+        &self,
+        driver_binding_handle: efi::Handle,
+        controller_handle: efi::Handle,
+    ) {
+        gate_measurement!(Measurement::DriverBindingStart);
+        let _ = self.create_measurement(
+            CallerIdentifier::Handle(driver_binding_handle),
+            None,
+            None,
+            0,
+            controller_handle as usize,
+            KnownPerfId::ModuleDbEnd.as_u16(),
+            PerfAttribute::PerfEntry,
+        );
+    }
+
+    /// Begins performance measurement of driver binding stop in the core.
+    pub(crate) fn perf_driver_binding_stop_begin(&self, module_handle: efi::Handle, controller_handle: efi::Handle) {
+        gate_measurement!(Measurement::DriverBindingStop);
+        let _ = self.create_measurement(
+            CallerIdentifier::Handle(module_handle),
+            None,
+            None,
+            0,
+            controller_handle as usize,
+            KnownPerfId::ModuleDbStopStart.as_u16(),
+            PerfAttribute::PerfEntry,
+        );
+    }
+
+    /// Ends performance measurement of driver binding stop in the core.
+    pub(crate) fn perf_driver_binding_stop_end(&self, module_handle: efi::Handle, controller_handle: efi::Handle) {
+        gate_measurement!(Measurement::DriverBindingStop);
+        let _ = self.create_measurement(
+            CallerIdentifier::Handle(module_handle),
+            None,
+            None,
+            0,
+            controller_handle as usize,
+            KnownPerfId::ModuleDbStopEnd.as_u16(),
+            PerfAttribute::PerfEntry,
+        );
+    }
 }
 
 impl PerformanceMeasurement for CorePerformance {
-    fn measurement_mask(&self) -> u32 {
-        PERF_MEASUREMENT_MASK.load(Ordering::Relaxed)
-    }
-
     fn set_measurement_mask(&self, mask: u32) {
         PERF_MEASUREMENT_MASK.store(mask, Ordering::Relaxed);
     }
@@ -379,95 +534,63 @@ mod tests {
         }
     }
 
-    /// Exercises [`create_measurement_inner`] (and all the trait default `perf_*` helpers) against a mock table,
-    /// verifying that each helper produces exactly one record.
+    /// Exercises every record-building arm of [`create_measurement_inner`] against a mock table, verifying each
+    /// known performance id produces exactly one record.
     #[test]
     fn test_core_performance_create_measurement_all_records() {
-        // Test-only implementation that routes `create_measurement` to `create_measurement_inner` with a mock table.
-        struct TestPerf;
-        static mut FBPT: Option<&TplMutex<MockFirmwareBasicBootPerfTable>> = None;
-
-        impl PerformanceMeasurement for TestPerf {
-            fn measurement_mask(&self) -> u32 {
-                u32::MAX
-            }
-            fn set_measurement_mask(&self, _mask: u32) {}
-            fn set_load_image_count(&self, _count: u32) {}
-            fn set_perf_records(&self, _perf_records: PerformanceRecordBuffer) {}
-            fn create_measurement(
-                &self,
-                caller_identifier: CallerIdentifier,
-                guid: Option<&efi::Guid>,
-                string: Option<&str>,
-                ticker: u64,
-                address: usize,
-                perf_id: u16,
-                attribute: PerfAttribute,
-            ) -> Result<(), Error> {
-                let timer = MockTimer {};
-                create_measurement_inner(
-                    caller_identifier,
-                    guid,
-                    string,
-                    ticker,
-                    address,
-                    perf_id,
-                    attribute,
-                    // SAFETY: Test code - statics are initialized below before use on a single thread.
-                    unsafe { FBPT.unwrap() },
-                    &timer,
-                )
-            }
-            fn add_generic_record(&self, record: GenericPerformanceRecord<&[u8]>) -> Result<(), Error> {
-                // SAFETY: Test code - statics are initialized below before use on a single thread.
-                unsafe { FBPT.unwrap() }.lock().add_record(record)
-            }
-            fn published_table_size(&self) -> Result<usize, Error> {
-                Ok(0)
-            }
-            fn publish_table(&self, _buffer: &'static mut [u8]) -> Result<(), Error> {
-                Ok(())
-            }
-        }
-
         const EXPECTED_NUMBER_OF_RECORD: usize = 21;
         let mut fbpt = MockFirmwareBasicBootPerfTable::new();
         fbpt.expect_add_record().times(EXPECTED_NUMBER_OF_RECORD).returning(|_| Ok(()));
         let fbpt = TplMutex::new(efi::TPL_NOTIFY, fbpt, "TestPerfTableLock");
+        let timer = MockTimer {};
 
         let module_handle = 1_usize as efi::Handle;
-        let controller_handle = 2_usize as efi::Handle;
-        let caller_id = efi::Guid::from_bytes(&[1; 16]);
-        let trigger_guid = efi::Guid::from_bytes(&[2; 16]);
-        let event_guid = efi::Guid::from_bytes(&[3; 16]);
+        let caller_guid = efi::Guid::from_bytes(&[1; 16]);
+        let event_guid = efi::Guid::from_bytes(&[2; 16]);
 
-        // SAFETY: Test code - initializing the static with the test reference before use.
-        unsafe {
-            FBPT = Some(&*ptr::addr_of!(fbpt));
+        macro_rules! measure {
+            ($caller:expr, $guid:expr, $string:expr, $perf_id:ident) => {
+                create_measurement_inner(
+                    $caller,
+                    $guid,
+                    $string,
+                    0,
+                    0,
+                    KnownPerfId::$perf_id.as_u16(),
+                    PerfAttribute::PerfEntry,
+                    &fbpt,
+                    &timer,
+                )
+                .unwrap();
+            };
         }
 
-        let perf = TestPerf;
-        perf.perf_image_start_begin(module_handle);
-        perf.perf_image_start_end(module_handle);
-        perf.perf_load_image_begin(module_handle);
-        perf.perf_load_image_end(module_handle);
-        perf.perf_driver_binding_support_begin(module_handle, controller_handle);
-        perf.perf_driver_binding_support_end(module_handle, controller_handle);
-        perf.perf_driver_binding_start_begin(module_handle, controller_handle);
-        perf.perf_driver_binding_start_end(module_handle, controller_handle);
-        perf.perf_driver_binding_stop_begin(module_handle, controller_handle);
-        perf.perf_driver_binding_stop_end(module_handle, controller_handle);
-        perf.perf_event("event_string", &caller_id);
-        perf.perf_event_signal_begin(&event_guid, "fun_name", &caller_id);
-        perf.perf_event_signal_end(&event_guid, "fun_name", &caller_id);
-        perf.perf_callback_begin(&trigger_guid, "fun_name", &caller_id);
-        perf.perf_callback_end(&trigger_guid, "fun_name", &caller_id);
-        perf.perf_function_begin("fun_name", &caller_id);
-        perf.perf_function_end("fun_name", &caller_id);
-        perf.perf_in_module_begin("measurement_str", &caller_id);
-        perf.perf_in_module_end("measurement_str", &caller_id);
-        perf.perf_cross_module_begin("measurement_str", &caller_id);
-        perf.perf_cross_module_end("measurement_str", &caller_id);
+        // Handle-based records (GUID resolved from the handle, which yields ZERO here).
+        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleStart);
+        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleEnd);
+        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleLoadImageStart);
+        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleLoadImageEnd);
+        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbStart);
+        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbSupportStart);
+        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbSupportEnd);
+        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbStopStart);
+        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbStopEnd);
+        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbEnd);
+
+        // Dual-guid + string records (require a caller GUID, a trigger GUID, and a string).
+        measure!(CallerIdentifier::Guid(caller_guid), Some(&event_guid), Some("fun_name"), PerfEventSignalStart);
+        measure!(CallerIdentifier::Guid(caller_guid), Some(&event_guid), Some("fun_name"), PerfEventSignalEnd);
+        measure!(CallerIdentifier::Guid(caller_guid), Some(&event_guid), Some("fun_name"), PerfCallbackStart);
+        measure!(CallerIdentifier::Guid(caller_guid), Some(&event_guid), Some("fun_name"), PerfCallbackEnd);
+
+        // Dynamic-string records (require a caller GUID and a string).
+        measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfFunctionStart);
+        measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfFunctionEnd);
+        measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfInModuleStart);
+        measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfInModuleEnd);
+        measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfCrossModuleStart);
+        measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfCrossModuleEnd);
+        measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfEvent);
     }
 
     /// Verifies the validation paths of [`create_measurement_inner`] for unknown perf ids.

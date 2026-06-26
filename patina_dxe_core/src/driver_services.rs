@@ -12,7 +12,6 @@ use alloc::{
 };
 use core::ptr::NonNull;
 use patina::{
-    component::service::performance::PerformanceMeasurement,
     device_path::walker::{concat_device_path_to_boxed_slice, copy_device_path_to_boxed_slice},
     error::EfiError,
 };
@@ -535,6 +534,7 @@ pub unsafe fn core_disconnect_controller(
         let driver_binding = unsafe { &mut *(driver_binding_interface) };
 
         let mut status = efi::Status::SUCCESS;
+        CorePerformance.perf_driver_binding_stop_begin(driver_binding.driver_binding_handle, controller_handle);
         if !child_handles.is_empty() {
             // Disconnect the child controller(s).
             // SAFETY: driver_binding_interface is a valid pointer to a driver binding protocol instance
@@ -554,6 +554,7 @@ pub unsafe fn core_disconnect_controller(
             status =
                 unsafe { (driver_binding.stop)(driver_binding_interface, controller_handle, 0, core::ptr::null_mut()) };
         }
+        CorePerformance.perf_driver_binding_stop_end(driver_binding.driver_binding_handle, controller_handle);
         if status == efi::Status::SUCCESS {
             one_or_more_drivers_disconnected = true;
         }

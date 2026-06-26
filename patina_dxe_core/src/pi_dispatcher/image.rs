@@ -56,7 +56,6 @@ use corosensei::{
 };
 
 use efi::Guid;
-use patina::component::service::performance::PerformanceMeasurement;
 
 pub const EFI_IMAGE_SUBSYSTEM_EFI_APPLICATION: u16 = 10;
 pub const EFI_IMAGE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER: u16 = 11;

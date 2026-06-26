@@ -710,9 +710,6 @@ mod tests {
     }
 
     impl PerformanceMeasurement for MockPerf {
-        fn measurement_mask(&self) -> u32 {
-            0
-        }
         fn set_measurement_mask(&self, _mask: u32) {}
         fn set_load_image_count(&self, _count: u32) {}
         fn set_perf_records(&self, _perf_records: PerformanceRecordBuffer) {}

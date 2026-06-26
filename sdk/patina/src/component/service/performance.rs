@@ -10,7 +10,6 @@ use r_efi::efi;
 
 use crate::{
     performance::{
-        Measurement,
         error::Error,
         measurement::CallerIdentifier,
         record::{GenericPerformanceRecord, PerformanceRecordBuffer, known::KnownPerfId},
@@ -21,10 +20,7 @@ use crate::{
 /// Service that records firmware performance measurements into the Firmware Basic Boot Performance Table (FBPT).
 ///
 pub trait PerformanceMeasurement: Send + Sync {
-    /// Returns the bitmask of enabled [`Measurement`]s.
-    fn measurement_mask(&self) -> u32;
-
-    /// Sets the bitmask of enabled [`Measurement`]s.
+    /// Sets the bitmask of enabled [`Measurement`](crate::performance::Measurement)s.
     fn set_measurement_mask(&self, mask: u32);
 
     /// Sets the running load-image count, typically restored from a HOB at startup.
@@ -55,162 +51,28 @@ pub trait PerformanceMeasurement: Send + Sync {
     /// Serializes the tracked records into the caller-provided `buffer` and puts the table into a published state.
     fn publish_table(&self, buffer: &'static mut [u8]) -> Result<(), Error>;
 
-    /// Begins performance measurement of start image in core.
-    fn perf_image_start_begin(&self, module_handle: efi::Handle) {
-        if self.measurement_mask() & Measurement::StartImage as u32 == 0 {
-            return;
-        }
+    /// Begins performance measurement of a behavior in different modules.
+    fn perf_cross_module_begin(&self, measurement_str: &str, caller_id: &efi::Guid) {
         let _ = self.create_measurement(
-            CallerIdentifier::Handle(module_handle),
+            CallerIdentifier::Guid(*caller_id),
             None,
-            None,
+            Some(measurement_str),
             0,
             0,
-            KnownPerfId::ModuleStart.as_u16(),
+            KnownPerfId::PerfCrossModuleStart.as_u16(),
             PerfAttribute::PerfEntry,
         );
     }
 
-    /// Ends performance measurement of start image in core.
-    fn perf_image_start_end(&self, image_handle: efi::Handle) {
-        if self.measurement_mask() & Measurement::StartImage as u32 == 0 {
-            return;
-        }
+    /// Ends performance measurement of a behavior in different modules.
+    fn perf_cross_module_end(&self, measurement_str: &str, caller_id: &efi::Guid) {
         let _ = self.create_measurement(
-            CallerIdentifier::Handle(image_handle),
+            CallerIdentifier::Guid(*caller_id),
             None,
-            None,
+            Some(measurement_str),
             0,
             0,
-            KnownPerfId::ModuleEnd.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
-    }
-
-    /// Begins performance measurement of load image in core.
-    fn perf_load_image_begin(&self, module_handle: efi::Handle) {
-        if self.measurement_mask() & Measurement::LoadImage as u32 == 0 {
-            return;
-        }
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(module_handle),
-            None,
-            None,
-            0,
-            0,
-            KnownPerfId::ModuleLoadImageStart.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
-    }
-
-    /// Ends performance measurement of load image in core.
-    fn perf_load_image_end(&self, module_handle: efi::Handle) {
-        if self.measurement_mask() & Measurement::LoadImage as u32 == 0 {
-            return;
-        }
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(module_handle),
-            None,
-            None,
-            0,
-            0,
-            KnownPerfId::ModuleLoadImageEnd.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
-    }
-
-    /// Begins performance measurement of driver binding support in the core.
-    fn perf_driver_binding_support_begin(&self, driver_binding_handle: efi::Handle, controller_handle: efi::Handle) {
-        if self.measurement_mask() & Measurement::DriverBindingSupport as u32 == 0 {
-            return;
-        }
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(driver_binding_handle),
-            None,
-            None,
-            0,
-            controller_handle as usize,
-            KnownPerfId::ModuleDbSupportStart.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
-    }
-
-    /// Ends performance measurement of driver binding support in the core.
-    fn perf_driver_binding_support_end(&self, driver_binding_handle: efi::Handle, controller_handle: efi::Handle) {
-        if self.measurement_mask() & Measurement::DriverBindingSupport as u32 == 0 {
-            return;
-        }
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(driver_binding_handle),
-            None,
-            None,
-            0,
-            controller_handle as usize,
-            KnownPerfId::ModuleDbSupportEnd.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
-    }
-
-    /// Begins performance measurement of driver binding start in the core.
-    fn perf_driver_binding_start_begin(&self, driver_binding_handle: efi::Handle, controller_handle: efi::Handle) {
-        if self.measurement_mask() & Measurement::DriverBindingStart as u32 == 0 {
-            return;
-        }
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(driver_binding_handle),
-            None,
-            None,
-            0,
-            controller_handle as usize,
-            KnownPerfId::ModuleDbStart.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
-    }
-
-    /// Ends performance measurement of driver binding start in the core.
-    fn perf_driver_binding_start_end(&self, driver_binding_handle: efi::Handle, controller_handle: efi::Handle) {
-        if self.measurement_mask() & Measurement::DriverBindingStart as u32 == 0 {
-            return;
-        }
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(driver_binding_handle),
-            None,
-            None,
-            0,
-            controller_handle as usize,
-            KnownPerfId::ModuleDbEnd.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
-    }
-
-    /// Begins performance measurement of driver binding stop in the core.
-    fn perf_driver_binding_stop_begin(&self, module_handle: efi::Handle, controller_handle: efi::Handle) {
-        if self.measurement_mask() & Measurement::DriverBindingStop as u32 == 0 {
-            return;
-        }
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(module_handle),
-            None,
-            None,
-            0,
-            controller_handle as usize,
-            KnownPerfId::ModuleDbStopStart.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
-    }
-
-    /// Ends performance measurement of driver binding stop in the core.
-    fn perf_driver_binding_stop_end(&self, module_handle: efi::Handle, controller_handle: efi::Handle) {
-        if self.measurement_mask() & Measurement::DriverBindingStop as u32 == 0 {
-            return;
-        }
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(module_handle),
-            None,
-            None,
-            0,
-            controller_handle as usize,
-            KnownPerfId::ModuleDbStopEnd.as_u16(),
+            KnownPerfId::PerfCrossModuleEnd.as_u16(),
             PerfAttribute::PerfEntry,
         );
     }
@@ -328,32 +190,6 @@ pub trait PerformanceMeasurement: Send + Sync {
             0,
             0,
             KnownPerfId::PerfInModuleEnd.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
-    }
-
-    /// Begins performance measurement of a behavior in different modules.
-    fn perf_cross_module_begin(&self, measurement_str: &str, caller_id: &efi::Guid) {
-        let _ = self.create_measurement(
-            CallerIdentifier::Guid(*caller_id),
-            None,
-            Some(measurement_str),
-            0,
-            0,
-            KnownPerfId::PerfCrossModuleStart.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
-    }
-
-    /// Ends performance measurement of a behavior in different modules.
-    fn perf_cross_module_end(&self, measurement_str: &str, caller_id: &efi::Guid) {
-        let _ = self.create_measurement(
-            CallerIdentifier::Guid(*caller_id),
-            None,
-            Some(measurement_str),
-            0,
-            0,
-            KnownPerfId::PerfCrossModuleEnd.as_u16(),
             PerfAttribute::PerfEntry,
         );
     }
