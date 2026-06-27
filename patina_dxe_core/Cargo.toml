@@ -29,10 +29,9 @@ corosensei = { workspace = true  }
 uuid = { workspace = true  }
 patina = { workspace = true, features = ["core"] }
 patina_ffs = { workspace = true }
-patina_internal_collections = { workspace = true  }
+patina_internal_lib = { workspace = true  }
 patina_internal_cpu = { workspace = true }
 patina_debugger = { workspace = true, features = ["alloc"] }
-patina_internal_depex = { workspace = true}
 patina_performance = { workspace = true }
 patina_test = { workspace = true }
 
@@ -43,7 +42,8 @@ patina_test = { workspace = true }
 # compile due to the dev-dependency not being published yet.
 patina_samples = { path = "../components/patina_samples" }
 patina_ffs_extractors = { path = "../sdk/patina_ffs_extractors" }
-patina_internal_collections = { path = "../core/patina_internal_collections" }
+# Enable the `alloc` feature of `patina_internal_lib` for tests (e.g. `Rbt::dfs`).
+patina_internal_lib = { path = "../core/patina_internal_lib" }
 env_logger = { workspace = true }
 mockall = { workspace = true }
 serial_test = { workspace = true }

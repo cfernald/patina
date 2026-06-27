@@ -30,7 +30,7 @@
 //! ## Examples
 //!
 //! ```rust
-//! use patina_internal_collections::{Bst, Rbt, SortedSlice, SliceKey, node_size};
+//! use patina_internal_lib::collections::{Bst, Rbt, SortedSlice, SliceKey, node_size};
 //!
 //! const MAX_SIZE: usize = 4096;
 //!
@@ -57,8 +57,6 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 //!
-#![no_std]
-#![feature(coverage_attribute)]
 mod bst;
 mod node;
 mod rbt;

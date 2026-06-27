@@ -8,11 +8,6 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 //!
-#![no_std]
-#![feature(coverage_attribute)]
-
-extern crate alloc;
-
 use alloc::{
     format,
     string::{String, ToString},

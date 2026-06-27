@@ -8,7 +8,7 @@
 //!
 use core::{fmt::Debug, mem, ops::Deref, slice};
 
-use crate::{Error, SliceKey};
+use crate::collections::{Error, SliceKey};
 
 /// A slice that is always sorted.
 pub struct SortedSlice<'a, T> {

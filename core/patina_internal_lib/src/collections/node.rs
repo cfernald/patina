@@ -8,7 +8,7 @@
 //!
 use core::{cell::Cell, mem, mem::MaybeUninit, ptr::NonNull, slice};
 
-use crate::{Error, Result, SliceKey};
+use crate::collections::{Error, Result, SliceKey};
 
 /// The color RED of a node in a red-black tree.
 pub const RED: bool = false;

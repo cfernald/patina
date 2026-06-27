@@ -21,7 +21,7 @@ use patina::{
     },
     uefi_pages_to_size, uefi_size_to_pages, writelncrlf,
 };
-use patina_internal_collections::{Error as SliceError, Rbt, SliceKey, node_size};
+use patina_internal_lib::collections::{Error as SliceError, Rbt, SliceKey, node_size};
 use r_efi::efi;
 
 use crate::{

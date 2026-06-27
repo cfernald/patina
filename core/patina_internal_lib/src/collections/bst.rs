@@ -6,11 +6,9 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 //!
-#[cfg(feature = "alloc")]
-extern crate alloc;
 use core::{cell::Cell, cmp::Ordering};
 
-use crate::{
+use crate::collections::{
     Error, Result, SliceKey,
     node::{Node, NodeTrait, Storage},
 };
@@ -680,7 +678,7 @@ where
 #[coverage(off)]
 #[allow(clippy::undocumented_unsafe_blocks)]
 mod tests {
-    use crate::{Bst, node_size};
+    use crate::collections::{Bst, node_size};
 
     const BST_MAX_SIZE: usize = 4096;
 
@@ -724,7 +722,7 @@ mod tests {
     fn test_get_functions() {
         #[derive(Debug)]
         struct MyType(usize, usize);
-        impl crate::SliceKey for MyType {
+        impl crate::collections::SliceKey for MyType {
             type Key = usize;
             fn key(&self) -> &Self::Key {
                 &self.0
@@ -899,7 +897,7 @@ mod tests {
 #[allow(clippy::undocumented_unsafe_blocks)]
 mod fuzz_tests {
     extern crate std;
-    use crate::{Bst, node_size};
+    use crate::collections::{Bst, node_size};
     use rand::{
         RngExt,
         seq::{IndexedRandom, SliceRandom},

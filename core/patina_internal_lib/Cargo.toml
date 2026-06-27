@@ -1,11 +1,11 @@
 [package]
-name = "patina_internal_collections"
+name = "patina_internal_lib"
 version.workspace = true
 repository.workspace = true
 license.workspace = true
 edition.workspace = true
 readme = "README.md"
-description = "Collection types to the DXE Core."
+description = "Common internal library for Patina"
 
 [lints]
 workspace = true
@@ -20,6 +20,8 @@ ci_features = ["alloc"]
 
 [dependencies]
 log = { workspace=true }
+r-efi = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 rand = { workspace = true }
