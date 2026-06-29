@@ -126,7 +126,7 @@ level at which memory attributes (such as `Execute Protect` or `Read Protect`) a
 
 The Patina DXE Core implements the GCD using a Red-Black Tree to track the memory regions within the
 GCD. This gives the best expected performance when the number of elements in the GCD is expected to
-be large. There are alternative storage implementations in the `patina_internal_collections` crate
+be large. There are alternative storage implementations in the `patina_internal_core::collections` module
 within the core that implement the same interface that provide different performance characteristics
 (which may be desirable if different assumptions are used - for example if the number of map entries
 is expected to be small), but the RBT-based implementation is expected to give the best performance

@@ -7,18 +7,18 @@
 //!
 //! Running this exact benchmark can be done with the following command:
 //!
-//! `> cargo make bench -p patina_internal_collections --bench bench_add`
+//! `> cargo make bench -p patina_internal_core --bench bench_add`
 //!
 //! If you wish to run a subset of benchmarks in this file, you can filter them by name:
 //!
-//! `> cargo make bench -p patina_internal_collections --bench bench_add -- <filter>`
+//! `> cargo make bench -p patina_internal_core --bench bench_add -- <filter>`
 //!
 //! ## Examples
 //!
 //! ```bash
-//! > cargo make bench -p patina_internal_collections --bench bench_add -- rbt
-//! > cargo make bench -p patina_internal_collections --bench bench_add -- 32bit
-//! > cargo make bench -p patina_internal_collections --bench bench_add
+//! > cargo make bench -p patina_internal_core --bench bench_add -- rbt
+//! > cargo make bench -p patina_internal_core --bench bench_add -- 32bit
+//! > cargo make bench -p patina_internal_core --bench bench_add
 //! ```
 //!
 //! ## License
