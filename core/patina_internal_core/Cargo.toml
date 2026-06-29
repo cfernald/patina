@@ -1,5 +1,5 @@
 [package]
-name = "patina_internal_lib"
+name = "patina_internal_core"
 version.workspace = true
 repository.workspace = true
 license.workspace = true

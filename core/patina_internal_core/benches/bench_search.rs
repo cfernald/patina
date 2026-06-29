@@ -27,8 +27,8 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 //!
-use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
-use patina_internal_lib::collections::{Bst, Rbt, SortedSlice, node_size};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use patina_internal_core::collections::{node_size, Bst, Rbt, SortedSlice};
 use rand::RngExt;
 use ruint::Uint;
 use std::{collections::HashSet, hash::Hash, mem::size_of};

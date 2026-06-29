@@ -35,7 +35,7 @@ use patina_ffs::{
     section::{Section, SectionExtractor},
     volume::VolumeRef,
 };
-use patina_internal_lib::depex::{AssociatedDependency, Depex, Opcode};
+use patina_internal_core::depex::{AssociatedDependency, Depex, Opcode};
 use r_efi::efi;
 use spin::RwLock;
 
