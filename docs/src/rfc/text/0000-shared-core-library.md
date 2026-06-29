@@ -1,6 +1,6 @@
 # RFC: Consolidate common core code into a single internal library crate
 
-This RFC proposes creating an internal crate (`core/patina_internal_lib`) for
+This RFC proposes creating an internal crate (`core/patina_internal_core`) for
 code shared by core implementations. This single crate would remove overhead and
 simplify changing internal code and interfaces. This will become increasingly
 important with the introduction of the Standalone MM core.
@@ -11,6 +11,8 @@ This RFC builds on the crate organization and naming conventions established by
 ## Change Log
 
 - 2026-06-26: Initial RFC created.
+- 2026-06-29: Renames proposed crate to `patina_internal_core`, and opted to leave CPU
+              crate independent for now.
 
 ## Motivation
 
@@ -127,12 +129,11 @@ CORE\PATINA_INTERNAL_DEPEX
 
 ## Unresolved Questions
 
-- **MM Supervisor coupling.** The exact subset of `patina_internal_lib` consumed
+- **MM Supervisor coupling.** The exact subset of `patina_internal_core` consumed
   by the MM Supervisor is out of scope here and will be driven by the MM
   Supervisor work.
 - **CPU Crate Independence.** The CPU crate is used in more limited environments
-  such as the supervisor. There may be a use case for keeping this independent for
-  simplicity.
+  such as the supervisor.This RFC leaves this as a future decision.
 
 ## Prior Art
 
@@ -158,19 +159,18 @@ to the internal core crates.
 ## Rust Code Design
 
 Each existing `patina_internal_*` crate becomes a top-level module in
-`patina_internal_lib`, named after the crate's purpose with the
+`patina_internal_core`, named after the crate's purpose with the
 `patina_internal_` prefix dropped. The existing crates then stop being
 published and are deprecated.
 
 ```rust
-// core/patina_internal_lib/src/lib.rs
+// core/patina_internal_core/src/lib.rs
 #![no_std]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
 pub mod collections; // was patina_internal_collections
-pub mod cpu;         // was patina_internal_cpu
 pub mod depex;       // was patina_internal_depex
 ```
 
@@ -178,7 +178,7 @@ Each former crate root (`lib.rs`) becomes the module root for its area, keeping
 its existing submodule layout unchanged underneath it:
 
 ```text
-core/patina_internal_lib/src/
+core/patina_internal_core/src/
     lib.rs
     collections.rs
     collections/
@@ -186,20 +186,20 @@ core/patina_internal_lib/src/
         node.rs
         rbt.rs
         sorted_slice.rs
-    cpu.rs
-    cpu/
-        ...
     depex.rs
     ... future expansion ...
 ```
 
-In the future, new `patina_internal_` crates may be introduced if the need arises
+For now, `patina_internal_cpu` will be left independent because of it's unique compilation
+requirements, use in low level environments, and increased scope compared to the other crates.
+
+In the future, new `patina_internal_` crates may still be introduced if the need arises
 for either large or logically contained code.
 
 ## Guide-Level Explanation
 
 All internal shared code must live in a `patina_internal` crate. For smaller
-modules, `patina_internal_lib` serves as the common library. If a given internal
+modules, `patina_internal_core` serves as the common library. If a given internal
 interface meets the following criteria:
 
 1. Logically contained
