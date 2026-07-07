@@ -124,6 +124,7 @@ use patina::{
     boot_services::StandardBootServices,
     component::IntoComponent,
     error::{self, Result},
+    performance::config::PerformanceConfig,
     pi::{
         hob::{HobList, get_pi_hob_list_size},
         protocols::{bds, status_code},
@@ -238,6 +239,15 @@ pub trait PlatformInfo: 'static {
 
     /// The platform's section extractor type, used when extracting sections from firmware volumes.
     type Extractor: SectionExtractor;
+
+    /// The performance measurement configuration used when no performance configuration HOB is present.
+    ///
+    /// Defaults to disabled. Platforms may override this option to control the default behavior of the performance
+    /// measurement service when no configuration HOB is present.
+    #[inline(always)]
+    fn default_performance_config() -> PerformanceConfig {
+        PerformanceConfig::new()
+    }
 }
 
 /// Static reference to the DXE Core instance in the compiled binary.
@@ -477,7 +487,9 @@ impl<P: PlatformInfo> Core<P> {
         component_dispatcher.add_service(dxe_dispatch_service::CoreDxeDispatch::new(self));
         component_dispatcher
             .add_service(cpu::PerfTimer::with_frequency(P::CpuInfo::perf_timer_frequency().unwrap_or(0)));
-        component_dispatcher.add_service(performance::CorePerformance);
+        if performance::CorePerformance::enabled() {
+            component_dispatcher.add_service(performance::CorePerformance);
+        }
 
         relocated_hob_list
     }
@@ -544,9 +556,16 @@ impl<P: PlatformInfo> Core<P> {
         let runtime_services = StandardRuntimeServices::new(st.runtime_services().as_mut_ptr());
         drop(st_guard);
 
-        // Provide the core performance service with the platform timer frequency. The core owns its timer and table,
-        // so it needs no boot services for this.
-        performance::CorePerformance::init(P::CpuInfo::perf_timer_frequency().unwrap_or(0));
+        // Initialize the performance measurement service with the configuration from the HOB list or the platform
+        // selected default configuration if no HOB is present.
+        let perf_config =
+            performance::read_performance_config(self.hob_list()).unwrap_or(P::default_performance_config());
+        let perf_hob_records = performance::read_hob_performance_records(self.hob_list());
+        performance::CorePerformance::init(
+            P::CpuInfo::perf_timer_frequency().unwrap_or(0),
+            perf_config,
+            perf_hob_records,
+        );
 
         self.component_dispatcher.lock().set_boot_services(boot_services);
         self.component_dispatcher.lock().set_runtime_services(runtime_services);

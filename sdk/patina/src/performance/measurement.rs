@@ -8,7 +8,7 @@
 //!
 use core::{ffi::c_void, mem, ops::BitOr};
 
-use crate::performance::record::known::KnownPerfId;
+use crate::{bit, performance::record::known::KnownPerfId};
 
 use r_efi::efi;
 
@@ -88,15 +88,15 @@ impl CallerIdentifier {
 #[repr(u32)]
 pub enum Measurement {
     /// Dispatch modules entry point execution
-    StartImage = 1,
+    StartImage = bit!(0),
     /// Load a dispatched module.
-    LoadImage = 1 << 1,
+    LoadImage = bit!(1),
     /// Diver binding support function call.
-    DriverBindingSupport = 1 << 2,
+    DriverBindingSupport = bit!(2),
     /// Diver binding start function call.
-    DriverBindingStart = 1 << 3,
+    DriverBindingStart = bit!(3),
     /// Diver binding stop function call.
-    DriverBindingStop = 1 << 4,
+    DriverBindingStop = bit!(4),
 }
 
 impl Measurement {

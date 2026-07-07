@@ -68,7 +68,9 @@ impl HobPerformanceDataExtractor for Hob<'_, HobPerformanceData> {
     }
 }
 
-fn merge_hob_performance_buffer<'a, T>(iter: T) -> Result<(u32, PerformanceRecordBuffer), Error>
+/// Merges the performance records from an iterator of [`HobPerformanceData`] into a single
+/// [`PerformanceRecordBuffer`], returning the total load-image count and the merged records.
+pub fn merge_hob_performance_buffer<'a, T>(iter: T) -> Result<(u32, PerformanceRecordBuffer), Error>
 where
     T: Iterator<Item = &'a HobPerformanceData>,
 {

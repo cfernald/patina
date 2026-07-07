@@ -10,24 +10,32 @@ use core::{
     sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
 };
 
+use alloc::vec::Vec;
+
 use patina::{
     BinaryGuid,
-    component::service::{IntoService, perf_timer::ArchTimerFunctionality, performance::PerformanceMeasurement},
+    component::{
+        hob::FromHob,
+        service::{IntoService, perf_timer::ArchTimerFunctionality, performance::PerformanceMeasurement},
+    },
     error::EfiError,
     performance::{
         Measurement,
+        config::PerformanceConfig,
         error::Error,
         measurement::CallerIdentifier,
         record::{
-            GenericPerformanceRecord, PerformanceRecordBuffer,
+            GenericPerformanceRecord, PerformanceRecord, PerformanceRecordBuffer,
             extended::{
                 DualGuidStringEventRecord, DynamicStringEventRecord, GuidEventRecord, GuidQwordEventRecord,
                 GuidQwordStringEventRecord,
             },
+            hob::{HobPerformanceData, merge_hob_performance_buffer},
             known::KnownPerfId,
         },
         table::{FBPT, FirmwareBasicBootPerfTable},
     },
+    pi::hob::{Hob as PiHob, HobList},
     uefi_protocol::performance_measurement::PerfAttribute,
 };
 
@@ -60,13 +68,30 @@ macro_rules! gate_measurement {
 pub(crate) struct CorePerformance;
 
 impl CorePerformance {
-    /// Initializes the core performance service with the platform timer frequency.
-    ///
-    /// This is intentionally not part of the [`PerformanceMeasurement`] trait: the DXE Core owns its timer and
-    /// initializes this itself rather than exposing initialization to service consumers. A frequency of `0` selects
-    /// architecture-specific auto-detection.
-    pub(crate) fn init(frequency: u64) {
+    /// Initializes the core performance service.
+    pub(crate) fn init(frequency: u64, config: PerformanceConfig, hob_records: Option<(u32, PerformanceRecordBuffer)>) {
         PERF_FREQUENCY.store(frequency, Ordering::Relaxed);
+
+        if config.enabled == PerformanceConfig::DISABLED {
+            return;
+        }
+
+        PERF_MEASUREMENT_MASK.store(config.enabled_measurements, Ordering::Relaxed);
+
+        if let Some((load_image_count, perf_records)) = hob_records {
+            LOAD_IMAGE_COUNT.store(load_image_count, Ordering::Relaxed);
+            PERFORMANCE_TABLE.lock().set_perf_records(perf_records);
+        }
+
+        // This PEI end and DXE begin are later into the DXE phase than ideal. However, this cannot be improved without
+        // integrating performance earlier into the core.
+        let dxe_core_guid = patina::guids::DXE_CORE.into_inner();
+        CorePerformance.perf_cross_module_end("PEI", &dxe_core_guid);
+        CorePerformance.perf_cross_module_begin("DXE", &dxe_core_guid);
+    }
+
+    pub(crate) fn enabled() -> bool {
+        PERF_MEASUREMENT_MASK.load(Ordering::Relaxed) != 0
     }
 
     /// Begins performance measurement of start image in core.
@@ -226,6 +251,41 @@ impl CorePerformance {
     }
 }
 
+/// Reads the [`PerformanceConfig`] from the HOB list, returning a disabled default when no such HOB is present.
+pub(crate) fn read_performance_config(hob_list: &HobList) -> Option<PerformanceConfig> {
+    for hob in hob_list.iter() {
+        if let PiHob::GuidHob(guid, data) = hob
+            && guid.name == PerformanceConfig::HOB_GUID
+        {
+            return Some(PerformanceConfig::parse(data));
+        }
+    }
+    None
+}
+
+/// Reads and merges any performance records carried over from a previous phase via HOBs.
+///
+/// Returns `None` when no performance record HOBs are present.
+pub(crate) fn read_hob_performance_records(hob_list: &HobList) -> Option<(u32, PerformanceRecordBuffer)> {
+    let perf_hobs: Vec<HobPerformanceData> = hob_list
+        .iter()
+        .filter_map(|hob| match hob {
+            PiHob::GuidHob(guid, data) if guid.name == HobPerformanceData::HOB_GUID => {
+                Some(HobPerformanceData::parse(data))
+            }
+            _ => None,
+        })
+        .collect();
+
+    if perf_hobs.is_empty() {
+        return None;
+    }
+
+    merge_hob_performance_buffer(perf_hobs.iter())
+        .inspect_err(|e| log::error!("Performance: failed to merge HOB performance records: {e:?}"))
+        .ok()
+}
+
 impl PerformanceMeasurement for CorePerformance {
     fn set_measurement_mask(&self, mask: u32) {
         PERF_MEASUREMENT_MASK.store(mask, Ordering::Relaxed);
@@ -236,7 +296,10 @@ impl PerformanceMeasurement for CorePerformance {
     }
 
     fn set_perf_records(&self, perf_records: PerformanceRecordBuffer) {
-        PERFORMANCE_TABLE.lock().set_perf_records(perf_records);
+        match PERFORMANCE_TABLE.try_lock() {
+            Some(mut table) => table.set_perf_records(perf_records),
+            None => log::error!("Performance: failed to set performance records"),
+        }
     }
 
     fn create_measurement(
@@ -253,15 +316,21 @@ impl PerformanceMeasurement for CorePerformance {
     }
 
     fn add_generic_record(&self, record: GenericPerformanceRecord<&[u8]>) -> Result<(), Error> {
-        PERFORMANCE_TABLE.lock().add_record(record)
+        add_fbpt_record(&PERFORMANCE_TABLE, record)
     }
 
     fn published_table_size(&self) -> Result<usize, Error> {
-        Ok(PERFORMANCE_TABLE.lock().published_table_size())
+        match PERFORMANCE_TABLE.try_lock() {
+            Some(table) => Ok(table.published_table_size()),
+            None => Err(EfiError::InvalidParameter.into()),
+        }
     }
 
     fn publish_table(&self, buffer: &'static mut [u8]) -> Result<(), Error> {
-        PERFORMANCE_TABLE.lock().publish_table(buffer).map(|_| ())
+        match PERFORMANCE_TABLE.try_lock() {
+            Some(mut table) => table.publish_table(buffer).map(|_| ()),
+            None => Err(EfiError::InvalidParameter.into()),
+        }
     }
 }
 
@@ -518,6 +587,7 @@ fn get_module_guid_from_handle(handle: efi::Handle) -> Result<BinaryGuid, efi::S
 #[coverage(off)]
 mod tests {
     use super::*;
+    use crate::test_support::with_global_lock;
     use patina::performance::table::MockFirmwareBasicBootPerfTable;
     use r_efi::efi;
 
@@ -538,94 +608,166 @@ mod tests {
     /// known performance id produces exactly one record.
     #[test]
     fn test_core_performance_create_measurement_all_records() {
-        const EXPECTED_NUMBER_OF_RECORD: usize = 21;
-        let mut fbpt = MockFirmwareBasicBootPerfTable::new();
-        fbpt.expect_add_record().times(EXPECTED_NUMBER_OF_RECORD).returning(|_| Ok(()));
-        let fbpt = TplMutex::new(efi::TPL_NOTIFY, fbpt, "TestPerfTableLock");
-        let timer = MockTimer {};
+        with_global_lock(|| {
+            const EXPECTED_NUMBER_OF_RECORD: usize = 21;
+            let mut fbpt = MockFirmwareBasicBootPerfTable::new();
+            fbpt.expect_add_record().times(EXPECTED_NUMBER_OF_RECORD).returning(|_| Ok(()));
+            let fbpt = TplMutex::new(efi::TPL_NOTIFY, fbpt, "TestPerfTableLock");
+            let timer = MockTimer {};
 
-        let module_handle = 1_usize as efi::Handle;
-        let caller_guid = efi::Guid::from_bytes(&[1; 16]);
-        let event_guid = efi::Guid::from_bytes(&[2; 16]);
+            let module_handle = 1_usize as efi::Handle;
+            let caller_guid = efi::Guid::from_bytes(&[1; 16]);
+            let event_guid = efi::Guid::from_bytes(&[2; 16]);
 
-        macro_rules! measure {
-            ($caller:expr, $guid:expr, $string:expr, $perf_id:ident) => {
-                create_measurement_inner(
-                    $caller,
-                    $guid,
-                    $string,
-                    0,
-                    0,
-                    KnownPerfId::$perf_id.as_u16(),
-                    PerfAttribute::PerfEntry,
-                    &fbpt,
-                    &timer,
-                )
-                .unwrap();
-            };
-        }
+            macro_rules! measure {
+                ($caller:expr, $guid:expr, $string:expr, $perf_id:ident) => {
+                    create_measurement_inner(
+                        $caller,
+                        $guid,
+                        $string,
+                        0,
+                        0,
+                        KnownPerfId::$perf_id.as_u16(),
+                        PerfAttribute::PerfEntry,
+                        &fbpt,
+                        &timer,
+                    )
+                    .unwrap();
+                };
+            }
 
-        // Handle-based records (GUID resolved from the handle, which yields ZERO here).
-        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleStart);
-        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleEnd);
-        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleLoadImageStart);
-        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleLoadImageEnd);
-        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbStart);
-        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbSupportStart);
-        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbSupportEnd);
-        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbStopStart);
-        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbStopEnd);
-        measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbEnd);
+            // Handle-based records (GUID resolved from the handle, which yields ZERO here).
+            measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleStart);
+            measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleEnd);
+            measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleLoadImageStart);
+            measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleLoadImageEnd);
+            measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbStart);
+            measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbSupportStart);
+            measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbSupportEnd);
+            measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbStopStart);
+            measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbStopEnd);
+            measure!(CallerIdentifier::Handle(module_handle), None, None, ModuleDbEnd);
 
-        // Dual-guid + string records (require a caller GUID, a trigger GUID, and a string).
-        measure!(CallerIdentifier::Guid(caller_guid), Some(&event_guid), Some("fun_name"), PerfEventSignalStart);
-        measure!(CallerIdentifier::Guid(caller_guid), Some(&event_guid), Some("fun_name"), PerfEventSignalEnd);
-        measure!(CallerIdentifier::Guid(caller_guid), Some(&event_guid), Some("fun_name"), PerfCallbackStart);
-        measure!(CallerIdentifier::Guid(caller_guid), Some(&event_guid), Some("fun_name"), PerfCallbackEnd);
+            // Dual-guid + string records (require a caller GUID, a trigger GUID, and a string).
+            measure!(CallerIdentifier::Guid(caller_guid), Some(&event_guid), Some("fun_name"), PerfEventSignalStart);
+            measure!(CallerIdentifier::Guid(caller_guid), Some(&event_guid), Some("fun_name"), PerfEventSignalEnd);
+            measure!(CallerIdentifier::Guid(caller_guid), Some(&event_guid), Some("fun_name"), PerfCallbackStart);
+            measure!(CallerIdentifier::Guid(caller_guid), Some(&event_guid), Some("fun_name"), PerfCallbackEnd);
 
-        // Dynamic-string records (require a caller GUID and a string).
-        measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfFunctionStart);
-        measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfFunctionEnd);
-        measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfInModuleStart);
-        measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfInModuleEnd);
-        measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfCrossModuleStart);
-        measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfCrossModuleEnd);
-        measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfEvent);
+            // Dynamic-string records (require a caller GUID and a string).
+            measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfFunctionStart);
+            measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfFunctionEnd);
+            measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfInModuleStart);
+            measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfInModuleEnd);
+            measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfCrossModuleStart);
+            measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfCrossModuleEnd);
+            measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfEvent);
+        })
+        .unwrap();
     }
 
     /// Verifies the validation paths of [`create_measurement_inner`] for unknown perf ids.
     #[test]
     fn test_core_performance_create_measurement_invalid_params() {
-        let fbpt = TplMutex::new(efi::TPL_NOTIFY, MockFirmwareBasicBootPerfTable::new(), "TestPerfTableLock");
-        let timer = MockTimer {};
+        with_global_lock(|| {
+            let fbpt = TplMutex::new(efi::TPL_NOTIFY, MockFirmwareBasicBootPerfTable::new(), "TestPerfTableLock");
+            let timer = MockTimer {};
 
-        // A PerfEntry must have a known perf id.
-        let unknown_perf_id = 0xFFFF;
-        let result = create_measurement_inner(
-            CallerIdentifier::Handle(0x1_usize as efi::Handle),
-            None,
-            Some("test"),
-            0,
-            0,
-            unknown_perf_id,
-            PerfAttribute::PerfEntry,
-            &fbpt,
-            &timer,
-        );
-        assert_eq!(result.unwrap_err(), Error::Efi(EfiError::InvalidParameter));
+            // A PerfEntry must have a known perf id.
+            let unknown_perf_id = 0xFFFF;
+            let result = create_measurement_inner(
+                CallerIdentifier::Handle(0x1_usize as efi::Handle),
+                None,
+                Some("test"),
+                0,
+                0,
+                unknown_perf_id,
+                PerfAttribute::PerfEntry,
+                &fbpt,
+                &timer,
+            );
+            assert_eq!(result.unwrap_err(), Error::Efi(EfiError::InvalidParameter));
 
-        // If the perf id is unknown, the caller identifier must be a handle.
-        let result = create_measurement_inner(
-            CallerIdentifier::Guid(efi::Guid::from_bytes(&[1; 16])),
-            None,
-            Some("test"),
-            0,
-            0,
-            unknown_perf_id,
-            PerfAttribute::PerfStartEntry,
-            &fbpt,
-            &timer,
-        );
-        assert_eq!(result.unwrap_err(), Error::Efi(EfiError::InvalidParameter));
+            // If the perf id is unknown, the caller identifier must be a handle.
+            let result = create_measurement_inner(
+                CallerIdentifier::Guid(efi::Guid::from_bytes(&[1; 16])),
+                None,
+                Some("test"),
+                0,
+                0,
+                unknown_perf_id,
+                PerfAttribute::PerfStartEntry,
+                &fbpt,
+                &timer,
+            );
+            assert_eq!(result.unwrap_err(), Error::Efi(EfiError::InvalidParameter));
+        })
+        .unwrap();
+    }
+
+    /// Verifies that [`read_performance_config`] reads the config HOB when present and falls back to a disabled
+    /// default when absent.
+    #[test]
+    fn test_core_performance_read_performance_config() {
+        use patina::pi::hob::{GUID_EXTENSION, GuidHob, header};
+
+        // Absent: returns a disabled default.
+        let empty = HobList::new();
+        let config = read_performance_config(&empty);
+        assert!(config.is_none());
+
+        // Present: enabled with a measurement mask of 0x9 (packed u8 + u32, little-endian).
+        let bytes: [u8; 5] = [PerformanceConfig::ENABLED, 0x09, 0x00, 0x00, 0x00];
+        let guid_hob = GuidHob {
+            header: header::Hob { r#type: GUID_EXTENSION, length: 0, reserved: 0 },
+            name: PerformanceConfig::HOB_GUID,
+        };
+        let mut hob_list = HobList::new();
+        hob_list.push(PiHob::GuidHob(&guid_hob, &bytes));
+
+        let config = read_performance_config(&hob_list).expect("config present");
+        assert_eq!(config.enabled, PerformanceConfig::ENABLED);
+        assert_eq!({ config.enabled_measurements }, 0x9);
+    }
+
+    /// Verifies that [`read_hob_performance_records`] merges carried-over performance HOBs and returns `None` when
+    /// none are present.
+    #[test]
+    fn test_core_performance_read_hob_performance_records() {
+        use patina::pi::hob::{GUID_EXTENSION, GuidHob, header};
+
+        // Absent: returns None.
+        let empty = HobList::new();
+        assert!(read_hob_performance_records(&empty).is_none());
+
+        // Present: a single HOB carrying a load-image count and no records.
+        const LOAD_IMAGE_COUNT: u32 = 7;
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&0u32.to_le_bytes()); // size_of_all_entries
+        bytes.extend_from_slice(&LOAD_IMAGE_COUNT.to_le_bytes()); // load_image_count
+        bytes.extend_from_slice(&0u32.to_le_bytes()); // hob_is_full
+        let guid_hob = GuidHob {
+            header: header::Hob { r#type: GUID_EXTENSION, length: 0, reserved: 0 },
+            name: HobPerformanceData::HOB_GUID,
+        };
+        let mut hob_list = HobList::new();
+        hob_list.push(PiHob::GuidHob(&guid_hob, &bytes));
+
+        let (load_image_count, records) = read_hob_performance_records(&hob_list).expect("records present");
+        assert_eq!(load_image_count, LOAD_IMAGE_COUNT);
+        assert_eq!(records.iter().count(), 0);
+    }
+
+    /// Verifies that [`CorePerformance::init`] stores the timer frequency and honors the disable gate. The enabled
+    /// path drives the global FBPT (and thus the global TPL) and is exercised at the integration level instead.
+    #[test]
+    fn test_core_performance_init_disabled_stores_frequency() {
+        const FREQ: u64 = 987_654;
+        let config = PerformanceConfig::new();
+        assert_eq!(config.enabled, PerformanceConfig::DISABLED);
+
+        CorePerformance::init(FREQ, config, None);
+
+        assert_eq!(PERF_FREQUENCY.load(Ordering::Relaxed), FREQ);
     }
 }
