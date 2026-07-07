@@ -38,7 +38,7 @@ use crate::{
 };
 pub use fixed_size_block_allocator::SpinLockedFixedSizeBlockAllocator;
 use patina::pi::{
-    dxe_services::{self, GcdMemoryType},
+    dxe_services::GcdMemoryType,
     hob::{self, EFiMemoryTypeInformation, Hob, HobList, MEMORY_TYPE_INFO_HOB_GUID},
 };
 use r_efi::{efi, system::TPL_HIGH_LEVEL};
@@ -1094,7 +1094,8 @@ fn process_hob_allocations(hob_list: &HobList) {
                 }
 
                 let address = desc.memory_base_address;
-                match GCD.get_existent_memory_descriptor_for_address(address) {
+                match GCD.get_memory_descriptor_for_address(address, |d, _| d.memory_type != GcdMemoryType::NonExistent)
+                {
                     // we found the region in the GCD, so we can allocate it
                     Ok(gcd_desc) => {
                         if gcd_desc.base_address == desc.memory_base_address
@@ -1191,25 +1192,20 @@ fn process_hob_allocations(hob_list: &HobList) {
             }) => {
                 log::trace!("[{}] Processing Firmware Volume HOB:\n{:#x?}\n\n", function!(), hob);
 
-                //The EDK2 C reference core maps FVs to MMIO space, but many implementations don't declare the
-                //corresponding resource descriptor. Check the current region in the GCD to see whether a resource
-                //descriptor of the appropriate type has been reported. If not, print a warning and skip attempting
-                //to reserve it in the GCD.
-                if let Ok(existing_desc) = GCD.get_existent_memory_descriptor_for_address(*base_address)
-                    && (existing_desc.memory_type != dxe_services::GcdMemoryType::MemoryMappedIo
-                        || existing_desc.image_handle != INVALID_HANDLE)
-                {
-                    log::info!(
-                        "Skipping FV HOB at {base_address:#x?} of length {length:#x?}. Containing region is not MMIO."
-                    );
-                    continue;
-                }
+                // EDK II assumes all FVs are MMIO, however many platforms do not report the
+                // backing address space as an MMIO resource, causing the allocation to silently fail.
+                // Instead of assuming MMIO here, retrieve the backing memory type from the GCD if it
+                // exists and allocate the FV region using that type. Note: there are often multiple
+                // FV HOBs for the same FV. This will only allocate for the first HOB since
+                // get_memory_descriptor_for_address() is filtering for free descriptors.
 
                 //The 4K granularity rule does not apply to FV hobs, so allocate_pages cannot be used.
                 //This means they must be direct-allocated in the GCD, and no stats will be tracked for them.
-                let _ = GCD.allocate_memory_space(
+                match GCD.get_memory_descriptor_for_address(*base_address, |_, allocated| !allocated) {
+                    Ok(desc) => {
+                        let _ = GCD.allocate_memory_space(
                     AllocationStrategy::Address(*base_address as usize),
-                    dxe_services::GcdMemoryType::MemoryMappedIo,
+                    desc.memory_type,
                     0,
                     *length as usize,
                     protocol_db::DXE_CORE_HANDLE,
@@ -1219,6 +1215,9 @@ fn process_hob_allocations(hob_list: &HobList) {
                             "Failed to allocate memory space for firmware volume HOB at {base_address:#x?} of length {length:#x?}. Error: {err}",
                         );
                     });
+                    }
+                    Err(_) => continue,
+                }
             }
             _ => continue,
         };
@@ -1229,7 +1228,7 @@ fn process_hob_allocations(hob_list: &HobList) {
     // EFI_MEMORY_MAP reports as EfiConventionalMemory), which will cause a failure that is unnecessary. We do this
     // after HOB processing because we want to ensure that the GCD is fully populated with the memory map
     // before we allocate page 0, as it may not live in system memory, in which case we cannot allocate it.
-    match GCD.get_existent_memory_descriptor_for_address(0) {
+    match GCD.get_memory_descriptor_for_address(0, |d, _| d.memory_type != GcdMemoryType::NonExistent) {
         Ok(desc) if desc.memory_type == GcdMemoryType::SystemMemory => {
             let address: efi::PhysicalAddress = 0;
 
@@ -1639,7 +1638,10 @@ mod tests {
     };
 
     use super::*;
-    use patina::pi::hob::{GUID_EXTENSION, GuidHob, Hob, header};
+    use patina::pi::{
+        dxe_services,
+        hob::{GUID_EXTENSION, GuidHob, Hob, header},
+    };
     use r_efi::efi;
 
     enum GcdInit {
@@ -2062,6 +2064,61 @@ mod tests {
     }
 
     #[test]
+    fn process_hob_allocations_should_allocate_fv_in_system_memory() {
+        // A firmware volume HOB whose region resides in free system memory (rather than MMIO) must still
+        // be allocated so that regular allocations cannot corrupt the FV.
+        with_locked_state(GcdInit::WithHobList(0x1000000), |_physical_hob_list| {
+            // Carve out a page-aligned region of free system memory from the GCD, then free it back so it
+            // becomes free (unallocated) system memory. This is where the FV HOB will point.
+            let fv_len = 0x10000usize; // 64 KiB
+            let fv_base = GCD
+                .allocate_memory_space(
+                    DEFAULT_ALLOCATION_STRATEGY,
+                    GcdMemoryType::SystemMemory,
+                    patina::base::UEFI_PAGE_SHIFT,
+                    fv_len,
+                    protocol_db::DXE_CORE_HANDLE,
+                    None,
+                )
+                .expect("Failed to reserve system memory for the FV region");
+            GCD.free_memory_space(fv_base, fv_len).expect("Failed to free the FV region back to the GCD");
+
+            // Confirm the region is free system memory before processing the FV HOB.
+            let desc = GCD
+                .get_memory_descriptor_for_address(fv_base as u64, |d, allocated| {
+                    !allocated && d.memory_type == GcdMemoryType::SystemMemory
+                })
+                .unwrap();
+            assert_eq!(desc.memory_type, dxe_services::GcdMemoryType::SystemMemory);
+            assert_eq!(desc.image_handle, INVALID_HANDLE);
+
+            // Build a HOB list containing only the FV HOB pointing at the free system memory region.
+            let fv_hob = patina::pi::hob::FirmwareVolume {
+                header: patina::pi::hob::header::Hob {
+                    r#type: hob::FV,
+                    length: core::mem::size_of::<patina::pi::hob::FirmwareVolume>() as u16,
+                    reserved: 0,
+                },
+                base_address: fv_base as u64,
+                length: fv_len as u64,
+            };
+            let mut hob_list = HobList::default();
+            hob_list.push(Hob::FirmwareVolume(&fv_hob));
+
+            process_hob_allocations(&hob_list);
+
+            // The FV region should now be allocated to the DXE Core, still typed as system memory.
+            let desc = GCD
+                .get_memory_descriptor_for_address(fv_base as u64, |d, _| d.memory_type != GcdMemoryType::NonExistent)
+                .unwrap();
+            assert_eq!(desc.memory_type, dxe_services::GcdMemoryType::SystemMemory);
+            assert_eq!(desc.base_address, fv_base as u64);
+            assert_eq!(desc.length, fv_len as u64);
+            assert_eq!(desc.image_handle, protocol_db::DXE_CORE_HANDLE);
+        })
+    }
+
+    #[test]
     fn init_memory_support_should_process_resource_allocations() {
         // 4 MiB of test memory is required because allocator expansion during initialization
         // may need to handle large allocations for memory buckets and HOBs.
@@ -2108,7 +2165,9 @@ mod tests {
             ]
             .iter()
             {
-                let allocator = allocators.get_allocator(*memory_type).unwrap();
+                let allocator = allocators
+                    .get_allocator(*memory_type)
+                    .unwrap_or_else(|| panic!("no allocator for type {:#x}", memory_type));
 
                 let granularity = match *memory_type {
                     efi::RESERVED_MEMORY_TYPE
@@ -2132,14 +2191,18 @@ mod tests {
             }
 
             // confirm the MMIO memory allocation occurred in the GCD
-            let mmio_desc = GCD.get_existent_memory_descriptor_for_address(0x10000000).unwrap();
+            let mmio_desc = GCD
+                .get_memory_descriptor_for_address(0x10000000, |d, _| d.memory_type != GcdMemoryType::NonExistent)
+                .unwrap();
             assert_eq!(mmio_desc.memory_type, dxe_services::GcdMemoryType::MemoryMappedIo);
             assert_eq!(mmio_desc.base_address, 0x10000000);
             assert_eq!(mmio_desc.length, 0x2000);
             assert_eq!(mmio_desc.image_handle, protocol_db::DXE_CORE_HANDLE);
 
             // confirm the rest of the MMIO region is not allocated
-            let mmio_desc = GCD.get_existent_memory_descriptor_for_address(0x10002000).unwrap();
+            let mmio_desc = GCD
+                .get_memory_descriptor_for_address(0x10002000, |d, _| d.memory_type != GcdMemoryType::NonExistent)
+                .unwrap();
             assert_eq!(mmio_desc.memory_type, dxe_services::GcdMemoryType::MemoryMappedIo);
             assert_eq!(mmio_desc.base_address, 0x10002000);
             assert_eq!(mmio_desc.length, 0x1000000 - 0x2000);

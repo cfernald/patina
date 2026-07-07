@@ -10,8 +10,6 @@ mod io_block;
 mod memory_block;
 mod spin_locked_gcd;
 
-pub use spin_locked_gcd::DescriptorFilter;
-
 use goblin::pe::section_table;
 
 use alloc::boxed::Box;
@@ -305,7 +303,7 @@ impl MemoryProtectionPolicy {
         // always map page 0 if it exists in this system, as grub will attempt to read it for legacy boot structures
         // map it WB by default, because 0 is being used as the null page, it may not have gotten cache attributes
         // populated
-        match gcd.get_existent_memory_descriptor_for_address(0) {
+        match gcd.get_memory_descriptor_for_address(0, |d, _| d.memory_type != GcdMemoryType::NonExistent) {
             Ok(descriptor) if descriptor.memory_type == GcdMemoryType::SystemMemory => {
                 // set_memory_space_attributes will set both the GCD and paging attributes
                 if let Err(e) = gcd.set_memory_space_attributes(
@@ -323,7 +321,9 @@ impl MemoryProtectionPolicy {
         let mut address = UEFI_PAGE_SIZE; // start at 0x1000, as we already mapped page 0
         while address < LEGACY_BIOS_WB_ADDRESS {
             let mut size = UEFI_PAGE_SIZE;
-            if let Ok(descriptor) = gcd.get_existent_memory_descriptor_for_address(address as efi::PhysicalAddress) {
+            if let Ok(descriptor) = gcd.get_memory_descriptor_for_address(address as efi::PhysicalAddress, |d, _| {
+                d.memory_type != GcdMemoryType::NonExistent
+            }) {
                 // if the legacy region is not system memory, we should not map it
                 if descriptor.memory_type == GcdMemoryType::SystemMemory {
                     size = match address + descriptor.length as usize {
@@ -361,7 +361,7 @@ impl MemoryProtectionPolicy {
             let mut addr = range.start;
             while addr < range.end {
                 let mut len = UEFI_PAGE_SIZE as u64;
-                match gcd.get_existent_memory_descriptor_for_address(addr) {
+                match gcd.get_memory_descriptor_for_address(addr, |d, _| d.memory_type != GcdMemoryType::NonExistent) {
                     Ok(descriptor) => {
                         let attributes = descriptor.attributes & !efi::MEMORY_XP;
                         len = match descriptor.base_address + descriptor.length {
@@ -405,7 +405,9 @@ impl MemoryProtectionPolicy {
 
         // for this image map all mem RWX preserving cache attributes if we find them
         let stripped_attrs = gcd
-            .get_existent_memory_descriptor_for_address(image_base_page as u64)
+            .get_memory_descriptor_for_address(image_base_page as u64, |d, _| {
+                d.memory_type != GcdMemoryType::NonExistent
+            })
             .map(|desc| desc.attributes & efi::CACHE_ATTRIBUTE_MASK)
             .unwrap_or(patina::base::DEFAULT_CACHE_ATTR);
         if gcd
@@ -780,7 +782,7 @@ mod tests {
         assert!(free_memory_start >= mem_base && free_memory_start < mem_base + MEM_SIZE);
         assert!(free_memory_size <= 0x100000);
         let mut descriptors: Vec<MemorySpaceDescriptor> = Vec::with_capacity(GCD.memory_descriptor_count() + 10);
-        GCD.get_memory_descriptors(&mut descriptors, DescriptorFilter::All).expect("get_memory_descriptors failed.");
+        GCD.get_memory_descriptors(&mut descriptors, |_, _| true).expect("get_memory_descriptors failed.");
         assert!(
             descriptors
                 .iter()
@@ -791,7 +793,7 @@ mod tests {
     fn add_resource_descriptors_should_add_resource_descriptors(hob_list: &HobList, mem_base: u64) {
         add_hob_resource_descriptors_to_gcd(hob_list);
         let mut descriptors: Vec<MemorySpaceDescriptor> = Vec::with_capacity(GCD.memory_descriptor_count() + 10);
-        GCD.get_memory_descriptors(&mut descriptors, DescriptorFilter::All).expect("get_memory_descriptors failed.");
+        GCD.get_memory_descriptors(&mut descriptors, |_, _| true).expect("get_memory_descriptors failed.");
         descriptors
             .iter()
             .find(|x| x.base_address == mem_base + 0xE0000 && x.memory_type == GcdMemoryType::SystemMemory)
@@ -1076,7 +1078,9 @@ mod tests {
                 let mut addr = range.start;
                 while addr < range.end {
                     let mut len = 0x1000;
-                    if let Ok(desc) = GCD.get_existent_memory_descriptor_for_address(addr) {
+                    if let Ok(desc) =
+                        GCD.get_memory_descriptor_for_address(addr, |d, _| d.memory_type != GcdMemoryType::NonExistent)
+                    {
                         assert_eq!(desc.attributes & efi::MEMORY_XP, efi::MEMORY_XP);
                         len = desc.length;
                     }
@@ -1090,7 +1094,9 @@ mod tests {
             let image_num_pages = 4;
             let filename = "legacy_app.efi";
 
-            let desc = GCD.get_existent_memory_descriptor_for_address(image_base_page).unwrap();
+            let desc = GCD
+                .get_memory_descriptor_for_address(image_base_page, |d, _| d.memory_type != GcdMemoryType::NonExistent)
+                .unwrap();
             assert_eq!(desc.attributes & efi::MEMORY_XP, efi::MEMORY_XP);
 
             // 2. Activate compatibility mode
@@ -1106,11 +1112,13 @@ mod tests {
             assert_eq!(policy.memory_allocation_default_attributes.get(), 0);
 
             // 4. Page 0 should be mapped
-            let desc = GCD.get_existent_memory_descriptor_for_address(0).unwrap();
+            let desc =
+                GCD.get_memory_descriptor_for_address(0, |d, _| d.memory_type != GcdMemoryType::NonExistent).unwrap();
             assert_eq!(desc.attributes & efi::CACHE_ATTRIBUTE_MASK, efi::MEMORY_WB);
 
             // 5. Legacy BIOS region (0xA0000) should be mapped if system memory
-            let legacy_desc = GCD.get_existent_memory_descriptor_for_address(0xA0000);
+            let legacy_desc =
+                GCD.get_memory_descriptor_for_address(0xA0000, |d, _| d.memory_type != GcdMemoryType::NonExistent);
             if let Ok(desc) = legacy_desc
                 && desc.memory_type == GcdMemoryType::SystemMemory
             {
@@ -1125,7 +1133,9 @@ mod tests {
                 let mut addr = range.start;
                 while addr < range.end {
                     let mut len = 0x1000;
-                    if let Ok(desc) = GCD.get_existent_memory_descriptor_for_address(addr) {
+                    if let Ok(desc) =
+                        GCD.get_memory_descriptor_for_address(addr, |d, _| d.memory_type != GcdMemoryType::NonExistent)
+                    {
                         assert_eq!(desc.attributes & efi::MEMORY_XP, 0);
                         len = desc.length;
                     }
@@ -1134,7 +1144,9 @@ mod tests {
             }
 
             // 7. The image region should be mapped RWX (XP cleared)
-            let desc = GCD.get_existent_memory_descriptor_for_address(image_base_page).unwrap();
+            let desc = GCD
+                .get_memory_descriptor_for_address(image_base_page, |d, _| d.memory_type != GcdMemoryType::NonExistent)
+                .unwrap();
             assert_eq!(desc.attributes & efi::MEMORY_XP, 0);
         });
     }

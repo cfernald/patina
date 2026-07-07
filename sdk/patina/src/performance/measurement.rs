@@ -26,6 +26,7 @@ use crate::{
         error::Error,
         globals::{get_load_image_count, get_static_state, increment_load_image_count},
         record::{
+            PerformanceRecord,
             extended::{
                 DualGuidStringEventRecord, DynamicStringEventRecord, GuidEventRecord, GuidQwordEventRecord,
                 GuidQwordStringEventRecord,
@@ -211,6 +212,27 @@ pub fn create_performance_measurement(
     }
 }
 
+/// Adds a record to the FBPT, returning an error if the table lock cannot be acquired.
+///
+/// The FBPT [`TplMutex`] must never be acquired re-entrantly. A re-entrant performance measurement
+/// may occur when dropping a measurement's lock guard restores the TPL and dispatches a pending
+/// event notification whose callback creates another measurement before the guard finishes releasing
+/// the lock. To avoid panicking, this attempts lock acquisition and, on contention, drops the record and returns
+/// [`EfiError::InvalidParameter`] so the caller can observe that the record was not added. This is similar
+/// in behavior and return status to the edk2 implementation of [`create_performance_measurement`].
+fn add_fbpt_record<B, F, T>(fbpt: &TplMutex<F, B>, record: T) -> Result<(), Error>
+where
+    B: BootServices,
+    F: FirmwareBasicBootPerfTable,
+    T: PerformanceRecord,
+{
+    match fbpt.try_lock() {
+        Ok(mut table) => table.add_record(record),
+        // Re-entrant measurement: See function docs.
+        Err(()) => Err(EfiError::InvalidParameter.into()),
+    }
+}
+
 /// Create a performance measurement and add it to the FBPT.
 #[allow(clippy::too_many_arguments)]
 fn _create_performance_measurement<B, F>(
@@ -254,7 +276,7 @@ where
             return Err(EfiError::InvalidParameter.into());
         };
         let module_name = string.unwrap_or("unknown name");
-        fbpt.lock().add_record(DynamicStringEventRecord::new(perf_id, 0, timestamp, guid, module_name))?;
+        add_fbpt_record(fbpt, DynamicStringEventRecord::new(perf_id, 0, timestamp, guid, module_name))?;
         return Ok(());
     };
 
@@ -266,7 +288,7 @@ where
                 return Err(EfiError::InvalidParameter.into());
             };
             let record = GuidEventRecord::new(perf_id, 0, timestamp, guid);
-            fbpt.lock().add_record(record)?;
+            add_fbpt_record(fbpt, record)?;
         }
         id @ KnownPerfId::ModuleLoadImageStart | id @ KnownPerfId::ModuleLoadImageEnd => {
             if id == KnownPerfId::ModuleLoadImageStart {
@@ -278,7 +300,7 @@ where
                 return Err(EfiError::InvalidParameter.into());
             };
             let record = GuidQwordEventRecord::new(perf_id, 0, timestamp, guid, get_load_image_count() as u64);
-            fbpt.lock().add_record(record)?;
+            add_fbpt_record(fbpt, record)?;
         }
         KnownPerfId::ModuleDbStart
         | KnownPerfId::ModuleDbSupportStart
@@ -291,7 +313,7 @@ where
                 return Err(EfiError::InvalidParameter.into());
             };
             let record = GuidQwordEventRecord::new(perf_id, 0, timestamp, guid, address as u64);
-            fbpt.lock().add_record(record)?;
+            add_fbpt_record(fbpt, record)?;
         }
         KnownPerfId::ModuleDbEnd => {
             let module_handle = caller_identifier.as_handle().ok_or(EfiError::InvalidParameter)?;
@@ -301,7 +323,7 @@ where
             };
             let module_name = "";
             let record = GuidQwordStringEventRecord::new(perf_id, 0, timestamp, guid, address as u64, module_name);
-            fbpt.lock().add_record(record)?;
+            add_fbpt_record(fbpt, record)?;
         }
         KnownPerfId::PerfEventSignalStart
         | KnownPerfId::PerfEventSignalEnd
@@ -319,7 +341,7 @@ where
                 (*guid).into(),
                 function_string,
             );
-            fbpt.lock().add_record(record)?;
+            add_fbpt_record(fbpt, record)?;
         }
 
         KnownPerfId::PerfFunctionStart
@@ -332,7 +354,7 @@ where
             let module_guid = caller_identifier.as_guid().ok_or(EfiError::InvalidParameter)?;
             let string = string.unwrap_or("unknown name");
             let record = DynamicStringEventRecord::new(perf_id, 0, timestamp, (*module_guid).into(), string);
-            fbpt.lock().add_record(record)?;
+            add_fbpt_record(fbpt, record)?;
         }
     }
     Ok(())
