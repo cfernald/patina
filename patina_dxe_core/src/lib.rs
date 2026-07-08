@@ -480,6 +480,18 @@ impl<P: PlatformInfo> Core<P> {
 
         log::info!("GCD - After memory init:\n{GCD}");
 
+        // Initialize the core performance service from the HOB configuration (or the platform default) before
+        // registering it below, so the service is published only when performance measurement is enabled. The engine
+        // relies only on the arch timer and its own `TplMutex`, both of which are available at this point.
+        let perf_config =
+            performance::read_performance_config(self.hob_list()).unwrap_or(P::default_performance_config());
+        let perf_hob_records = performance::read_hob_performance_records(self.hob_list());
+        performance::CorePerformance::init(
+            P::CpuInfo::perf_timer_frequency().unwrap_or(0),
+            perf_config,
+            perf_hob_records,
+        );
+
         let mut component_dispatcher = self.component_dispatcher.lock();
         component_dispatcher.add_service(DxeCpu(cpu));
         component_dispatcher.add_service(DxeInterruptManager(interrupt_manager));
@@ -555,17 +567,6 @@ impl<P: PlatformInfo> Core<P> {
         let boot_services = StandardBootServices::new(st.boot_services().as_mut_ptr());
         let runtime_services = StandardRuntimeServices::new(st.runtime_services().as_mut_ptr());
         drop(st_guard);
-
-        // Initialize the performance measurement service with the configuration from the HOB list or the platform
-        // selected default configuration if no HOB is present.
-        let perf_config =
-            performance::read_performance_config(self.hob_list()).unwrap_or(P::default_performance_config());
-        let perf_hob_records = performance::read_hob_performance_records(self.hob_list());
-        performance::CorePerformance::init(
-            P::CpuInfo::perf_timer_frequency().unwrap_or(0),
-            perf_config,
-            perf_hob_records,
-        );
 
         self.component_dispatcher.lock().set_boot_services(boot_services);
         self.component_dispatcher.lock().set_runtime_services(runtime_services);

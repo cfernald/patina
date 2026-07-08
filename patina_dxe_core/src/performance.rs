@@ -83,8 +83,8 @@ impl CorePerformance {
             Self::set_perf_records(perf_records);
         }
 
-        // This PEI end and DXE begin are later into the DXE phase than ideal. However, this cannot be improved without
-        // integrating performance earlier into the core.
+        // Record the PEI-end / DXE-begin cross-module markers. This runs during core memory initialization, as early
+        // as the performance engine can record into its table, so the DXE span is captured close to the phase boundary.
         let dxe_core_guid = patina::guids::DXE_CORE.into_inner();
         CorePerformance.perf_cross_module_end("PEI", &dxe_core_guid);
         CorePerformance.perf_cross_module_begin("DXE", &dxe_core_guid);
