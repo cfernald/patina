@@ -20,11 +20,7 @@ use core::{
 use alloc::string::ToString;
 use patina::{
     component::service::{Service, performance::PerformanceMeasurement},
-    performance::{
-        error::Error,
-        measurement::CallerIdentifier,
-        record::known::{KnownPerfId, KnownPerfToken},
-    },
+    performance::{error::Error, measurement::CallerIdentifier, record::known::KnownPerfId},
     uefi_protocol::performance_measurement::PerfAttribute,
 };
 use r_efi::efi;
@@ -100,27 +96,15 @@ pub(crate) unsafe extern "efiapi" fn create_performance_measurement_efiapi(
         return efi::Status::INVALID_PARAMETER;
     }
 
-    let mut perf_id = identifier as u16;
-    let is_known_id = KnownPerfId::try_from(perf_id).is_ok();
-    let is_known_token = string.as_ref().is_some_and(|s| KnownPerfToken::try_from(s.as_str()).is_ok());
-    if attribute != PerfAttribute::PerfEntry {
-        if perf_id != 0 && is_known_id && is_known_token {
-            return efi::Status::INVALID_PARAMETER;
-        } else if perf_id != 0 && !is_known_id && !is_known_token {
-            // By convention, a start measurement should have its lower 4 bits as 0.
-            if attribute == PerfAttribute::PerfStartEntry && ((perf_id & 0x000F) != 0) {
-                perf_id &= 0xFFF0;
-            // By convention, an end measurement should have its lower 4 bits not as 0.
-            } else if attribute == PerfAttribute::PerfEndEntry && ((perf_id & 0x000F) == 0) {
-                perf_id += 1;
-            }
-        } else if perf_id == 0 {
-            match KnownPerfId::try_from_perf_info(caller_identifier as efi::Handle, string.as_ref(), attribute) {
-                Ok(known_perf_id) => perf_id = known_perf_id.as_u16(),
-                Err(status) => return status,
-            }
-        }
-    }
+    let perf_id = match KnownPerfId::normalize_perf_id(
+        identifier as u16,
+        caller_identifier as efi::Handle,
+        string.as_ref(),
+        attribute,
+    ) {
+        Ok(perf_id) => perf_id,
+        Err(status) => return status,
+    };
 
     let is_guid = CallerIdentifier::perf_id_is_guid(perf_id);
     // SAFETY: This is enforced by the safety contract of this function.
