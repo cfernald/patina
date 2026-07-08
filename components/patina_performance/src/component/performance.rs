@@ -1,11 +1,7 @@
 //! Patina Performance Component
 //!
-//! Publishes the firmware performance data produced by the DXE Core to the rest of the UEFI environment. The DXE Core
-//! owns the performance measurement engine (the timer, the Firmware Basic Boot Performance Table, the measurement mask,
-//! the carried-over records, and the recording of boot measurements); this component is the DXE integration and
-//! interoperability layer on top of it. It publishes the FBPT at End of DXE, installs the EDK II Performance
-//! Measurement protocol for C drivers, exposes performance properties through a configuration table, and optionally
-//! merges Management Mode (MM) performance records.
+//! Publishes the firmware performance data produced by the DXE Core to the rest of the UEFI environment. This crate
+//! acts as the UEFI/ACPI translation layer for the performance implementation in the DXE Core.
 //!
 //! ## License
 //!
@@ -51,18 +47,12 @@ type MmPerformanceEventContext<B> = Box<(B, Service<dyn PerformanceMeasurement>,
 /// Context parameter for the End-of-DXE event callback that publishes the FBPT.
 type ReportFbptEventContext<B, R> = Box<(B, R, Service<dyn PerformanceMeasurement>)>;
 
-/// Performance reporting component.
+/// Performance component.
 ///
-/// The DXE Core owns the performance measurement engine: the timer, the Firmware Basic Boot Performance Table (FBPT),
-/// the active measurement mask, the load-image count, the records carried over from prior boot phases, and the
-/// recording of boot measurements. This component is the DXE integration layer on top of that engine. It publishes the
-/// FBPT at End of DXE, installs the EDK II Performance Measurement protocol for C drivers, exposes performance
-/// properties through a configuration table, and optionally merges Management Mode (MM) performance records.
-///
-/// Whether performance measurement is enabled is decided by the DXE Core from the performance configuration (a
-/// configuration HOB, falling back to the platform-provided default). When performance is disabled the core does not
-/// publish the [`PerformanceMeasurement`] service, so this component's service dependency is unsatisfied and it does
-/// not dispatch.
+/// This component provides performance measurement capabilities in the UEFI boot environment, exposing the core
+/// performance functionality exposed by the performance measurement service. This crate will package those function
+/// into a UEFI protocol and provide the necessary event callbacks to publish the performance data to the rest of the
+/// UEFI environment
 ///
 /// ## Example Usage
 ///

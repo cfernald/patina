@@ -5,7 +5,7 @@ repository.workspace = true
 license.workspace = true
 edition.workspace = true
 readme = "README.md"
-description = "Publishes core performance information to UEFI"
+description = "Performance measurement infrastructure."
 
 [lints]
 workspace = true
