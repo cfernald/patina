@@ -76,11 +76,11 @@ impl CorePerformance {
             return;
         }
 
-        PERF_MEASUREMENT_MASK.store(config.enabled_measurements, Ordering::Relaxed);
+        Self::set_measurement_mask(config.enabled_measurements);
 
         if let Some((load_image_count, perf_records)) = hob_records {
-            LOAD_IMAGE_COUNT.store(load_image_count, Ordering::Relaxed);
-            PERFORMANCE_TABLE.lock().set_perf_records(perf_records);
+            Self::set_load_image_count(load_image_count);
+            Self::set_perf_records(perf_records);
         }
 
         // This PEI end and DXE begin are later into the DXE phase than ideal. However, this cannot be improved without
@@ -92,6 +92,21 @@ impl CorePerformance {
 
     pub(crate) fn enabled() -> bool {
         PERF_MEASUREMENT_MASK.load(Ordering::Relaxed) != 0
+    }
+
+    /// Stores the bitmask of enabled measurements.
+    fn set_measurement_mask(mask: u32) {
+        PERF_MEASUREMENT_MASK.store(mask, Ordering::Relaxed);
+    }
+
+    /// Stores the running load-image count, typically restored from a HOB at startup.
+    fn set_load_image_count(count: u32) {
+        LOAD_IMAGE_COUNT.store(count, Ordering::Relaxed);
+    }
+
+    /// Initializes the tracked performance records, typically restored from a HOB at startup.
+    fn set_perf_records(perf_records: PerformanceRecordBuffer) {
+        PERFORMANCE_TABLE.lock().set_perf_records(perf_records);
     }
 
     /// Begins performance measurement of start image in core.
@@ -287,21 +302,6 @@ pub(crate) fn read_hob_performance_records(hob_list: &HobList) -> Option<(u32, P
 }
 
 impl PerformanceMeasurement for CorePerformance {
-    fn set_measurement_mask(&self, mask: u32) {
-        PERF_MEASUREMENT_MASK.store(mask, Ordering::Relaxed);
-    }
-
-    fn set_load_image_count(&self, count: u32) {
-        LOAD_IMAGE_COUNT.store(count, Ordering::Relaxed);
-    }
-
-    fn set_perf_records(&self, perf_records: PerformanceRecordBuffer) {
-        match PERFORMANCE_TABLE.try_lock() {
-            Some(mut table) => table.set_perf_records(perf_records),
-            None => log::error!("Performance: failed to set performance records"),
-        }
-    }
-
     fn create_measurement(
         &self,
         caller_identifier: CallerIdentifier,

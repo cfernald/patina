@@ -12,7 +12,7 @@ use crate::{
     performance::{
         error::Error,
         measurement::CallerIdentifier,
-        record::{GenericPerformanceRecord, PerformanceRecordBuffer, known::KnownPerfId},
+        record::{GenericPerformanceRecord, known::KnownPerfId},
     },
     uefi_protocol::performance_measurement::PerfAttribute,
 };
@@ -20,15 +20,6 @@ use crate::{
 /// Service that records firmware performance measurements into the Firmware Basic Boot Performance Table (FBPT).
 ///
 pub trait PerformanceMeasurement: Send + Sync {
-    /// Sets the bitmask of enabled [`Measurement`](crate::performance::Measurement)s.
-    fn set_measurement_mask(&self, mask: u32);
-
-    /// Sets the running load-image count, typically restored from a HOB at startup.
-    fn set_load_image_count(&self, count: u32);
-
-    /// Initializes the performance records of the table, typically restored from a HOB at startup.
-    fn set_perf_records(&self, perf_records: PerformanceRecordBuffer);
-
     /// Function to log performance record with event description and a timestamp.
     #[allow(clippy::too_many_arguments)]
     fn create_measurement(

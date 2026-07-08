@@ -43,7 +43,6 @@ classDiagram
         <<service trait>>
         +create_measurement()
         +publish_table()
-        +set_measurement_mask()
         +etc()
     }
     class CorePerformance {

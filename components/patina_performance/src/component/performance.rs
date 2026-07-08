@@ -516,10 +516,7 @@ mod tests {
             c_ptr::{CMutPtr, CPtr},
         },
         component::service::{IntoService, Service},
-        performance::{
-            error::Error, measurement::CallerIdentifier, record::PerformanceRecordBuffer,
-            table::FirmwarePerformanceVariable,
-        },
+        performance::{error::Error, measurement::CallerIdentifier, table::FirmwarePerformanceVariable},
         runtime_services::MockRuntimeServices,
         uefi_protocol::{
             ProtocolInterface,
@@ -610,9 +607,6 @@ mod tests {
     }
 
     impl PerformanceMeasurement for MockPerf {
-        fn set_measurement_mask(&self, _mask: u32) {}
-        fn set_load_image_count(&self, _count: u32) {}
-        fn set_perf_records(&self, _perf_records: PerformanceRecordBuffer) {}
         fn create_measurement(
             &self,
             _caller_identifier: CallerIdentifier,
