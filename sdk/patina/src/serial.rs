@@ -8,17 +8,18 @@
 //!
 
 /// A Trait for a Rust-UEFI serial IO access.
-pub trait SerialIO: Sync {
+pub trait SerialIO: Send {
     /// Initialize the serial port.
-    fn init(&self);
+    fn init(&mut self);
     /// Write a buffer to the serial port.
-    fn write(&self, buffer: &[u8]);
+    fn write(&mut self, buffer: &[u8]);
     /// Read a byte from the serial port, blocking until a byte is available.
-    fn read(&self) -> u8;
+    fn read(&mut self) -> u8;
     /// Try to read a byte from the serial port, returning `None` if no byte is available.
-    fn try_read(&self) -> Option<u8>;
+    fn try_read(&mut self) -> Option<u8>;
 }
 
+pub mod shared;
 pub mod uart;
 pub mod virtio;
 

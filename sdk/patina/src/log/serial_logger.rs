@@ -6,7 +6,7 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 //!
-use crate::serial::SerialIO;
+use crate::serial::{SerialIO, shared::SharedSerial};
 use core::marker::Send;
 
 use super::Format;
@@ -21,7 +21,7 @@ pub struct Logger<'a, S>
 where
     S: SerialIO + Send,
 {
-    serial_port: S,
+    serial_port: SharedSerial<S>,
     target_filters: &'a [(&'a str, log::LevelFilter)],
     max_level: log::LevelFilter,
     format: Format,
@@ -38,7 +38,7 @@ where
         max_level: log::LevelFilter,
         serial_port: S,
     ) -> Self {
-        Self { serial_port, target_filters, max_level, format }
+        Self { serial_port: SharedSerial::new(serial_port), target_filters, max_level, format }
     }
 }
 
@@ -73,7 +73,7 @@ struct LogWriter<'a, S>
 where
     S: SerialIO + Send,
 {
-    serial_port: &'a S,
+    serial_port: &'a SharedSerial<S>,
 }
 
 impl<S> core::fmt::Write for LogWriter<'_, S>
@@ -81,7 +81,8 @@ where
     S: SerialIO + Send,
 {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        self.serial_port.write(s.as_bytes());
+        // Best-effort: serial write failures (e.g. contested access) must not break logging.
+        let _ = self.serial_port.write(s.as_bytes());
         Ok(())
     }
 }

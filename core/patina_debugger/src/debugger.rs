@@ -22,7 +22,10 @@ use gdbstub::{
     conn::{Connection, ConnectionExt},
     stub::{GdbStubBuilder, SingleThreadStopReason, state_machine::GdbStubStateMachine},
 };
-use patina::{component::service::perf_timer::ArchTimerFunctionality, serial::SerialIO};
+use patina::{
+    component::service::perf_timer::ArchTimerFunctionality,
+    serial::{SerialIO, shared::SharedSerial},
+};
 use patina_internal_cpu::interrupts::{ExceptionType, HandlerType, InterruptHandler, InterruptManager};
 use spin::Mutex;
 
@@ -72,7 +75,7 @@ where
     T: SerialIO + 'static,
 {
     /// The transport for the debugger.
-    transport: T,
+    transport: SharedSerial<T>,
     /// The exception types the debugger will register for.
     exception_types: &'static [usize],
     /// Controls what the debugger does with logging.
@@ -118,7 +121,7 @@ impl<T: SerialIO> PatinaDebugger<T> {
     ///
     pub const fn new(transport: T) -> Self {
         PatinaDebugger {
-            transport,
+            transport: SharedSerial::new(transport),
             log_policy: DebuggerLoggingPolicy::SuspendLogging,
             transport_init: false,
             exception_types: SystemArch::DEFAULT_EXCEPTION_TYPES,
@@ -226,7 +229,7 @@ impl<T: SerialIO> PatinaDebugger<T> {
             Some(_) => debug.gdb.take().unwrap(),
             None => {
                 // Flush any stale data from the transport.
-                while self.transport.try_read().is_some() {}
+                while self.transport.try_read().map_err(|_| DebugError::TransportFailure)?.is_some() {}
 
                 // SAFETY: The buffer will only ever be used by the paired GDB stub
                 // within the internal state lock. Because there is no GDB stub at
@@ -358,8 +361,9 @@ impl<T: SerialIO> Debugger for PatinaDebugger<T> {
         log::info!("Initializing debugger.");
 
         // Initialize the underlying transport.
-        if self.transport_init {
-            self.transport.init();
+        if self.transport_init && self.transport.init().is_err() {
+            log::error!("Failed to initialize transport.");
+            return;
         }
 
         // Initialize any architecture specifics.
@@ -442,7 +446,7 @@ impl<T: SerialIO> Debugger for PatinaDebugger<T> {
             return;
         }
 
-        while let Some(byte) = self.transport.try_read() {
+        while let Ok(Some(byte)) = self.transport.try_read() {
             if byte == CRTL_C {
                 // Ctrl-C
                 SystemArch::breakpoint();
