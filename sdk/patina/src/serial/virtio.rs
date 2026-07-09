@@ -147,6 +147,20 @@ mod tests {
     }
 
     #[test]
+    fn test_virtio_init_checks() {
+        let regs = VirtioMmioRegs::new_fake(VIRTIO_ID_CONSOLE);
+        let mut serial: VirtioSerial<4, 16> = test_instance(&regs);
+
+        // The test instance is already initialized, so this tests the re-init path.
+        serial.init();
+
+        // Now forcibly uninit, and make sure that all calls fail gracefully.
+        serial.initialized = false;
+        serial.write(b"a");
+        assert_eq!(serial.try_read(), None);
+    }
+
+    #[test]
     fn test_virtio_serial_write_single_descriptor() {
         let regs = VirtioMmioRegs::new_fake(VIRTIO_ID_CONSOLE);
         let mut serial: VirtioSerial<4, 16> = test_instance(&regs);
