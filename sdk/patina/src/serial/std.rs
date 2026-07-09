@@ -12,19 +12,19 @@ use std::io::{Read, Write};
 pub struct Terminal {}
 
 impl super::SerialIO for Terminal {
-    fn init(&self) {}
+    fn init(&mut self) {}
 
-    fn write(&self, buffer: &[u8]) {
+    fn write(&mut self, buffer: &[u8]) {
         std::io::stdout().write_all(buffer).unwrap();
     }
 
-    fn read(&self) -> u8 {
+    fn read(&mut self) -> u8 {
         let buffer = &mut [0u8; 1];
         std::io::stdin().read_exact(buffer).unwrap();
         buffer[0]
     }
 
-    fn try_read(&self) -> Option<u8> {
+    fn try_read(&mut self) -> Option<u8> {
         let buffer = &mut [0u8; 1];
         match std::io::stdin().read(buffer) {
             Ok(0) => None,

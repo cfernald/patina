@@ -20,7 +20,7 @@ use patina::{
     error::EfiError,
     log::Format,
     pi::hob::{Hob, PhaseHandoffInformationTable},
-    serial::SerialIO,
+    serial::{SerialIO, shared::SharedSerial},
 };
 use r_efi::efi;
 use spin::RwLock;
@@ -48,7 +48,7 @@ pub struct AdvancedLogger<'a, S>
 where
     S: SerialIO + Send,
 {
-    hardware_port: S,
+    hardware_port: SharedSerial<S>,
     target_filters: &'a [TargetFilter<'a>],
     max_level: log::LevelFilter,
     format: Format,
@@ -76,7 +76,7 @@ where
         hardware_port: S,
     ) -> Self {
         Self {
-            hardware_port,
+            hardware_port: SharedSerial::new(hardware_port),
             target_filters,
             max_level,
             format,
@@ -152,7 +152,8 @@ where
         }
 
         if hw_write {
-            self.hardware_port.write(data);
+            let result = self.hardware_port.write(data);
+            debug_assert!(result.is_ok(), "Failed to write to hardware port: {:?}", result);
         }
     }
 

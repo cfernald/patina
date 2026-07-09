@@ -12,7 +12,7 @@
 
 use core::result::Result;
 use gdbstub::conn::{Connection, ConnectionExt};
-use patina::serial::SerialIO;
+use patina::serial::{SerialIO, shared::SharedSerial};
 
 /// Serial Connection for use with GdbStub
 ///
@@ -20,14 +20,14 @@ use patina::serial::SerialIO;
 ///
 pub(crate) struct SerialConnection<'a, T: SerialIO> {
     /// Serial IO transport for connecting to the debugger.
-    transport: &'a T,
+    transport: &'a SharedSerial<T>,
     /// Peeked byte for use with the GdbStub peek method.
     peeked_byte: Option<u8>,
 }
 
 impl<'a, T: SerialIO> SerialConnection<'a, T> {
     /// Create a new SerialConnection
-    pub fn new(transport: &'a T) -> Self {
+    pub fn new(transport: &'a SharedSerial<T>) -> Self {
         SerialConnection { transport, peeked_byte: None }
     }
 }
@@ -38,7 +38,7 @@ impl<T: SerialIO> Connection for SerialConnection<'_, T> {
     /// Write a byte to the serial transport.
     fn write(&mut self, byte: u8) -> Result<(), Self::Error> {
         let buff = [byte];
-        self.transport.write(&buff);
+        self.transport.write(&buff)?;
         Ok(())
     }
 
@@ -57,7 +57,7 @@ impl<T: SerialIO> ConnectionExt for SerialConnection<'_, T> {
             return Ok(byte);
         }
 
-        Ok(self.transport.read())
+        self.transport.read()
     }
 
     /// Peek a byte from the serial transport.
@@ -66,7 +66,7 @@ impl<T: SerialIO> ConnectionExt for SerialConnection<'_, T> {
             return Ok(self.peeked_byte);
         }
 
-        match self.transport.try_read() {
+        match self.transport.try_read()? {
             Some(byte) => {
                 self.peeked_byte = Some(byte);
                 Ok(Some(byte))
@@ -107,10 +107,10 @@ mod tests {
         Serial {}
 
         impl SerialIO for Serial {
-            fn init(&self);
-            fn write(&self, buffer: &[u8]);
-            fn read(&self) -> u8;
-            fn try_read(&self) -> Option<u8>;
+            fn init(&mut self);
+            fn write(&mut self, buffer: &[u8]);
+            fn read(&mut self) -> u8;
+            fn try_read(&mut self) -> Option<u8>;
         }
     }
 
@@ -123,7 +123,8 @@ mod tests {
         mock.expect_write().with(mockall::predicate::eq([0x02])).times(1).returning(|_| ());
         mock.expect_write().with(mockall::predicate::eq([0x03])).times(1).returning(|_| ());
 
-        let mut connection = SerialConnection::new(&mock);
+        let shared = SharedSerial::new(mock);
+        let mut connection = SerialConnection::new(&shared);
 
         // Test writing multiple bytes
         for &byte in &[0x01, 0x02, 0x03] {
@@ -135,7 +136,8 @@ mod tests {
     #[test]
     fn test_connection_flush() {
         let mock = MockSerial::new();
-        let mut connection = SerialConnection::new(&mock);
+        let shared = SharedSerial::new(mock);
+        let mut connection = SerialConnection::new(&shared);
 
         // Flush should always succeed and do nothing for SerialIO
         let result = connection.flush();
@@ -151,7 +153,8 @@ mod tests {
         mock.expect_read().times(1).returning(|| 0xBB);
         mock.expect_read().times(1).returning(|| 0xCC);
 
-        let mut connection = SerialConnection::new(&mock);
+        let shared = SharedSerial::new(mock);
+        let mut connection = SerialConnection::new(&shared);
 
         // Read the data back
         for expected_byte in [0xAA, 0xBB, 0xCC] {
@@ -170,7 +173,8 @@ mod tests {
         mock.expect_try_read().times(1).returning(|| Some(0xEE));
         mock.expect_try_read().times(1).returning(|| None);
 
-        let mut connection = SerialConnection::new(&mock);
+        let shared = SharedSerial::new(mock);
+        let mut connection = SerialConnection::new(&shared);
 
         // First peek should return the first byte
         let result = connection.peek();

@@ -46,8 +46,22 @@ pub fn rdtsc() -> u64 {
     ((hi as u64) << 32) | lo as u64
 }
 
+/// Returns the Current Privilege Level (CPL) from the CS selector.
+fn current_privilege_level() -> u16 {
+    let cs: u16;
+    // SAFETY: Reading the CS register has no side effects.
+    unsafe {
+        asm!("mov {0:x}, cs", out(reg) cs, options(nostack, nomem));
+    }
+    cs & 0b11
+}
+
 impl super::Interrupts for X64 {
     fn enable_interrupts() {
+        // `sti` is privileged and only valid at CPL 0.
+        if current_privilege_level() != 0 {
+            return;
+        }
         // SAFETY: Enabling interrupts via `sti` does not violate memory safety; the caller is
         // responsible for ensuring the system is ready to service interrupts. This operation
         // preserves flags even though it sets the IF flag, because preserves_flags is only about
@@ -58,9 +72,11 @@ impl super::Interrupts for X64 {
     }
 
     fn disable_interrupts() {
-        // SAFETY: Disabling interrupts via `cli` does not violate memory safety. This operation
-        // preserves flags even though it sets the IF flag, because preserves_flags is only about
-        // status flags, not control flags.
+        // `cli` is privileged and only valid at CPL 0.
+        if current_privilege_level() != 0 {
+            return;
+        }
+        // SAFETY: Disabling interrupts via `cli` does not violate memory safety.
         unsafe {
             asm!("cli", options(nostack, nomem, preserves_flags));
         }

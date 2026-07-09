@@ -12,16 +12,16 @@
 pub struct UartNull {}
 
 impl super::SerialIO for UartNull {
-    fn init(&self) {}
+    fn init(&mut self) {}
 
-    fn write(&self, _buffer: &[u8]) {}
+    fn write(&mut self, _buffer: &[u8]) {}
 
-    fn read(&self) -> u8 {
+    fn read(&mut self) -> u8 {
         // PANIC: Would loop forever, better to panic.
         panic!();
     }
 
-    fn try_read(&self) -> Option<u8> {
+    fn try_read(&mut self) -> Option<u8> {
         None
     }
 }
@@ -31,34 +31,6 @@ cfg_if::cfg_if! {
 
         use uart_16550::MmioSerialPort;
         use uart_16550::SerialPort as IoSerialPort;
-
-        /// Returns the Current Privilege Level (CPL) from the CS selector.
-        fn current_privilege_level() -> u16 {
-            let cs: u16;
-            // SAFETY: Reading the CS register has no side effects.
-            unsafe { core::arch::asm!("mov {0:x}, cs", out(reg) cs, options(nostack, nomem)); }
-            cs & 0b11
-        }
-
-        /// Runs `f` with CPU interrupts disabled, restoring the previous interrupt state afterward.
-        fn without_interrupts<F, R>(f: F) -> R
-        where
-            F: FnOnce() -> R,
-        {
-            let flags: u64;
-            // SAFETY: Reading RFLAGS and disabling interrupts around the closure is safe because we restore
-            // interrupts afterwards, but only if they were previously enabled.
-            unsafe {
-                core::arch::asm!("pushfq; pop {0}; cli", out(reg) flags, options(nomem));
-            }
-            let result = f();
-            // Restore interrupts only if they were previously enabled (IF bit).
-            if flags & (1 << 9) != 0 {
-                // SAFETY: Re-enabling interrupts that were enabled before.
-                unsafe { core::arch::asm!("sti", options(nostack, nomem)); }
-            }
-            result
-        }
 
         /// An interface for writing to a Uart16550 device.
         #[derive(Debug)]
@@ -78,7 +50,7 @@ cfg_if::cfg_if! {
         }
 
         impl super::SerialIO for Uart16550 {
-            fn init(&self) {
+            fn init(&mut self) {
                 match self {
                     Uart16550::Io { base } => {
                         // SAFETY: The base address is provided during Uart16550 construction and is assumed to be valid for I/O port access.
@@ -93,42 +65,26 @@ cfg_if::cfg_if! {
                 }
             }
 
-            fn write(&self, buffer: &[u8]) {
+            fn write(&mut self, buffer: &[u8]) {
                 match self {
                     Uart16550::Io { base } => {
                         // SAFETY: The base address is provided during Uart16550 construction and is assumed to be valid for I/O port access.
                         let mut serial_port = unsafe { IoSerialPort::new(*base) };
-                        let mut send = || {
-                            for b in buffer {
-                                serial_port.send(*b);
-                            }
-                        };
-                        if current_privilege_level() == 0 {
-                            // CPL is 0, so cli/sti are permitted.
-                            without_interrupts(send);
-                        } else {
-                            send();
+                        for b in buffer {
+                            serial_port.send(*b);
                         }
                     }
                     Uart16550::Mmio { base, reg_stride } => {
                         // SAFETY: The base address and stride are provided during Uart16550 construction and are assumed to be valid for MMIO access.
                         let mut serial_port = unsafe { MmioSerialPort::new_with_stride(*base, *reg_stride) };
-                        let mut send = || {
-                            for b in buffer {
-                                serial_port.send(*b);
-                            }
-                        };
-                        if current_privilege_level() == 0 {
-                            // CPL is 0, so cli/sti are permitted.
-                            without_interrupts(send);
-                        } else {
-                            send();
+                        for b in buffer {
+                            serial_port.send(*b);
                         }
                     }
                 }
             }
 
-            fn read(&self) -> u8 {
+            fn read(&mut self) -> u8 {
                 match self {
                     Uart16550::Io { base } => {
                         // SAFETY: The base address is provided during Uart16550 construction and is assumed to be valid for I/O port access.
@@ -143,7 +99,7 @@ cfg_if::cfg_if! {
                 }
             }
 
-            fn try_read(&self) -> Option<u8> {
+            fn try_read(&mut self) -> Option<u8> {
                 match self {
                     Uart16550::Io { base } => {
                         // SAFETY: The base address is provided during Uart16550 construction and is assumed to be valid for I/O port access.
@@ -157,7 +113,6 @@ cfg_if::cfg_if! {
                     }
                 }
             }
-
         }
     }
 }
@@ -215,7 +170,7 @@ cfg_if::cfg_if! {
             ///
             /// The caller must ensure that no other `UniqueMmioPointer` to the same
             /// MMIO region exists for the duration of the returned pointer's use.
-            unsafe fn registers(&self) -> UniqueMmioPointer<'_, Pl011Registers> {
+            unsafe fn registers(&mut self) -> UniqueMmioPointer<'_, Pl011Registers> {
                 // SAFETY: The base address is required by the safety contract of new() to point
                 // to a PL011 register block that is mapped as device memory.
                 unsafe {
@@ -224,7 +179,7 @@ cfg_if::cfg_if! {
             }
 
             /// Writes a single byte to the UART.
-            pub fn write_byte(&self, byte: u8) {
+            pub fn write_byte(&mut self, byte: u8) {
                 // SAFETY: Exclusive MMIO access is given by calling `UartPl011::new`.
                 let mut regs = unsafe { self.registers() };
 
@@ -239,7 +194,7 @@ cfg_if::cfg_if! {
             }
 
             /// Reads a single byte from the UART.
-            pub fn read_byte(&self) -> Option<u8> {
+            pub fn read_byte(&mut self) -> Option<u8> {
                 // SAFETY: Exclusive MMIO access is given by calling `UartPl011::new`.
                 let mut regs = unsafe { self.registers() };
 
@@ -254,15 +209,15 @@ cfg_if::cfg_if! {
         }
 
         impl super::SerialIO for UartPl011 {
-            fn init(&self) {}
+            fn init(&mut self) {}
 
-            fn write(&self, buffer: &[u8]) {
+            fn write(&mut self, buffer: &[u8]) {
                 for byte in buffer {
                     self.write_byte(*byte);
                 }
             }
 
-            fn read(&self) -> u8 {
+            fn read(&mut self) -> u8 {
                 loop {
                     if let Some(byte) = self.read_byte() {
                         return byte;
@@ -270,7 +225,7 @@ cfg_if::cfg_if! {
                 }
             }
 
-            fn try_read(&self) -> Option<u8> {
+            fn try_read(&mut self) -> Option<u8> {
                 self.read_byte()
             }
         }
