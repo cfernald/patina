@@ -23,31 +23,14 @@ const RX_QUEUE: u32 = 0;
 /// Transmit virt queue index.
 const TX_QUEUE: u32 = 1;
 
-struct State<const N: usize, const B: usize> {
+/// A [`SerialIO`](crate::serial::SerialIO) implementation for a virtio-console
+/// device attached via the virtio-MMIO transport.
+pub struct VirtioSerial<const N: usize = 8, const B: usize = 128> {
     initialized: bool,
     transport: VirtioMmio,
     rx: VirtQueue<N, B>,
     tx: VirtQueue<N, B>,
     rx_block_offset: usize,
-}
-
-impl<const N: usize, const B: usize> State<N, B> {
-    const unsafe fn new(base_address: usize) -> Self {
-        Self {
-            initialized: false,
-            // SAFETY: forwarded from the caller of this function.
-            transport: unsafe { VirtioMmio::new(base_address) },
-            rx: VirtQueue::new(),
-            tx: VirtQueue::new(),
-            rx_block_offset: 0,
-        }
-    }
-}
-
-/// A [`SerialIO`](crate::serial::SerialIO) implementation for a virtio-console
-/// device attached via the virtio-MMIO transport.
-pub struct VirtioSerial<const N: usize = 8, const B: usize = 128> {
-    state: State<N, B>,
 }
 
 impl<const N: usize, const B: usize> VirtioSerial<N, B> {
@@ -61,36 +44,40 @@ impl<const N: usize, const B: usize> VirtioSerial<N, B> {
     /// window for a virtio-console. This address must be exclusively used by
     /// this instance.
     pub const unsafe fn new(base_address: usize) -> Self {
-        // SAFETY: forwarded from caller.
-        Self { state: unsafe { State::new(base_address) } }
+        Self {
+            initialized: false,
+            // SAFETY: forwarded from caller.
+            transport: unsafe { VirtioMmio::new(base_address) },
+            rx: VirtQueue::new(),
+            tx: VirtQueue::new(),
+            rx_block_offset: 0,
+        }
     }
 }
 
 impl<const N: usize, const B: usize> crate::serial::SerialIO for VirtioSerial<N, B> {
     fn init(&mut self) {
-        let state = &mut self.state;
-        if state.initialized {
+        if self.initialized {
             return;
         }
 
-        if state.transport.begin_init(VIRTIO_ID_CONSOLE).is_err() {
+        if self.transport.begin_init(VIRTIO_ID_CONSOLE).is_err() {
             return;
         }
-        if state.transport.configure_queue(RX_QUEUE, &state.rx).is_err()
-            || state.transport.configure_queue(TX_QUEUE, &state.tx).is_err()
+        if self.transport.configure_queue(RX_QUEUE, &self.rx).is_err()
+            || self.transport.configure_queue(TX_QUEUE, &self.tx).is_err()
         {
-            state.transport.set_failed();
+            self.transport.set_failed();
             return;
         }
-        state.transport.set_driver_ok();
-        state.rx.rx_clean();
-        state.transport.notify(RX_QUEUE);
-        state.initialized = true;
+        self.transport.set_driver_ok();
+        self.rx.rx_clean();
+        self.transport.notify(RX_QUEUE);
+        self.initialized = true;
     }
 
     fn write(&mut self, buffer: &[u8]) {
-        let state = &mut self.state;
-        if !state.initialized {
+        if !self.initialized {
             return;
         }
 
@@ -99,13 +86,13 @@ impl<const N: usize, const B: usize> crate::serial::SerialIO for VirtioSerial<N,
             // Spin until a block is available in the queue.
             let take = loop {
                 let remaining = buffer.get(offset..).expect("offset < buffer.len()");
-                if let Some(n) = state.tx.tx_try_submit(remaining) {
+                if let Some(n) = self.tx.tx_try_submit(remaining) {
                     break n;
                 }
                 core::hint::spin_loop();
             };
             offset += take;
-            state.transport.notify(TX_QUEUE);
+            self.transport.notify(TX_QUEUE);
         }
     }
 
@@ -119,21 +106,20 @@ impl<const N: usize, const B: usize> crate::serial::SerialIO for VirtioSerial<N,
     }
 
     fn try_read(&mut self) -> Option<u8> {
-        let state = &mut self.state;
-        if !state.initialized {
+        if !self.initialized {
             return None;
         }
 
         // Get the next byte of the next RX block.
-        let data = state.rx.rx_peek()?;
-        let byte = *data.get(state.rx_block_offset).expect("rx_block_offset < data.len()");
-        state.rx_block_offset += 1;
+        let data = self.rx.rx_peek()?;
+        let byte = *data.get(self.rx_block_offset).expect("rx_block_offset < data.len()");
+        self.rx_block_offset += 1;
 
         // Release this block if all its data is consumed.
-        if state.rx_block_offset >= data.len() {
-            state.rx_block_offset = 0;
-            state.rx.rx_release();
-            state.transport.notify(RX_QUEUE);
+        if self.rx_block_offset >= data.len() {
+            self.rx_block_offset = 0;
+            self.rx.rx_release();
+            self.transport.notify(RX_QUEUE);
         }
         Some(byte)
     }
@@ -154,8 +140,8 @@ mod tests {
         let mut serial = unsafe { VirtioSerial::<N, B>::new(core::ptr::from_ref(regs) as usize) };
 
         // Skip device-handshake initialization.
-        serial.state.rx.rx_clean();
-        serial.state.initialized = true;
+        serial.rx.rx_clean();
+        serial.initialized = true;
 
         serial
     }
@@ -165,7 +151,7 @@ mod tests {
         let regs = VirtioMmioRegs::new_fake(VIRTIO_ID_CONSOLE);
         let mut serial: VirtioSerial<4, 16> = test_instance(&regs);
         serial.write(b"hello");
-        let chunks = serial.state.tx.test_drain_tx();
+        let chunks = serial.tx.test_drain_tx();
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0], b"hello");
     }
@@ -176,7 +162,7 @@ mod tests {
         let regs = VirtioMmioRegs::new_fake(VIRTIO_ID_CONSOLE);
         let mut serial: VirtioSerial<4, 4> = test_instance(&regs);
         serial.write(b"abcdefghij");
-        let chunks = serial.state.tx.test_drain_tx();
+        let chunks = serial.tx.test_drain_tx();
         let combined: Vec<u8> = chunks.into_iter().flatten().collect();
         assert_eq!(combined, b"abcdefghij");
     }
@@ -187,12 +173,12 @@ mod tests {
         let regs = VirtioMmioRegs::new_fake(VIRTIO_ID_CONSOLE);
         let mut serial: VirtioSerial<2, 4> = test_instance(&regs);
         serial.write(b"abcdefgh");
-        let first = serial.state.tx.test_drain_tx();
+        let first = serial.tx.test_drain_tx();
         let first_combined: Vec<u8> = first.into_iter().flatten().collect();
         assert_eq!(first_combined, b"abcdefgh");
 
         serial.write(b"ABCDEFGH");
-        let second = serial.state.tx.test_drain_tx();
+        let second = serial.tx.test_drain_tx();
         let second_combined: Vec<u8> = second.into_iter().flatten().collect();
         assert_eq!(second_combined, b"ABCDEFGH");
     }
@@ -208,7 +194,7 @@ mod tests {
     fn test_virtio_serial_read_single_block() {
         let regs = VirtioMmioRegs::new_fake(VIRTIO_ID_CONSOLE);
         let mut serial: VirtioSerial<4, 16> = test_instance(&regs);
-        let supplied = serial.state.rx.test_supply_rx(b"world");
+        let supplied = serial.rx.test_supply_rx(b"world");
         assert_eq!(supplied, Some(5));
         let mut got = Vec::new();
         for _ in 0..5 {
@@ -222,8 +208,8 @@ mod tests {
     fn test_virtio_serial_read_spans_multiple_blocks() {
         let regs = VirtioMmioRegs::new_fake(VIRTIO_ID_CONSOLE);
         let mut serial: VirtioSerial<4, 4> = test_instance(&regs);
-        assert_eq!(serial.state.rx.test_supply_rx(b"foo"), Some(3));
-        assert_eq!(serial.state.rx.test_supply_rx(b"bar"), Some(3));
+        assert_eq!(serial.rx.test_supply_rx(b"foo"), Some(3));
+        assert_eq!(serial.rx.test_supply_rx(b"bar"), Some(3));
         let mut got = Vec::new();
         for _ in 0..6 {
             got.push(serial.read());
@@ -238,14 +224,14 @@ mod tests {
 
         // Fill both TX descriptors, then drain to mark them used.
         serial.write(b"00001111");
-        let drained = serial.state.tx.test_drain_tx();
+        let drained = serial.tx.test_drain_tx();
         assert_eq!(drained.len(), 2);
         assert_eq!(drained[0], b"0000");
         assert_eq!(drained[1], b"1111");
 
         // This write would spin forever if `tx_reap` didn't reclaim slots.
         serial.write(b"2222");
-        let after = serial.state.tx.test_drain_tx();
+        let after = serial.tx.test_drain_tx();
         assert_eq!(after.len(), 1);
         assert_eq!(after[0], b"2222");
     }
@@ -255,7 +241,7 @@ mod tests {
         // 5-byte payload truncated to B = 4.
         let regs = VirtioMmioRegs::new_fake(VIRTIO_ID_CONSOLE);
         let mut serial: VirtioSerial<4, 4> = test_instance(&regs);
-        assert_eq!(serial.state.rx.test_supply_rx(b"abcde"), Some(4));
+        assert_eq!(serial.rx.test_supply_rx(b"abcde"), Some(4));
         let mut got = Vec::new();
         for _ in 0..4 {
             got.push(serial.read());

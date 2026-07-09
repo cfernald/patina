@@ -24,6 +24,6 @@ pub mod uart;
 pub mod virtio;
 
 #[cfg(feature = "std")]
-mod std;
+mod host;
 #[cfg(feature = "std")]
-pub use std::Terminal;
+pub use host::Terminal;
