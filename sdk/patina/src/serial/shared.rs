@@ -68,22 +68,12 @@ impl<T: SerialIO> SharedSerial<T> {
 #[cfg_attr(coverage, coverage(off))]
 mod tests {
     use super::*;
-    use mockall::{mock, predicate::eq};
-
-    mock! {
-        Serial {}
-
-        impl SerialIO for Serial {
-            fn init(&mut self);
-            fn write(&mut self, buffer: &[u8]);
-            fn read(&mut self) -> u8;
-            fn try_read(&mut self) -> Option<u8>;
-        }
-    }
+    use crate::serial::MockSerialIO;
+    use mockall::predicate::eq;
 
     #[test]
     fn test_shared_serial_forwards_operations() {
-        let mut mock = MockSerial::new();
+        let mut mock = MockSerialIO::new();
         mock.expect_init().times(1).returning(|| ());
         mock.expect_write().with(eq(*b"hi")).times(1).returning(|_| ());
         mock.expect_read().times(1).returning(|| 0xAB);
@@ -98,10 +88,12 @@ mod tests {
 
     #[test]
     fn test_shared_serial_contested_access_returns_err() {
-        let shared = SharedSerial::new(MockSerial::new());
+        let shared = SharedSerial::new(MockSerialIO::new());
         // Simulate the port already being locked (e.g. re-entrant access from the same core).
         let _guard = shared.serial.try_lock().expect("lock should be available");
+        assert_eq!(shared.init(), Err(EfiError::DeviceError));
         assert_eq!(shared.write(b"x"), Err(EfiError::DeviceError));
-        assert_eq!(shared.try_read().unwrap_err(), EfiError::DeviceError);
+        assert_eq!(shared.try_read(), Err(EfiError::DeviceError));
+        assert_eq!(shared.read(), Err(EfiError::DeviceError));
     }
 }

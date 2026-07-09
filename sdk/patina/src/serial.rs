@@ -8,6 +8,7 @@
 //!
 
 /// A Trait for a Rust-UEFI serial IO access.
+#[cfg_attr(any(test, feature = "mockall"), mockall::automock)]
 pub trait SerialIO: Send {
     /// Initialize the serial port.
     fn init(&mut self);

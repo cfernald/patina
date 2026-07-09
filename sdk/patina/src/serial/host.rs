@@ -33,3 +33,22 @@ impl super::SerialIO for Terminal {
         }
     }
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage, coverage(off))]
+mod tests {
+    use super::*;
+    use crate::serial::SerialIO;
+
+    #[test]
+    fn test_terminal_init() {
+        let mut terminal = Terminal {};
+        terminal.init();
+    }
+
+    #[test]
+    fn test_terminal_write_bytes() {
+        let mut terminal = Terminal {};
+        terminal.write(b"unittest output\n");
+    }
+}
