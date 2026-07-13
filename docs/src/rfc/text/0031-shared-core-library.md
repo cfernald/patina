@@ -13,6 +13,7 @@ This RFC builds on the crate organization and naming conventions established by
 - 2026-06-26: Initial RFC created.
 - 2026-06-29: Renames proposed crate to `patina_internal_core`, and opted to leave CPU
               crate independent for now.
+- 2026-07-13: Fixed incorrect RFC number
 
 ## Motivation
 
