@@ -142,3 +142,34 @@ pub(crate) unsafe extern "efiapi" fn create_performance_measurement_efiapi(
         }
     }
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use super::*;
+    use patina::component::service::performance::MockPerformanceMeasurement;
+
+    fn mock_service() -> Service<dyn PerformanceMeasurement> {
+        Service::mock(Box::new(MockPerformanceMeasurement::new()))
+    }
+
+    #[test]
+    fn test_service_holder_set_get_lifecycle() {
+        let holder = ServiceHolder::new();
+
+        // Nothing is registered yet.
+        assert!(holder.get().is_none());
+
+        // First registration succeeds and is observable.
+        assert!(holder.set(mock_service()).is_ok());
+        assert!(holder.get().is_some());
+
+        // A second registration is rejected.
+        assert_eq!(holder.set(mock_service()), Err("Performance service already set"));
+
+        // While a registration is in flight, `set` is rejected and `get` reports nothing.
+        holder.initializing.store(true, Ordering::Release);
+        assert_eq!(holder.set(mock_service()), Err("Performance service is currently being set elsewhere"));
+        assert!(holder.get().is_none());
+    }
+}
