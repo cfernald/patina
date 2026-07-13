@@ -444,7 +444,7 @@ The DXE core will provide the base implementation for detailed performance measu
 component provides the UEFI protocol, coordinates with MM for measurements, and publishes the ACPI table.
 To enable core support, the platform must either publish the
 [performance configuration hob](https://github.com/OpenDevicePartnership/patina-edk2/blob/main/PatinaPkg/Include/Guid/PatinaPerformanceConfig.h),
-or override the `default_performance_config` implementation in the `PlatformInfo` implementation.
+or override the `DEFAULT_PERFORMANCE_CONFIG` implementation in the `PlatformInfo` implementation.
 
 ```rust,ignore
 use patina::performance::config::PerformanceConfig;
@@ -454,21 +454,19 @@ struct ExamplePlatform;
 
 impl PlatformInfo for ExamplePlatform {
     // Optional override if the platform does not publish the performance configuration HOB.
-    fn default_performance_config() -> PerformanceConfig {
-        PerformanceConfig {
-            enabled: PerformanceConfig::ENABLED,
-            enabled_measurements: patina::performance::Measurement::DriverBindingStart // Adds driver binding start measurements.
-               | patina::performance::Measurement::DriverBindingStop // Adds driver binding stop measurements.
-               | patina::performance::Measurement::LoadImage         // Adds load image measurements.
-               | patina::performance::Measurement::StartImage, // Adds start image measurements.
-        }
+    const DEFAULT_PERFORMANCE_CONFIG : PerformanceConfig = PerformanceConfig {
+        enabled: PerformanceConfig::ENABLED,
+        enabled_measurements: patina::performance::Measurement::DriverBindingStart // Adds driver binding start measurements.
+            | patina::performance::Measurement::DriverBindingStop // Adds driver binding stop measurements.
+            | patina::performance::Measurement::LoadImage         // Adds load image measurements.
+            | patina::performance::Measurement::StartImage,       // Adds start image measurements.
     }
 }
 
 impl ComponentInfo for ExamplePlatform {
     fn components(mut add: Add<Component>) {
         // The component dispatches only when the DXE Core enables performance measurement, via a performance
-        // config HOB or the platform's `PlatformInfo::default_performance_config()` override.
+        // config HOB or the platform's `PlatformInfo::DEFAULT_PERFORMANCE_CONFIG` override.
         add.component(patina_performance::component::Performance::new());
     }
 }
@@ -556,7 +554,7 @@ impl ComponentInfo for ExamplePlatform {
         // Platform Mm Init hook
         // add.component(q35_services::mm_control::QemuQ35PlatformMmControl::new())
         // The component dispatches only when the DXE Core enables performance measurement, via a performance
-        // config HOB or the platform's `PlatformInfo::default_performance_config()` override.
+        // config HOB or the platform's `PlatformInfo::DEFAULT_PERFORMANCE_CONFIG` override.
         add.component(patina_performance::component::Performance::new());
     }
 }

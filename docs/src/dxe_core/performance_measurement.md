@@ -99,7 +99,7 @@ pub struct PerformanceConfig {
 The configuration is resolved in priority order:
 
 1. A `PerformanceConfig` guided HOB produced before the DXE Core runs.
-2. Otherwise, the platform's `PlatformInfo::default_performance_config()`. If not overridden, this will
+2. Otherwise, the platform's `PlatformInfo::DEFAULT_PERFORMANCE_CONFIG`. If not overridden, this will
    default to disabled.
 
 `enabled_measurements` is a bitmask of the `Measurement` values that gate the Core's boot

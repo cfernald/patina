@@ -1,7 +1,7 @@
 # Patina Performance Component
 
 The Patina performance component acts as the translation layer between the core's performance implementation, and the
-UEFI annd ACPI implementations.
+UEFI and ACPI implementations.
 
 ## Responsibilities
 
@@ -15,15 +15,14 @@ UEFI annd ACPI implementations.
 
 Whether performance measurement is enabled is decided by the DXE Core, not by this component. The core resolves the
 performance configuration from a `PerformanceConfigHob`, falling back to the platform-provided
-`PlatformInfo::default_performance_config()` when no such HOB is present. When performance is enabled the core
+`PlatformInfo::DEFAULT_PERFORMANCE_CONFIG` when no such HOB is present. When performance is enabled the core
 publishes the [`PerformanceMeasurement`] service; when it is disabled that service is absent, so this component's
 service dependency is unsatisfied and it does not dispatch.
 
 A platform therefore enables performance in one of two ways:
 
 1. Production of the `PerformanceConfigHob` prior to Patina DXE Core execution (this takes priority), or
-2. Overriding `PlatformInfo::default_performance_config()` to return an enabled configuration with the desired
-   `Measurement` values.
+2. Overriding `PlatformInfo::DEFAULT_PERFORMANCE_CONFIG` an enabled configuration with the desired `Measurement` values.
 
 ```rust,ignore
 use patina::performance::config::PerformanceConfig;
@@ -33,21 +32,19 @@ struct ExamplePlatform;
 
 impl PlatformInfo for ExamplePlatform {
     // Optional override if the platform does not publish the performance configuration HOB.
-    fn default_performance_config() -> PerformanceConfig {
-        PerformanceConfig {
-            enabled: PerformanceConfig::ENABLED,
-            enabled_measurements: patina::performance::Measurement::DriverBindingStart // Adds driver binding start measurements.
-               | patina::performance::Measurement::DriverBindingStop // Adds driver binding stop measurements.
-               | patina::performance::Measurement::LoadImage         // Adds load image measurements.
-               | patina::performance::Measurement::StartImage, // Adds start image measurements.
-        }
+    const DEFAULT_PERFORMANCE_CONFIG : PerformanceConfig = PerformanceConfig {
+        enabled: PerformanceConfig::ENABLED,
+        enabled_measurements: patina::performance::Measurement::DriverBindingStart // Adds driver binding start measurements.
+            | patina::performance::Measurement::DriverBindingStop // Adds driver binding stop measurements.
+            | patina::performance::Measurement::LoadImage         // Adds load image measurements.
+            | patina::performance::Measurement::StartImage,       // Adds start image measurements.
     }
 }
 
 impl ComponentInfo for ExamplePlatform {
     fn components(mut add: Add<Component>) {
         // The component dispatches only when the DXE Core enables performance measurement, via a performance
-        // config HOB or the platform's `PlatformInfo::default_performance_config()` override.
+        // config HOB or the platform's `PlatformInfo::DEFAULT_PERFORMANCE_CONFIG` override.
         add.component(patina_performance::component::Performance::new());
     }
 }

@@ -244,10 +244,7 @@ pub trait PlatformInfo: 'static {
     ///
     /// Defaults to disabled. Platforms may override this option to control the default behavior of the performance
     /// measurement service when no configuration HOB is present.
-    #[inline(always)]
-    fn default_performance_config() -> PerformanceConfig {
-        PerformanceConfig::new()
-    }
+    const DEFAULT_PERFORMANCE_CONFIG: PerformanceConfig = PerformanceConfig::new();
 }
 
 /// Static reference to the DXE Core instance in the compiled binary.
@@ -470,9 +467,10 @@ impl<P: PlatformInfo> Core<P> {
         debugger_reload::initialize_debugger_reload(physical_hob_list);
 
         // Initialize the debugger if it is enabled.
+        let perf_frequency = P::CpuInfo::perf_timer_frequency().unwrap_or(0);
         patina_debugger::initialize(
             &mut interrupt_manager,
-            Some(Box::leak(Box::new(cpu::PerfTimer::with_frequency(P::CpuInfo::perf_timer_frequency().unwrap_or(0))))),
+            Some(Box::leak(Box::new(cpu::PerfTimer::with_frequency(perf_frequency)))),
         );
 
         #[cfg(feature = "debugger_reload")]
@@ -484,21 +482,16 @@ impl<P: PlatformInfo> Core<P> {
         // registering it below, so the service is published only when performance measurement is enabled. The engine
         // relies only on the arch timer and its own `TplMutex`, both of which are available at this point.
         let perf_config =
-            performance::read_performance_config(self.hob_list()).unwrap_or(P::default_performance_config());
+            performance::read_performance_config(self.hob_list()).unwrap_or(P::DEFAULT_PERFORMANCE_CONFIG);
         let perf_hob_records = performance::read_hob_performance_records(self.hob_list());
-        performance::CorePerformance::init(
-            P::CpuInfo::perf_timer_frequency().unwrap_or(0),
-            perf_config,
-            perf_hob_records,
-        );
+        performance::CorePerformance::init(perf_frequency, perf_config, perf_hob_records);
 
         let mut component_dispatcher = self.component_dispatcher.lock();
         component_dispatcher.add_service(DxeCpu(cpu));
         component_dispatcher.add_service(DxeInterruptManager(interrupt_manager));
         component_dispatcher.add_service(CoreMemoryManager);
         component_dispatcher.add_service(dxe_dispatch_service::CoreDxeDispatch::new(self));
-        component_dispatcher
-            .add_service(cpu::PerfTimer::with_frequency(P::CpuInfo::perf_timer_frequency().unwrap_or(0)));
+        component_dispatcher.add_service(cpu::PerfTimer::with_frequency(perf_frequency));
         if performance::CorePerformance::enabled() {
             component_dispatcher.add_service(performance::CorePerformance);
         }
