@@ -16,13 +16,13 @@ UEFI and ACPI implementations.
 Whether performance measurement is enabled is decided by the DXE Core, not by this component. The core resolves the
 performance configuration from a `PerformanceConfigHob`, falling back to the platform-provided
 `PlatformInfo::DEFAULT_PERFORMANCE_CONFIG` when no such HOB is present. When performance is enabled the core
-publishes the [`PerformanceMeasurement`] service; when it is disabled that service is absent, so this component's
+publishes the [`PerformanceManager`] service; when it is disabled that service is absent, so this component's
 service dependency is unsatisfied and it does not dispatch.
 
 A platform therefore enables performance in one of two ways:
 
 1. Production of the `PerformanceConfigHob` prior to Patina DXE Core execution (this takes priority), or
-2. Overriding `PlatformInfo::DEFAULT_PERFORMANCE_CONFIG` an enabled configuration with the desired `Measurement` values.
+2. Setting `PlatformInfo::DEFAULT_PERFORMANCE_CONFIG` to an enabled configuration with the desired `Measurement` values.
 
 ```rust,ignore
 use patina::performance::config::PerformanceConfig;
@@ -32,13 +32,13 @@ struct ExamplePlatform;
 
 impl PlatformInfo for ExamplePlatform {
     // Optional override if the platform does not publish the performance configuration HOB.
-    const DEFAULT_PERFORMANCE_CONFIG : PerformanceConfig = PerformanceConfig {
+    const DEFAULT_PERFORMANCE_CONFIG: PerformanceConfig = PerformanceConfig {
         enabled: PerformanceConfig::ENABLED,
         enabled_measurements: patina::performance::Measurement::DriverBindingStart // Adds driver binding start measurements.
             | patina::performance::Measurement::DriverBindingStop // Adds driver binding stop measurements.
             | patina::performance::Measurement::LoadImage         // Adds load image measurements.
             | patina::performance::Measurement::StartImage,       // Adds start image measurements.
-    }
+    };
 }
 
 impl ComponentInfo for ExamplePlatform {
@@ -52,7 +52,7 @@ impl ComponentInfo for ExamplePlatform {
 
 ## API
 
-The functions below are provided by the [`PerformanceMeasurement`] service (produced by the DXE Core) and the core
+The functions below are provided by the [`PerformanceManager`] service (produced by the DXE Core) and the core
 internals; this component makes them reachable from external C modules through the `EdkiiPerformanceMeasurement`
 protocol.
 
@@ -73,32 +73,32 @@ protocol.
 
 ### Logging Performance Measurements
 
-Performance measurements are recorded through the [`PerformanceMeasurement`] service, which is produced by the DXE
+Performance measurements are recorded through the [`PerformanceManager`] service, which is produced by the DXE
 Core and consumed both internally by the core and by components via dependency injection.
 
 *Example of recording a measurement through the service:*
 
 ```rust,no_run
 # extern crate patina;
-use patina::component::service::{Service, performance::PerformanceMeasurement};
+use patina::component::service::{Service, performance::PerformanceManager};
 use patina::guids::CALLER_ID;
 
-fn record(perf: Service<dyn PerformanceMeasurement>) {
+fn record(perf: Service<dyn PerformanceManager>) {
     perf.perf_cross_module_begin("DXE", CALLER_ID.as_efi_guid());
 }
 ```
 
-[`PerformanceMeasurement`]: patina::component::service::performance::PerformanceMeasurement
+[`PerformanceManager`]: patina::component::service::performance::PerformanceManager
 
 ## Performance Component Overview
 
-The performance measurement API is provided by the [`PerformanceMeasurement`] service, which is produced by the DXE
+The performance measurement API is provided by the [`PerformanceManager`] service, which is produced by the DXE
 Core. This component contributes the UEFI-facing pieces on top of it:
 
 - The EDK II Performance Measurement protocol, produced by this component, for use by external (C) modules.
 - Publishing of the FBPT and performance properties.
 
-Patina code (core or components) records measurements through the [`PerformanceMeasurement`] service. External modules
+Patina code (core or components) records measurements through the [`PerformanceManager`] service. External modules
 use the function returned by the `EdkiiPerformanceMeasurement` protocol, which routes back into the same service.
 
 ---

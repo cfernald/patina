@@ -11,7 +11,7 @@ and implementations.
 ## Layers
 
 - **SDK** - Shared types and the service contract. It defines the interfaces and common structures used by all layers.
-- **DXE Core** - The measurement engine. `CorePerformance` implements `PerformanceMeasurement` and owns all
+- **DXE Core** - The measurement engine. `CorePerformance` implements `PerformanceManager` and owns all
   global state and will process new performance records. This is implemented in the core to ensure early
   availability of performance data.
 - **Component** - The DXE integration and interoperability layer. It consumes the service and, at boot,
@@ -23,10 +23,10 @@ and implementations.
 
 ## Interfaces
 
-`CorePerformance` is the single implementation of the `PerformanceMeasurement` service. All other
+`CorePerformance` is the single implementation of the `PerformanceManager` service. All other
 external callers reach the implementation through one of three interfaces:
 
-1. `PerformanceMeasurement` service (used by components)
+1. `PerformanceManager` service (used by components)
 2. `EdkiiPerformanceMeasurement` protocol (used by drivers)
 3. Published ACPI tables (read by applications & OS)
 
@@ -39,7 +39,7 @@ config:
   look: handDrawn
 ---
 classDiagram
-    class PerformanceMeasurement {
+    class PerformanceManager {
         <<service trait>>
         +create_measurement()
         +publish_table()
@@ -73,20 +73,20 @@ classDiagram
         <<UEFI driver>>
     }
 
-    PerformanceMeasurement <|.. CorePerformance : implements
+    PerformanceManager <|.. CorePerformance : implements
     CorePerformance *-- FBPT : owns
-    RustComponent ..> PerformanceMeasurement : uses service
-    PatinaPerformance ..> PerformanceMeasurement : uses service
+    RustComponent ..> PerformanceManager : uses service
+    PatinaPerformance ..> PerformanceManager : uses service
     PatinaPerformance ..> EdkiiPerformanceMeasurement : installs
     PatinaPerformance ..> PerformanceProperty : installs
-    EdkiiPerformanceMeasurement ..> PerformanceMeasurement : forwards to
+    EdkiiPerformanceMeasurement ..> PerformanceManager : forwards to
     UefiDriver ..> EdkiiPerformanceMeasurement : calls
 ```
 
 ## Configuration
 
 Whether performance measurement is enabled is decided by the DXE Core. The Core resolves a `PerformanceConfig` and,
-when enabled, registers the `PerformanceMeasurement` service. When disabled the service is absent, so the
+when enabled, registers the `PerformanceManager` service. When disabled the service is absent, so the
 `patina_performance` component's service dependency is unsatisfied and it never dispatches.
 
 ```rust

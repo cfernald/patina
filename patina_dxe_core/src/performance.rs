@@ -54,7 +54,7 @@ pub(crate) static CORE_PERFORMANCE: Once<&'static CorePerformance> = Once::new()
 /// Performance measurement service owned by the DXE Core.
 ///
 /// Owns all performance measurement state (the FBPT, measurement mask, load-image count, and arch timer). It is
-/// registered as a [`Service<dyn PerformanceMeasurement>`] for components and used directly by core internals.
+/// registered as a [`Service<dyn PerformanceManager>`] for components and used directly by core internals.
 #[derive(IntoService)]
 #[service(dyn PerformanceManager)]
 pub(crate) struct CorePerformance {

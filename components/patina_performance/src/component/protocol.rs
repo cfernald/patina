@@ -1,7 +1,7 @@
 //! Patina Performance Protocol
 //!
 //! Defines the interface for the performance measurement UEFI protocol. The protocol is produced by this component;
-//! the actual record building and state tracking is delegated to the [`PerformanceMeasurement`] service owned by the
+//! the actual record building and state tracking is delegated to the [`PerformanceManager`] service owned by the
 //! DXE Core.
 //!
 //! ## License
