@@ -23,7 +23,7 @@ use crate::{
 /// Service that records firmware performance measurements into the Firmware Basic Boot Performance Table (FBPT).
 ///
 #[cfg_attr(any(test, feature = "mockall"), automock)]
-pub trait PerformanceMeasurement: Send + Sync {
+pub trait PerformanceManager: Send + Sync {
     /// Function to log performance record with event description and a timestamp.
     #[allow(clippy::too_many_arguments)]
     fn create_measurement<'a>(
@@ -222,7 +222,7 @@ mod tests {
         }
     }
 
-    impl PerformanceMeasurement for RecordingService {
+    impl PerformanceManager for RecordingService {
         fn create_measurement(
             &self,
             caller_identifier: CallerIdentifier,

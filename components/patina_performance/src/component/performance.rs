@@ -20,7 +20,7 @@ use patina::{
     boot_services::{BootServices, StandardBootServices, allocation::AllocType, event::EventType, tpl::Tpl},
     component::{
         component,
-        service::{Service, perf_timer::ArchTimerFunctionality, performance::PerformanceMeasurement},
+        service::{Service, perf_timer::ArchTimerFunctionality, performance::PerformanceManager},
     },
     efi_types::EfiMemoryType,
     error::EfiError,
@@ -42,10 +42,10 @@ use patina::function;
 use patina::guids::EVENT_GROUP_END_OF_DXE;
 
 /// Context parameter for the Ready-to-Boot event callback that fetches MM performance records.
-type MmPerformanceEventContext<B> = Box<(B, Service<dyn PerformanceMeasurement>, Service<dyn MmCommunication>)>;
+type MmPerformanceEventContext<B> = Box<(B, Service<dyn PerformanceManager>, Service<dyn MmCommunication>)>;
 
 /// Context parameter for the End-of-DXE event callback that publishes the FBPT.
-type ReportFbptEventContext<B, R> = Box<(B, R, Service<dyn PerformanceMeasurement>)>;
+type ReportFbptEventContext<B, R> = Box<(B, R, Service<dyn PerformanceManager>)>;
 
 /// Performance component.
 ///
@@ -78,7 +78,7 @@ impl Performance {
         boot_services: StandardBootServices,
         runtime_services: StandardRuntimeServices,
         timer: Service<dyn ArchTimerFunctionality>,
-        performance: Service<dyn PerformanceMeasurement>,
+        performance: Service<dyn PerformanceManager>,
         mm_comm_service: Option<Service<dyn MmCommunication>>,
     ) -> Result<(), EfiError> {
         // Register the service so the EDK II Performance Measurement protocol function can reach it.
@@ -97,7 +97,7 @@ impl Performance {
         boot_services: B,
         runtime_services: R,
         mm_comm_service: Option<Service<dyn MmCommunication>>,
-        performance: Service<dyn PerformanceMeasurement>,
+        performance: Service<dyn PerformanceManager>,
         timer: Service<dyn ArchTimerFunctionality>,
     ) -> Result<(), EfiError>
     where
@@ -327,7 +327,7 @@ impl<'a> Iterator for PerformanceRecordIterator<'a> {
 /// Processes MM performance records and adds them to the FBPT
 fn process_mm_performance_records(
     comm_service: &Service<dyn MmCommunication>,
-    performance: &Service<dyn PerformanceMeasurement>,
+    performance: &Service<dyn PerformanceManager>,
 ) -> Result<(), MmPerformanceError> {
     let record_data = fetch_all_mm_record_data(comm_service)?;
 
@@ -596,7 +596,7 @@ mod tests {
         }
     }
 
-    impl PerformanceMeasurement for MockPerf {
+    impl PerformanceManager for MockPerf {
         fn create_measurement(
             &self,
             _caller_identifier: CallerIdentifier,
@@ -643,7 +643,7 @@ mod tests {
 
         // Test that an event to report the fbpt at the end of dxe is created.
         boot_services
-            .expect_create_event_ex::<Box<(MockBootServices, MockRuntimeServices, Service<dyn PerformanceMeasurement>)>>()
+            .expect_create_event_ex::<Box<(MockBootServices, MockRuntimeServices, Service<dyn PerformanceManager>)>>()
             .once()
             .withf_st(|event_type, notify_tpl, notify_function, _notify_context, event_group| {
                 assert_eq!(&EventType::NOTIFY_SIGNAL, event_type);
@@ -661,7 +661,7 @@ mod tests {
 
         let runtime_services = MockRuntimeServices::new();
 
-        let perf: Service<dyn PerformanceMeasurement> =
+        let perf: Service<dyn PerformanceManager> =
             Service::mock(Box::new(MockPerf::new(Arc::new(AtomicUsize::new(0)))));
 
         let _ = Performance::_entry_point(
@@ -690,7 +690,7 @@ mod tests {
         // Mock for _entry_point - handles event creation and protocol installation
         let mut entry_point_mock = MockBootServices::new();
         entry_point_mock
-            .expect_create_event_ex::<Box<(MockBootServices, MockRuntimeServices, Service<dyn PerformanceMeasurement>)>>()
+            .expect_create_event_ex::<Box<(MockBootServices, MockRuntimeServices, Service<dyn PerformanceManager>)>>()
             .once()
             .return_const_st(Ok(TEST_EVENT_HANDLE));
         entry_point_mock
@@ -709,7 +709,7 @@ mod tests {
 
         let runtime_services = MockRuntimeServices::new();
 
-        let perf: Service<dyn PerformanceMeasurement> =
+        let perf: Service<dyn PerformanceManager> =
             Service::mock(Box::new(MockPerf::new(Arc::new(AtomicUsize::new(0)))));
         let mm_service: Service<dyn MmCommunication> = Service::mock(Box::new(FakeComm));
         let timer: Service<dyn ArchTimerFunctionality> = Service::mock(Box::new(MockTimer {}));
@@ -754,7 +754,7 @@ mod tests {
             .once()
             .returning(|_, _, _| Err(efi::Status::NOT_FOUND));
 
-        let perf: Service<dyn PerformanceMeasurement> =
+        let perf: Service<dyn PerformanceManager> =
             Service::mock(Box::new(MockPerf::new(Arc::new(AtomicUsize::new(0)))));
 
         report_fbpt_event::<MockBootServices, MockRuntimeServices>(
@@ -793,7 +793,7 @@ mod tests {
         callback_mock.expect_close_event().once().return_const(Ok(()));
 
         let records = Arc::new(AtomicUsize::new(0));
-        let perf: Service<dyn PerformanceMeasurement> = Service::mock(Box::new(MockPerf::new(records.clone())));
+        let perf: Service<dyn PerformanceManager> = Service::mock(Box::new(MockPerf::new(records.clone())));
         let mm_service: Service<dyn MmCommunication> = Service::mock(Box::new(ZeroSizeComm));
         fetch_and_add_mm_performance_records::<MockBootServices>(
             TEST_EVENT_HANDLE,
@@ -848,7 +848,7 @@ mod tests {
         callback_mock.expect_close_event().once().return_const(Ok(()));
 
         let records = Arc::new(AtomicUsize::new(0));
-        let perf: Service<dyn PerformanceMeasurement> = Service::mock(Box::new(MockPerf::new(records.clone())));
+        let perf: Service<dyn PerformanceManager> = Service::mock(Box::new(MockPerf::new(records.clone())));
         let mm_service: Service<dyn MmCommunication> = Service::mock(Box::new(OneRecordComm::new()));
         fetch_and_add_mm_performance_records::<MockBootServices>(
             TEST_EVENT_HANDLE,
@@ -921,7 +921,7 @@ mod tests {
         callback_mock.expect_close_event().once().return_const(Ok(()));
 
         let records = Arc::new(AtomicUsize::new(0));
-        let perf: Service<dyn PerformanceMeasurement> = Service::mock(Box::new(MockPerf::new(records.clone())));
+        let perf: Service<dyn PerformanceManager> = Service::mock(Box::new(MockPerf::new(records.clone())));
         let mm_service: Service<dyn MmCommunication> =
             Service::mock(Box::new(MultiChunks { buf: all_records, fetches: Cell::new(0) }));
         fetch_and_add_mm_performance_records::<MockBootServices>(

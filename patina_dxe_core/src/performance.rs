@@ -16,7 +16,7 @@ use patina::{
     BinaryGuid,
     component::{
         hob::FromHob,
-        service::{IntoService, perf_timer::ArchTimerFunctionality, performance::PerformanceMeasurement},
+        service::{IntoService, perf_timer::ArchTimerFunctionality, performance::PerformanceManager},
     },
     error::EfiError,
     performance::{
@@ -56,7 +56,7 @@ pub(crate) static CORE_PERFORMANCE: Once<&'static CorePerformance> = Once::new()
 /// Owns all performance measurement state (the FBPT, measurement mask, load-image count, and arch timer). It is
 /// registered as a [`Service<dyn PerformanceMeasurement>`] for components and used directly by core internals.
 #[derive(IntoService)]
-#[service(dyn PerformanceMeasurement)]
+#[service(dyn PerformanceManager)]
 pub(crate) struct CorePerformance {
     loaded_image_count: AtomicU32,
     perf_measurement_mask: AtomicU32,
@@ -322,7 +322,7 @@ pub(crate) fn read_hob_performance_records(hob_list: &HobList) -> Option<(u32, P
         .ok()
 }
 
-impl PerformanceMeasurement for CorePerformance {
+impl PerformanceManager for CorePerformance {
     fn create_measurement(
         &self,
         caller_identifier: CallerIdentifier,

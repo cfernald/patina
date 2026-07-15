@@ -122,7 +122,7 @@ use gcd::SpinLockedGcd;
 use memory_manager::CoreMemoryManager;
 use patina::{
     boot_services::StandardBootServices,
-    component::{IntoComponent, service::performance::PerformanceMeasurement},
+    component::{IntoComponent, service::performance::PerformanceManager},
     error::{self, Result},
     performance::config::PerformanceConfig,
     pi::{

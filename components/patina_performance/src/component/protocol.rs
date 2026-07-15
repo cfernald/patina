@@ -19,7 +19,7 @@ use core::{
 
 use alloc::string::ToString;
 use patina::{
-    component::service::{Service, performance::PerformanceMeasurement},
+    component::service::{Service, performance::PerformanceManager},
     performance::{error::Error, measurement::CallerIdentifier, record::known::KnownPerfId},
     uefi_protocol::performance_measurement::PerfAttribute,
 };
@@ -31,7 +31,7 @@ use r_efi::efi;
 /// the injected [`Service`]. The service is therefore stashed here once during component initialization and read back
 /// by [`create_performance_measurement_efiapi`].
 struct ServiceHolder {
-    service: OnceCell<Service<dyn PerformanceMeasurement>>,
+    service: OnceCell<Service<dyn PerformanceManager>>,
     initializing: AtomicBool,
 }
 
@@ -44,7 +44,7 @@ impl ServiceHolder {
         Self { service: OnceCell::new(), initializing: AtomicBool::new(false) }
     }
 
-    fn set(&self, service: Service<dyn PerformanceMeasurement>) -> Result<(), &'static str> {
+    fn set(&self, service: Service<dyn PerformanceManager>) -> Result<(), &'static str> {
         if self.initializing.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_ok() {
             let result = self.service.set(service).map_err(|_| "Performance service already set");
             self.initializing.store(false, Ordering::Release);
@@ -53,7 +53,7 @@ impl ServiceHolder {
         Err("Performance service is currently being set elsewhere")
     }
 
-    fn get(&self) -> Option<&Service<dyn PerformanceMeasurement>> {
+    fn get(&self) -> Option<&Service<dyn PerformanceManager>> {
         if !self.initializing.load(Ordering::Acquire) { self.service.get() } else { None }
     }
 }
@@ -65,7 +65,7 @@ static PERF_SERVICE: ServiceHolder = ServiceHolder::new();
 /// ## Errors
 ///
 /// Returns an error string if the service was already registered.
-pub(crate) fn set_performance_service(service: Service<dyn PerformanceMeasurement>) -> Result<(), &'static str> {
+pub(crate) fn set_performance_service(service: Service<dyn PerformanceManager>) -> Result<(), &'static str> {
     PERF_SERVICE.set(service)
 }
 
@@ -147,10 +147,10 @@ pub(crate) unsafe extern "efiapi" fn create_performance_measurement_efiapi(
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
-    use patina::component::service::performance::MockPerformanceMeasurement;
+    use patina::component::service::performance::MockPerformanceManager;
 
-    fn mock_service() -> Service<dyn PerformanceMeasurement> {
-        Service::mock(Box::new(MockPerformanceMeasurement::new()))
+    fn mock_service() -> Service<dyn PerformanceManager> {
+        Service::mock(Box::new(MockPerformanceManager::new()))
     }
 
     #[test]
