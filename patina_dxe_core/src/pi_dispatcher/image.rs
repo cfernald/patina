@@ -39,7 +39,6 @@ use crate::{
     gcd::MemoryProtectionPolicy,
     memory_manager::CoreMemoryManager,
     pecoff::{self, UefiPeInfo, relocation::RelocationBlock},
-    performance::CorePerformance,
     pi_dispatcher::debug_image_info_table::{DebugImageInfoData, ImageInfoType},
     protocol_db,
     protocols::{
@@ -706,7 +705,9 @@ impl<P: super::PlatformInfo> super::PiDispatcher<P> {
         file_path: Option<NonNull<Protocol>>,
         image: Option<&[u8]>,
     ) -> Result<efi::Handle, ImageStatus> {
-        CorePerformance.perf_load_image_begin(core::ptr::null_mut());
+        if let Some(perf) = self.performance.get() {
+            perf.perf_load_image_begin(core::ptr::null_mut());
+        }
 
         if image.is_none() && file_path.is_none() {
             log::error!("failed to load image: both source buffer and device path are null.");
@@ -790,7 +791,9 @@ impl<P: super::PlatformInfo> super::PiDispatcher<P> {
             private_info.image_info.image_size as usize,
         );
 
-        CorePerformance.perf_load_image_end(handle);
+        if let Some(perf) = self.performance.get() {
+            perf.perf_load_image_end(handle);
+        }
 
         match security_status {
             Err(EfiError::SecurityViolation) => Err(ImageStatus::SecurityViolation(handle)),
@@ -870,7 +873,9 @@ impl<P: super::PlatformInfo> super::PiDispatcher<P> {
         // allocate a buffer for the entry point stack.
         let stack = ImageStack::new(ENTRY_POINT_STACK_SIZE)?;
 
-        CorePerformance.perf_image_start_begin(image_handle);
+        if let Some(perf) = self.performance.get() {
+            perf.perf_image_start_begin(image_handle);
+        }
 
         // define a co-routine that wraps the entry point execution. this doesn't
         // run until the coroutine.resume() call below.
@@ -940,7 +945,9 @@ impl<P: super::PlatformInfo> super::PiDispatcher<P> {
 
         self.image_data.lock().current_running_image = previous_image;
 
-        CorePerformance.perf_image_start_end(image_handle);
+        if let Some(perf) = self.performance.get() {
+            perf.perf_image_start_end(image_handle);
+        }
 
         match status {
             efi::Status::SUCCESS => Ok(()),

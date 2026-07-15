@@ -18,7 +18,15 @@ use patina::{
 
 use r_efi::{efi, protocols::device_path::Protocol};
 
-use crate::{performance::CorePerformance, protocols::PROTOCOL_DB, systemtables::EfiSystemTable};
+use crate::{performance::CORE_PERFORMANCE, protocols::PROTOCOL_DB, systemtables::EfiSystemTable};
+
+macro_rules! perf {
+    ($method:ident, $driver_handle:expr, $controller_handle:expr) => {
+        if let Some(perf) = CORE_PERFORMANCE.get() {
+            perf.$method($driver_handle, $controller_handle);
+        }
+    };
+}
 
 fn get_bindings_for_handles(handles: Vec<efi::Handle>) -> Vec<*mut efi::protocols::driver_binding::Protocol> {
     handles
@@ -241,7 +249,7 @@ fn core_connect_single_controller(
             let driver_binding = unsafe { &mut *(driver_binding_interface) };
             let device_path = remaining_device_path.map_or(core::ptr::null_mut(), |p| p.as_ptr());
 
-            CorePerformance.perf_driver_binding_support_begin(driver_binding.driver_binding_handle, controller_handle);
+            perf!(perf_driver_binding_support_begin, driver_binding.driver_binding_handle, controller_handle);
 
             // Driver claims support; attempt to start it.
             // SAFETY: driver_binding_interface is a valid pointer to a driver binding protocol instance
@@ -250,13 +258,11 @@ fn core_connect_single_controller(
                 unsafe { (driver_binding.supported)(driver_binding_interface, controller_handle, device_path) };
             match status {
                 efi::Status::SUCCESS => {
-                    CorePerformance
-                        .perf_driver_binding_support_end(driver_binding.driver_binding_handle, controller_handle);
+                    perf!(perf_driver_binding_support_end, driver_binding.driver_binding_handle, controller_handle);
 
                     started_drivers.push(driver_binding_interface);
 
-                    CorePerformance
-                        .perf_driver_binding_start_begin(driver_binding.driver_binding_handle, controller_handle);
+                    perf!(perf_driver_binding_start_begin, driver_binding.driver_binding_handle, controller_handle);
 
                     // SAFETY: driver_binding_interface is a valid pointer to a driver binding protocol instance
                     // as ensured by the construction of driver_candidates above.
@@ -266,12 +272,10 @@ fn core_connect_single_controller(
                         one_started = true;
                     }
 
-                    CorePerformance
-                        .perf_driver_binding_start_end(driver_binding.driver_binding_handle, controller_handle);
+                    perf!(perf_driver_binding_start_end, driver_binding.driver_binding_handle, controller_handle);
                 }
                 _ => {
-                    CorePerformance
-                        .perf_driver_binding_support_end(driver_binding.driver_binding_handle, controller_handle);
+                    perf!(perf_driver_binding_support_end, driver_binding.driver_binding_handle, controller_handle);
                     continue;
                 }
             }
@@ -534,7 +538,7 @@ pub unsafe fn core_disconnect_controller(
         let driver_binding = unsafe { &mut *(driver_binding_interface) };
 
         let mut status = efi::Status::SUCCESS;
-        CorePerformance.perf_driver_binding_stop_begin(driver_binding.driver_binding_handle, controller_handle);
+        perf!(perf_driver_binding_stop_begin, driver_binding.driver_binding_handle, controller_handle);
         if !child_handles.is_empty() {
             // Disconnect the child controller(s).
             // SAFETY: driver_binding_interface is a valid pointer to a driver binding protocol instance
@@ -554,7 +558,7 @@ pub unsafe fn core_disconnect_controller(
             status =
                 unsafe { (driver_binding.stop)(driver_binding_interface, controller_handle, 0, core::ptr::null_mut()) };
         }
-        CorePerformance.perf_driver_binding_stop_end(driver_binding.driver_binding_handle, controller_handle);
+        perf!(perf_driver_binding_stop_end, driver_binding.driver_binding_handle, controller_handle);
         if status == efi::Status::SUCCESS {
             one_or_more_drivers_disconnected = true;
         }

@@ -8,13 +8,8 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-#[cfg(any(test, feature = "mockall"))]
-use mockall::automock;
-
 use alloc::vec::Vec;
 use core::{
-    fmt::Debug,
-    marker::Sized,
     mem, ptr,
     sync::atomic::{AtomicPtr, Ordering},
 };
@@ -33,29 +28,6 @@ use scroll::Pwrite;
 /// The number of extra space in byte that will be allocated when publishing the performance buffer.
 /// This is used for every performance records that will be added to the table after it is published.
 const PUBLISHED_FBPT_EXTRA_SPACE: usize = 0x40_000;
-
-/// Interface for a Firmware Basic Boot Performance Table.
-#[cfg_attr(any(test, feature = "mockall"), automock)]
-pub trait FirmwareBasicBootPerfTable: Sized {
-    /// Return the address where the table is.
-    fn fbpt_address(&self) -> usize;
-
-    /// Return every performance records that has been added to the table.
-    fn perf_records(&self) -> &PerformanceRecordBuffer;
-
-    /// Initialize the performance records.
-    fn set_perf_records(&mut self, perf_records: PerformanceRecordBuffer);
-
-    /// Add a performance record to the table.
-    #[cfg_attr(test, mockall::concretize)]
-    fn add_record<T: PerformanceRecord>(&mut self, record: T) -> Result<(), Error>;
-
-    /// Returns the number of bytes that must be allocated to publish the table.
-    fn published_table_size(&self) -> usize;
-
-    /// Returns [`Error::BufferTooSmall`] if `buffer` is not large enough to hold the table.
-    fn publish_table(&mut self, buffer: &'static mut [u8]) -> Result<usize, Error>;
-}
 
 /// Firmware Basic Boot Performance Table (FBPT)
 #[derive(Debug)]
@@ -101,31 +73,37 @@ impl FBPT {
     }
 }
 
-impl FirmwareBasicBootPerfTable for FBPT {
-    fn fbpt_address(&self) -> usize {
+impl FBPT {
+    /// Return the address where the table is.
+    pub fn fbpt_address(&self) -> usize {
         self.fbpt_address
     }
 
-    fn perf_records(&self) -> &PerformanceRecordBuffer {
+    /// Return every performance records that has been added to the table.
+    pub fn perf_records(&self) -> &PerformanceRecordBuffer {
         &self.other_records
     }
 
-    fn set_perf_records(&mut self, perf_records: PerformanceRecordBuffer) {
+    /// Initialize the performance records.
+    pub fn set_perf_records(&mut self, perf_records: PerformanceRecordBuffer) {
         *self.length_mut() = (Self::size_of_empty_table() + perf_records.size()) as u32;
         self.other_records = perf_records;
     }
 
-    fn add_record<T: PerformanceRecord>(&mut self, record: T) -> Result<(), Error> {
+    /// Add a performance record to the table.
+    pub fn add_record<T: PerformanceRecord>(&mut self, record: T) -> Result<(), Error> {
         let record_size = self.other_records.push_record(record)?;
         *self.length_mut() += record_size as u32;
         Ok(())
     }
 
-    fn published_table_size(&self) -> usize {
+    /// Returns the number of bytes that must be allocated to publish the table.
+    pub fn published_table_size(&self) -> usize {
         Self::size_of_empty_table() + self.other_records.size() + PUBLISHED_FBPT_EXTRA_SPACE
     }
 
-    fn publish_table(&mut self, buffer: &'static mut [u8]) -> Result<usize, Error> {
+    /// Returns [`Error::BufferTooSmall`] if `buffer` is not large enough to hold the table.
+    pub fn publish_table(&mut self, buffer: &'static mut [u8]) -> Result<usize, Error> {
         self.fbpt_address = buffer.as_ptr() as usize;
 
         let mut offset = 0;

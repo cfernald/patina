@@ -7,7 +7,7 @@
 //!
 use core::{
     mem, ptr,
-    sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
+    sync::atomic::{AtomicBool, AtomicU32, Ordering},
 };
 
 use alloc::vec::Vec;
@@ -33,11 +33,12 @@ use patina::{
             hob::{HobPerformanceData, merge_hob_performance_buffer},
             known::KnownPerfId,
         },
-        table::{FBPT, FirmwareBasicBootPerfTable},
+        table::FBPT,
     },
     pi::hob::{Hob as PiHob, HobList},
     uefi_protocol::performance_measurement::PerfAttribute,
 };
+use spin::Once;
 
 use crate::{cpu::PerfTimer, protocols::PROTOCOL_DB, tpl_mutex::TplMutex};
 
@@ -46,123 +47,137 @@ use r_efi::{
     protocols::device_path::{Media, TYPE_MEDIA},
 };
 
-static LOAD_IMAGE_COUNT: AtomicU32 = AtomicU32::new(0);
-static PERF_MEASUREMENT_MASK: AtomicU32 = AtomicU32::new(0);
-static PERF_FREQUENCY: AtomicU64 = AtomicU64::new(0);
-static PERFORMANCE_TABLE: TplMutex<FBPT> = TplMutex::new(efi::TPL_NOTIFY, FBPT::new(), "PerformanceTableLock");
-
-macro_rules! gate_measurement {
-    ($measurement:expr) => {
-        if PERF_MEASUREMENT_MASK.load(Ordering::Relaxed) & $measurement as u32 == 0 {
-            return;
-        }
-    };
-}
+/// This is a temporary global reference for code that has not yet been converted to use the instanced
+/// core mechanisms. This should be removed once driver_services.rs is converted.
+pub(crate) static CORE_PERFORMANCE: Once<&'static CorePerformance> = Once::new();
 
 /// Performance measurement service owned by the DXE Core.
 ///
-/// This is a stateless handle; all state lives in module statics. It is registered as a
-/// [`Service<dyn PerformanceMeasurement>`] for components and used directly by core internals.
+/// Owns all performance measurement state (the FBPT, measurement mask, load-image count, and arch timer). It is
+/// registered as a [`Service<dyn PerformanceMeasurement>`] for components and used directly by core internals.
 #[derive(IntoService)]
 #[service(dyn PerformanceMeasurement)]
-pub(crate) struct CorePerformance;
+pub(crate) struct CorePerformance {
+    loaded_image_count: AtomicU32,
+    perf_measurement_mask: AtomicU32,
+    performance_table: TplMutex<FBPT>,
+    timer: PerfTimer,
+}
 
 impl CorePerformance {
-    /// Initializes the core performance service.
-    pub(crate) fn init(frequency: u64, config: PerformanceConfig, hob_records: Option<(u32, PerformanceRecordBuffer)>) {
-        PERF_FREQUENCY.store(frequency, Ordering::Relaxed);
+    pub(crate) const fn new() -> Self {
+        Self {
+            loaded_image_count: AtomicU32::new(0),
+            perf_measurement_mask: AtomicU32::new(0),
+            performance_table: TplMutex::new(efi::TPL_NOTIFY, FBPT::new(), "PerformanceTableLock"),
+            timer: PerfTimer::new(),
+        }
+    }
 
+    fn measurement_enabled(&self, measurement: Measurement) -> bool {
+        if self.perf_measurement_mask.load(Ordering::Relaxed) & measurement as u32 == 0 {
+            return false;
+        }
+        true
+    }
+
+    /// Initializes the core performance service.
+    pub(crate) fn init(
+        &self,
+        frequency: u64,
+        config: PerformanceConfig,
+        hob_records: Option<(u32, PerformanceRecordBuffer)>,
+    ) {
         if config.enabled == PerformanceConfig::DISABLED {
             return;
         }
 
-        Self::set_measurement_mask(config.enabled_measurements);
+        self.timer.set_frequency(frequency);
 
+        self.set_measurement_mask(config.enabled_measurements);
         if let Some((load_image_count, perf_records)) = hob_records {
-            Self::set_load_image_count(load_image_count);
-            Self::set_perf_records(perf_records);
+            self.set_load_image_count(load_image_count);
+            self.set_perf_records(perf_records);
         }
-
-        // Record the PEI-end / DXE-begin cross-module markers. This runs during core memory initialization, as early
-        // as the performance engine can record into its table, so the DXE span is captured close to the phase boundary.
-        let dxe_core_guid = patina::guids::DXE_CORE.into_inner();
-        CorePerformance.perf_cross_module_end("PEI", &dxe_core_guid);
-        CorePerformance.perf_cross_module_begin("DXE", &dxe_core_guid);
     }
 
-    pub(crate) fn enabled() -> bool {
-        PERF_MEASUREMENT_MASK.load(Ordering::Relaxed) != 0
+    pub(crate) fn enabled(&self) -> bool {
+        self.perf_measurement_mask.load(Ordering::Relaxed) != 0
     }
 
     /// Stores the bitmask of enabled measurements.
-    fn set_measurement_mask(mask: u32) {
-        PERF_MEASUREMENT_MASK.store(mask, Ordering::Relaxed);
+    fn set_measurement_mask(&self, mask: u32) {
+        self.perf_measurement_mask.store(mask, Ordering::Relaxed);
     }
 
     /// Stores the running load-image count, typically restored from a HOB at startup.
-    fn set_load_image_count(count: u32) {
-        LOAD_IMAGE_COUNT.store(count, Ordering::Relaxed);
+    fn set_load_image_count(&self, count: u32) {
+        self.loaded_image_count.store(count, Ordering::Relaxed);
     }
 
     /// Initializes the tracked performance records, typically restored from a HOB at startup.
-    fn set_perf_records(perf_records: PerformanceRecordBuffer) {
-        PERFORMANCE_TABLE.lock().set_perf_records(perf_records);
+    fn set_perf_records(&self, perf_records: PerformanceRecordBuffer) {
+        self.performance_table.lock().set_perf_records(perf_records);
     }
 
     /// Begins performance measurement of start image in core.
     pub(crate) fn perf_image_start_begin(&self, module_handle: efi::Handle) {
-        gate_measurement!(Measurement::StartImage);
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(module_handle),
-            None,
-            None,
-            0,
-            0,
-            KnownPerfId::ModuleStart.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
+        if self.measurement_enabled(Measurement::StartImage) {
+            let _ = self.create_measurement(
+                CallerIdentifier::Handle(module_handle),
+                None,
+                None,
+                0,
+                0,
+                KnownPerfId::ModuleStart.as_u16(),
+                PerfAttribute::PerfEntry,
+            );
+        }
     }
 
     /// Ends performance measurement of start image in core.
     pub(crate) fn perf_image_start_end(&self, image_handle: efi::Handle) {
-        gate_measurement!(Measurement::StartImage);
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(image_handle),
-            None,
-            None,
-            0,
-            0,
-            KnownPerfId::ModuleEnd.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
+        if self.measurement_enabled(Measurement::StartImage) {
+            let _ = self.create_measurement(
+                CallerIdentifier::Handle(image_handle),
+                None,
+                None,
+                0,
+                0,
+                KnownPerfId::ModuleEnd.as_u16(),
+                PerfAttribute::PerfEntry,
+            );
+        }
     }
 
     /// Begins performance measurement of load image in core.
     pub(crate) fn perf_load_image_begin(&self, module_handle: efi::Handle) {
-        gate_measurement!(Measurement::LoadImage);
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(module_handle),
-            None,
-            None,
-            0,
-            0,
-            KnownPerfId::ModuleLoadImageStart.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
+        if self.measurement_enabled(Measurement::LoadImage) {
+            let _ = self.create_measurement(
+                CallerIdentifier::Handle(module_handle),
+                None,
+                None,
+                0,
+                0,
+                KnownPerfId::ModuleLoadImageStart.as_u16(),
+                PerfAttribute::PerfEntry,
+            );
+        }
     }
 
     /// Ends performance measurement of load image in core.
     pub(crate) fn perf_load_image_end(&self, module_handle: efi::Handle) {
-        gate_measurement!(Measurement::LoadImage);
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(module_handle),
-            None,
-            None,
-            0,
-            0,
-            KnownPerfId::ModuleLoadImageEnd.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
+        if self.measurement_enabled(Measurement::LoadImage) {
+            let _ = self.create_measurement(
+                CallerIdentifier::Handle(module_handle),
+                None,
+                None,
+                0,
+                0,
+                KnownPerfId::ModuleLoadImageEnd.as_u16(),
+                PerfAttribute::PerfEntry,
+            );
+        }
     }
 
     /// Begins performance measurement of driver binding support in the core.
@@ -171,16 +186,17 @@ impl CorePerformance {
         driver_binding_handle: efi::Handle,
         controller_handle: efi::Handle,
     ) {
-        gate_measurement!(Measurement::DriverBindingSupport);
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(driver_binding_handle),
-            None,
-            None,
-            0,
-            controller_handle as usize,
-            KnownPerfId::ModuleDbSupportStart.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
+        if self.measurement_enabled(Measurement::DriverBindingSupport) {
+            let _ = self.create_measurement(
+                CallerIdentifier::Handle(driver_binding_handle),
+                None,
+                None,
+                0,
+                controller_handle as usize,
+                KnownPerfId::ModuleDbSupportStart.as_u16(),
+                PerfAttribute::PerfEntry,
+            );
+        }
     }
 
     /// Ends performance measurement of driver binding support in the core.
@@ -189,16 +205,17 @@ impl CorePerformance {
         driver_binding_handle: efi::Handle,
         controller_handle: efi::Handle,
     ) {
-        gate_measurement!(Measurement::DriverBindingSupport);
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(driver_binding_handle),
-            None,
-            None,
-            0,
-            controller_handle as usize,
-            KnownPerfId::ModuleDbSupportEnd.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
+        if self.measurement_enabled(Measurement::DriverBindingSupport) {
+            let _ = self.create_measurement(
+                CallerIdentifier::Handle(driver_binding_handle),
+                None,
+                None,
+                0,
+                controller_handle as usize,
+                KnownPerfId::ModuleDbSupportEnd.as_u16(),
+                PerfAttribute::PerfEntry,
+            );
+        }
     }
 
     /// Begins performance measurement of driver binding start in the core.
@@ -207,16 +224,17 @@ impl CorePerformance {
         driver_binding_handle: efi::Handle,
         controller_handle: efi::Handle,
     ) {
-        gate_measurement!(Measurement::DriverBindingStart);
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(driver_binding_handle),
-            None,
-            None,
-            0,
-            controller_handle as usize,
-            KnownPerfId::ModuleDbStart.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
+        if self.measurement_enabled(Measurement::DriverBindingStart) {
+            let _ = self.create_measurement(
+                CallerIdentifier::Handle(driver_binding_handle),
+                None,
+                None,
+                0,
+                controller_handle as usize,
+                KnownPerfId::ModuleDbStart.as_u16(),
+                PerfAttribute::PerfEntry,
+            );
+        }
     }
 
     /// Ends performance measurement of driver binding start in the core.
@@ -225,44 +243,47 @@ impl CorePerformance {
         driver_binding_handle: efi::Handle,
         controller_handle: efi::Handle,
     ) {
-        gate_measurement!(Measurement::DriverBindingStart);
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(driver_binding_handle),
-            None,
-            None,
-            0,
-            controller_handle as usize,
-            KnownPerfId::ModuleDbEnd.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
+        if self.measurement_enabled(Measurement::DriverBindingStart) {
+            let _ = self.create_measurement(
+                CallerIdentifier::Handle(driver_binding_handle),
+                None,
+                None,
+                0,
+                controller_handle as usize,
+                KnownPerfId::ModuleDbEnd.as_u16(),
+                PerfAttribute::PerfEntry,
+            );
+        }
     }
 
     /// Begins performance measurement of driver binding stop in the core.
     pub(crate) fn perf_driver_binding_stop_begin(&self, module_handle: efi::Handle, controller_handle: efi::Handle) {
-        gate_measurement!(Measurement::DriverBindingStop);
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(module_handle),
-            None,
-            None,
-            0,
-            controller_handle as usize,
-            KnownPerfId::ModuleDbStopStart.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
+        if self.measurement_enabled(Measurement::DriverBindingStop) {
+            let _ = self.create_measurement(
+                CallerIdentifier::Handle(module_handle),
+                None,
+                None,
+                0,
+                controller_handle as usize,
+                KnownPerfId::ModuleDbStopStart.as_u16(),
+                PerfAttribute::PerfEntry,
+            );
+        }
     }
 
     /// Ends performance measurement of driver binding stop in the core.
     pub(crate) fn perf_driver_binding_stop_end(&self, module_handle: efi::Handle, controller_handle: efi::Handle) {
-        gate_measurement!(Measurement::DriverBindingStop);
-        let _ = self.create_measurement(
-            CallerIdentifier::Handle(module_handle),
-            None,
-            None,
-            0,
-            controller_handle as usize,
-            KnownPerfId::ModuleDbStopEnd.as_u16(),
-            PerfAttribute::PerfEntry,
-        );
+        if self.measurement_enabled(Measurement::DriverBindingStop) {
+            let _ = self.create_measurement(
+                CallerIdentifier::Handle(module_handle),
+                None,
+                None,
+                0,
+                controller_handle as usize,
+                KnownPerfId::ModuleDbStopEnd.as_u16(),
+                PerfAttribute::PerfEntry,
+            );
+        }
     }
 }
 
@@ -312,199 +333,174 @@ impl PerformanceMeasurement for CorePerformance {
         perf_id: u16,
         attribute: PerfAttribute,
     ) -> Result<(), Error> {
-        create_measurement_impl(caller_identifier, guid, string, ticker, address, perf_id, attribute)
+        self.create_measurement_inner(caller_identifier, guid, string, ticker, address, perf_id, attribute)
     }
 
     fn add_generic_record(&self, record: GenericPerformanceRecord<&[u8]>) -> Result<(), Error> {
-        add_fbpt_record(&PERFORMANCE_TABLE, record)
+        self.add_fbpt_record(record)
     }
 
     fn published_table_size(&self) -> Result<usize, Error> {
-        match PERFORMANCE_TABLE.try_lock() {
+        match self.performance_table.try_lock() {
             Some(table) => Ok(table.published_table_size()),
             None => Err(EfiError::InvalidParameter.into()),
         }
     }
 
     fn publish_table(&self, buffer: &'static mut [u8]) -> Result<(), Error> {
-        match PERFORMANCE_TABLE.try_lock() {
+        match self.performance_table.try_lock() {
             Some(mut table) => table.publish_table(buffer).map(|_| ()),
             None => Err(EfiError::InvalidParameter.into()),
         }
     }
 }
 
-/// Builds the appropriate performance record and adds it to the FBPT.
-fn create_measurement_impl(
-    caller_identifier: CallerIdentifier,
-    guid: Option<&efi::Guid>,
-    string: Option<&str>,
-    ticker: u64,
-    address: usize,
-    perf_id: u16,
-    attribute: PerfAttribute,
-) -> Result<(), Error> {
-    let timer = PerfTimer::with_frequency(PERF_FREQUENCY.load(Ordering::Relaxed));
-    create_measurement_inner(
-        caller_identifier,
-        guid,
-        string,
-        ticker,
-        address,
-        perf_id,
-        attribute,
-        &PERFORMANCE_TABLE,
-        &timer,
-    )
-}
-
-/// Adds a record to the FBPT, returning an error if the table lock cannot be acquired.
-///
-/// The FBPT [`TplMutex`] must never be acquired re-entrantly. A re-entrant performance measurement
-/// may occur when dropping a measurement's lock guard restores the TPL and dispatches a pending
-/// event notification whose callback creates another measurement before the guard finishes releasing
-/// the lock. To avoid panicking, this attempts lock acquisition and, on contention, drops the record and returns
-/// [`EfiError::InvalidParameter`] so the caller can observe that the record was not added. This is similar
-/// in behavior and return status to the edk2 implementation of [`create_performance_measurement`].
-fn add_fbpt_record<F, T>(fbpt: &TplMutex<F>, record: T) -> Result<(), Error>
-where
-    F: FirmwareBasicBootPerfTable,
-    T: PerformanceRecord,
-{
-    match fbpt.try_lock() {
-        Some(mut table) => table.add_record(record),
-        // Re-entrant measurement: See function docs.
-        None => Err(EfiError::InvalidParameter.into()),
+impl CorePerformance {
+    /// Adds a record to the FBPT, returning an error if the table lock cannot be acquired.
+    ///
+    /// The FBPT [`TplMutex`] must never be acquired re-entrantly. A re-entrant performance measurement
+    /// may occur when dropping a measurement's lock guard restores the TPL and dispatches a pending
+    /// event notification whose callback creates another measurement before the guard finishes releasing
+    /// the lock. To avoid panicking, this attempts lock acquisition and, on contention, drops the record and returns
+    /// [`EfiError::InvalidParameter`] so the caller can observe that the record was not added. This is similar
+    /// in behavior and return status to the edk2 implementation of [`create_performance_measurement`].
+    fn add_fbpt_record<T: PerformanceRecord>(&self, record: T) -> Result<(), Error> {
+        match self.performance_table.try_lock() {
+            Some(mut table) => table.add_record(record),
+            // Re-entrant measurement: See function docs.
+            None => Err(EfiError::InvalidParameter.into()),
+        }
     }
-}
 
-/// Builds the appropriate performance record and adds it to the provided FBPT.
-///
-/// This is the generic core of [`create_measurement_impl`], split out so it can be unit-tested with a mock table.
-#[allow(clippy::too_many_arguments)]
-fn create_measurement_inner<F>(
-    caller_identifier: CallerIdentifier,
-    guid: Option<&efi::Guid>,
-    string: Option<&str>,
-    ticker: u64,
-    address: usize,
-    perf_id: u16,
-    attribute: PerfAttribute,
-    fbpt: &TplMutex<F>,
-    timer: &impl ArchTimerFunctionality,
-) -> Result<(), Error>
-where
-    F: FirmwareBasicBootPerfTable,
-{
-    let cpu_count = timer.cpu_count();
-    let timestamp = match ticker {
-        0 => (cpu_count as f64 / timer.perf_frequency() as f64 * 1_000_000_000_f64) as u64,
-        1 => 0,
-        ticker => (ticker as f64 / timer.perf_frequency() as f64 * 1_000_000_000_f64) as u64,
-    };
-
-    // If the `perf_id` is not a known one, we create a DynamicStringEventRecord.
-    // In this case, `caller_id` can be either an image handle or a guid pointer.
-    let Ok(known_perf_id) = KnownPerfId::try_from(perf_id) else {
-        // PERF_ENTRY must have a matching start and end.
-        // Unknown IDs cannot be matched, so we reject PERF_ENTRY for unknown IDs.
-        if attribute == PerfAttribute::PerfEntry {
-            return Err(EfiError::InvalidParameter.into());
-        }
-
-        let handle = caller_identifier.as_handle().ok_or(EfiError::InvalidParameter)?;
-
-        // Mirroring EDK2 behavior, when the ID is unknown, we treat `caller_identifier` as a handle.
-        let Ok(guid) = get_module_guid_from_handle(handle) else {
-            log::error!("Performance: Could not find the guid for module handle: {handle:?}");
-            return Err(EfiError::InvalidParameter.into());
+    /// Builds the appropriate performance record and adds it to the FBPT.
+    #[allow(clippy::too_many_arguments)]
+    fn create_measurement_inner(
+        &self,
+        caller_identifier: CallerIdentifier,
+        guid: Option<&efi::Guid>,
+        string: Option<&str>,
+        ticker: u64,
+        address: usize,
+        perf_id: u16,
+        attribute: PerfAttribute,
+    ) -> Result<(), Error> {
+        let cpu_count = self.timer.cpu_count();
+        let timestamp = match ticker {
+            0 => (cpu_count as f64 / self.timer.perf_frequency() as f64 * 1_000_000_000_f64) as u64,
+            1 => 0,
+            ticker => (ticker as f64 / self.timer.perf_frequency() as f64 * 1_000_000_000_f64) as u64,
         };
-        let module_name = string.unwrap_or("unknown name");
-        return match add_fbpt_record(fbpt, DynamicStringEventRecord::new(perf_id, 0, timestamp, guid, module_name)) {
-            Ok(()) => Ok(()),
-            Err(e) => Err(report_add_record_error(e)),
-        };
-    };
 
-    let result = match known_perf_id {
-        KnownPerfId::ModuleStart | KnownPerfId::ModuleEnd => {
-            let module_handle = caller_identifier.as_handle().ok_or(EfiError::InvalidParameter)?;
-            let Ok(guid) = get_module_guid_from_handle(module_handle) else {
-                log::error!("Performance: Could not find the guid for module handle: {module_handle:?}");
+        // If the `perf_id` is not a known one, we create a DynamicStringEventRecord.
+        // In this case, `caller_id` can be either an image handle or a guid pointer.
+        let Ok(known_perf_id) = KnownPerfId::try_from(perf_id) else {
+            // PERF_ENTRY must have a matching start and end.
+            // Unknown IDs cannot be matched, so we reject PERF_ENTRY for unknown IDs.
+            if attribute == PerfAttribute::PerfEntry {
                 return Err(EfiError::InvalidParameter.into());
-            };
-            add_fbpt_record(fbpt, GuidEventRecord::new(perf_id, 0, timestamp, guid))
-        }
-        id @ KnownPerfId::ModuleLoadImageStart | id @ KnownPerfId::ModuleLoadImageEnd => {
-            if id == KnownPerfId::ModuleLoadImageStart {
-                LOAD_IMAGE_COUNT.fetch_add(1, Ordering::Relaxed);
             }
-            let module_handle = caller_identifier.as_handle().ok_or(EfiError::InvalidParameter)?;
-            let Ok(guid) = get_module_guid_from_handle(module_handle) else {
-                log::error!("Performance: Could not find the guid for module handle: {module_handle:?}");
+
+            let handle = caller_identifier.as_handle().ok_or(EfiError::InvalidParameter)?;
+
+            // Mirroring EDK2 behavior, when the ID is unknown, we treat `caller_identifier` as a handle.
+            let Ok(guid) = get_module_guid_from_handle(handle) else {
+                log::error!("Performance: Could not find the guid for module handle: {handle:?}");
                 return Err(EfiError::InvalidParameter.into());
             };
-            let load_image_count = LOAD_IMAGE_COUNT.load(Ordering::Relaxed) as u64;
-            add_fbpt_record(fbpt, GuidQwordEventRecord::new(perf_id, 0, timestamp, guid, load_image_count))
-        }
-        KnownPerfId::ModuleDbStart
-        | KnownPerfId::ModuleDbSupportStart
-        | KnownPerfId::ModuleDbSupportEnd
-        | KnownPerfId::ModuleDbStopStart
-        | KnownPerfId::ModuleDbStopEnd => {
-            let module_handle = caller_identifier.as_handle().ok_or(EfiError::InvalidParameter)?;
-            let Ok(guid) = get_module_guid_from_handle(module_handle) else {
-                log::error!("Performance: Could not find the guid for module handle: {module_handle:?}");
-                return Err(EfiError::InvalidParameter.into());
+            let module_name = string.unwrap_or("unknown name");
+            return match self.add_fbpt_record(DynamicStringEventRecord::new(perf_id, 0, timestamp, guid, module_name)) {
+                Ok(()) => Ok(()),
+                Err(e) => Err(report_add_record_error(e)),
             };
-            add_fbpt_record(fbpt, GuidQwordEventRecord::new(perf_id, 0, timestamp, guid, address as u64))
-        }
-        KnownPerfId::ModuleDbEnd => {
-            let module_handle = caller_identifier.as_handle().ok_or(EfiError::InvalidParameter)?;
-            let Ok(guid) = get_module_guid_from_handle(module_handle) else {
-                log::error!("Performance: Could not find the guid for module handle: {module_handle:?}");
-                return Err(EfiError::InvalidParameter.into());
-            };
-            let module_name = "";
-            add_fbpt_record(
-                fbpt,
-                GuidQwordStringEventRecord::new(perf_id, 0, timestamp, guid, address as u64, module_name),
-            )
-        }
-        KnownPerfId::PerfEventSignalStart
-        | KnownPerfId::PerfEventSignalEnd
-        | KnownPerfId::PerfCallbackStart
-        | KnownPerfId::PerfCallbackEnd => {
-            let (Some(function_string), Some(guid)) = (string.as_ref(), guid) else {
-                return Err(EfiError::InvalidParameter.into());
-            };
-            let module_guid = caller_identifier.as_guid().ok_or(EfiError::InvalidParameter)?;
-            add_fbpt_record(
-                fbpt,
-                DualGuidStringEventRecord::new(
+        };
+
+        let result = match known_perf_id {
+            KnownPerfId::ModuleStart | KnownPerfId::ModuleEnd => {
+                let module_handle = caller_identifier.as_handle().ok_or(EfiError::InvalidParameter)?;
+                let Ok(guid) = get_module_guid_from_handle(module_handle) else {
+                    log::error!("Performance: Could not find the guid for module handle: {module_handle:?}");
+                    return Err(EfiError::InvalidParameter.into());
+                };
+                self.add_fbpt_record(GuidEventRecord::new(perf_id, 0, timestamp, guid))
+            }
+            id @ KnownPerfId::ModuleLoadImageStart | id @ KnownPerfId::ModuleLoadImageEnd => {
+                if id == KnownPerfId::ModuleLoadImageStart {
+                    self.loaded_image_count.fetch_add(1, Ordering::Relaxed);
+                }
+                let module_handle = caller_identifier.as_handle().ok_or(EfiError::InvalidParameter)?;
+                let Ok(guid) = get_module_guid_from_handle(module_handle) else {
+                    log::error!("Performance: Could not find the guid for module handle: {module_handle:?}");
+                    return Err(EfiError::InvalidParameter.into());
+                };
+                let load_image_count = self.loaded_image_count.load(Ordering::Relaxed) as u64;
+                self.add_fbpt_record(GuidQwordEventRecord::new(perf_id, 0, timestamp, guid, load_image_count))
+            }
+            KnownPerfId::ModuleDbStart
+            | KnownPerfId::ModuleDbSupportStart
+            | KnownPerfId::ModuleDbSupportEnd
+            | KnownPerfId::ModuleDbStopStart
+            | KnownPerfId::ModuleDbStopEnd => {
+                let module_handle = caller_identifier.as_handle().ok_or(EfiError::InvalidParameter)?;
+                let Ok(guid) = get_module_guid_from_handle(module_handle) else {
+                    log::error!("Performance: Could not find the guid for module handle: {module_handle:?}");
+                    return Err(EfiError::InvalidParameter.into());
+                };
+                self.add_fbpt_record(GuidQwordEventRecord::new(perf_id, 0, timestamp, guid, address as u64))
+            }
+            KnownPerfId::ModuleDbEnd => {
+                let module_handle = caller_identifier.as_handle().ok_or(EfiError::InvalidParameter)?;
+                let Ok(guid) = get_module_guid_from_handle(module_handle) else {
+                    log::error!("Performance: Could not find the guid for module handle: {module_handle:?}");
+                    return Err(EfiError::InvalidParameter.into());
+                };
+                let module_name = "";
+                self.add_fbpt_record(GuidQwordStringEventRecord::new(
+                    perf_id,
+                    0,
+                    timestamp,
+                    guid,
+                    address as u64,
+                    module_name,
+                ))
+            }
+            KnownPerfId::PerfEventSignalStart
+            | KnownPerfId::PerfEventSignalEnd
+            | KnownPerfId::PerfCallbackStart
+            | KnownPerfId::PerfCallbackEnd => {
+                let (Some(function_string), Some(guid)) = (string.as_ref(), guid) else {
+                    return Err(EfiError::InvalidParameter.into());
+                };
+                let module_guid = caller_identifier.as_guid().ok_or(EfiError::InvalidParameter)?;
+                self.add_fbpt_record(DualGuidStringEventRecord::new(
                     perf_id,
                     0,
                     timestamp,
                     (*module_guid).into(),
                     (*guid).into(),
                     function_string,
-                ),
-            )
-        }
-        KnownPerfId::PerfFunctionStart
-        | KnownPerfId::PerfFunctionEnd
-        | KnownPerfId::PerfInModuleStart
-        | KnownPerfId::PerfInModuleEnd
-        | KnownPerfId::PerfCrossModuleStart
-        | KnownPerfId::PerfCrossModuleEnd
-        | KnownPerfId::PerfEvent => {
-            let module_guid = caller_identifier.as_guid().ok_or(EfiError::InvalidParameter)?;
-            let string = string.unwrap_or("unknown name");
-            add_fbpt_record(fbpt, DynamicStringEventRecord::new(perf_id, 0, timestamp, (*module_guid).into(), string))
-        }
-    };
+                ))
+            }
+            KnownPerfId::PerfFunctionStart
+            | KnownPerfId::PerfFunctionEnd
+            | KnownPerfId::PerfInModuleStart
+            | KnownPerfId::PerfInModuleEnd
+            | KnownPerfId::PerfCrossModuleStart
+            | KnownPerfId::PerfCrossModuleEnd
+            | KnownPerfId::PerfEvent => {
+                let module_guid = caller_identifier.as_guid().ok_or(EfiError::InvalidParameter)?;
+                let string = string.unwrap_or("unknown name");
+                self.add_fbpt_record(DynamicStringEventRecord::new(
+                    perf_id,
+                    0,
+                    timestamp,
+                    (*module_guid).into(),
+                    string,
+                ))
+            }
+        };
 
-    result.map_err(report_add_record_error)
+        result.map_err(report_add_record_error)
+    }
 }
 
 /// Logs and forwards an error encountered while adding a record to the FBPT.
@@ -575,7 +571,7 @@ fn get_module_guid_from_handle(handle: efi::Handle) -> Result<BinaryGuid, efi::S
                 let guid_ptr = (loaded_image.file_path as *const u8)
                     .add(mem::size_of::<efi::protocols::device_path::Protocol>())
                     as *const BinaryGuid;
-                guid = ptr::read(guid_ptr);
+                guid = ptr::read_unaligned(guid_ptr);
             }
         };
     }
@@ -588,32 +584,25 @@ fn get_module_guid_from_handle(handle: efi::Handle) -> Result<BinaryGuid, efi::S
 mod tests {
     use super::*;
     use crate::test_support::with_global_lock;
-    use patina::performance::table::MockFirmwareBasicBootPerfTable;
     use r_efi::efi;
 
-    #[derive(IntoService)]
-    #[service(dyn ArchTimerFunctionality)]
-    struct MockTimer {}
-
-    impl ArchTimerFunctionality for MockTimer {
-        fn perf_frequency(&self) -> u64 {
-            100
-        }
-        fn cpu_count(&self) -> u64 {
-            200
+    /// Builds a `CorePerformance` backed by a real FBPT and a fixed-frequency timer for host testing.
+    fn test_core_performance() -> CorePerformance {
+        CorePerformance {
+            loaded_image_count: AtomicU32::new(0),
+            perf_measurement_mask: AtomicU32::new(0),
+            performance_table: TplMutex::new(efi::TPL_NOTIFY, FBPT::new(), "TestPerfTableLock"),
+            timer: PerfTimer::with_frequency(100),
         }
     }
 
-    /// Exercises every record-building arm of [`create_measurement_inner`] against a mock table, verifying each
-    /// known performance id produces exactly one record.
+    /// Exercises every record-building arm of [`CorePerformance::create_measurement_inner`], verifying each
+    /// known performance id produces exactly one record in the table.
     #[test]
     fn test_core_performance_create_measurement_all_records() {
         with_global_lock(|| {
             const EXPECTED_NUMBER_OF_RECORD: usize = 21;
-            let mut fbpt = MockFirmwareBasicBootPerfTable::new();
-            fbpt.expect_add_record().times(EXPECTED_NUMBER_OF_RECORD).returning(|_| Ok(()));
-            let fbpt = TplMutex::new(efi::TPL_NOTIFY, fbpt, "TestPerfTableLock");
-            let timer = MockTimer {};
+            let perf = test_core_performance();
 
             let module_handle = 1_usize as efi::Handle;
             let caller_guid = efi::Guid::from_bytes(&[1; 16]);
@@ -621,7 +610,7 @@ mod tests {
 
             macro_rules! measure {
                 ($caller:expr, $guid:expr, $string:expr, $perf_id:ident) => {
-                    create_measurement_inner(
+                    perf.create_measurement_inner(
                         $caller,
                         $guid,
                         $string,
@@ -629,8 +618,6 @@ mod tests {
                         0,
                         KnownPerfId::$perf_id.as_u16(),
                         PerfAttribute::PerfEntry,
-                        &fbpt,
-                        &timer,
                     )
                     .unwrap();
                 };
@@ -662,20 +649,21 @@ mod tests {
             measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfCrossModuleStart);
             measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfCrossModuleEnd);
             measure!(CallerIdentifier::Guid(caller_guid), None, Some("measurement_str"), PerfEvent);
+
+            assert_eq!(perf.performance_table.lock().perf_records().iter().count(), EXPECTED_NUMBER_OF_RECORD);
         })
         .unwrap();
     }
 
-    /// Verifies the validation paths of [`create_measurement_inner`] for unknown perf ids.
+    /// Verifies the validation paths of [`CorePerformance::create_measurement_inner`] for unknown perf ids.
     #[test]
     fn test_core_performance_create_measurement_invalid_params() {
         with_global_lock(|| {
-            let fbpt = TplMutex::new(efi::TPL_NOTIFY, MockFirmwareBasicBootPerfTable::new(), "TestPerfTableLock");
-            let timer = MockTimer {};
+            let perf = test_core_performance();
 
             // A PerfEntry must have a known perf id.
             let unknown_perf_id = 0xFFFF;
-            let result = create_measurement_inner(
+            let result = perf.create_measurement_inner(
                 CallerIdentifier::Handle(0x1_usize as efi::Handle),
                 None,
                 Some("test"),
@@ -683,13 +671,11 @@ mod tests {
                 0,
                 unknown_perf_id,
                 PerfAttribute::PerfEntry,
-                &fbpt,
-                &timer,
             );
             assert_eq!(result.unwrap_err(), Error::Efi(EfiError::InvalidParameter));
 
             // If the perf id is unknown, the caller identifier must be a handle.
-            let result = create_measurement_inner(
+            let result = perf.create_measurement_inner(
                 CallerIdentifier::Guid(efi::Guid::from_bytes(&[1; 16])),
                 None,
                 Some("test"),
@@ -697,8 +683,6 @@ mod tests {
                 0,
                 unknown_perf_id,
                 PerfAttribute::PerfStartEntry,
-                &fbpt,
-                &timer,
             );
             assert_eq!(result.unwrap_err(), Error::Efi(EfiError::InvalidParameter));
         })
@@ -758,16 +742,37 @@ mod tests {
         assert_eq!(records.iter().count(), 0);
     }
 
-    /// Verifies that [`CorePerformance::init`] stores the timer frequency and honors the disable gate. The enabled
-    /// path drives the global FBPT (and thus the global TPL) and is exercised at the integration level instead.
+    /// Verifies that [`CorePerformance::init`] honors the disable gate: a disabled config leaves the service
+    /// disabled and records nothing.
     #[test]
-    fn test_core_performance_init_disabled_stores_frequency() {
+    fn test_core_performance_init_disabled() {
         const FREQ: u64 = 987_654;
+        let perf = test_core_performance();
         let config = PerformanceConfig::new();
         assert_eq!(config.enabled, PerformanceConfig::DISABLED);
 
-        CorePerformance::init(FREQ, config, None);
+        perf.init(FREQ, config, None);
 
-        assert_eq!(PERF_FREQUENCY.load(Ordering::Relaxed), FREQ);
+        assert!(!perf.enabled());
+    }
+
+    /// Verifies that [`CorePerformance::init`] applies the enabled config: it sets the timer frequency and
+    /// measurement mask and restores the carried-over load-image count and performance records.
+    #[test]
+    fn test_core_performance_init_enabled() {
+        with_global_lock(|| {
+            const FREQ: u64 = 987_654;
+            const LOAD_IMAGE_COUNT: u32 = 7;
+            let perf = test_core_performance();
+            let config = PerformanceConfig { enabled: PerformanceConfig::ENABLED, enabled_measurements: 0xFF };
+
+            perf.init(FREQ, config, Some((LOAD_IMAGE_COUNT, PerformanceRecordBuffer::new())));
+
+            assert!(perf.enabled());
+            assert_eq!(perf.timer.perf_frequency(), FREQ);
+            assert_eq!(perf.loaded_image_count.load(Ordering::Relaxed), LOAD_IMAGE_COUNT);
+            assert_eq!(perf.performance_table.lock().perf_records().iter().count(), 0);
+        })
+        .unwrap();
     }
 }

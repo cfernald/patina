@@ -38,6 +38,7 @@ pub trait PerformanceMeasurement: Send + Sync {
     ) -> Result<(), Error>;
 
     /// Adds an already-formed generic performance record to the FBPT.
+    #[allow(clippy::needless_lifetimes)]
     fn add_generic_record<'a>(&self, record: GenericPerformanceRecord<&'a [u8]>) -> Result<(), Error>;
 
     /// Returns the number of bytes that must be allocated to publish the Firmware Basic Boot Performance Table.

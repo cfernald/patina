@@ -37,13 +37,13 @@ use patina_ffs::{
 };
 use patina_internal_core::depex::{AssociatedDependency, Depex, Opcode};
 use r_efi::efi;
-use spin::RwLock;
+use spin::{Once, RwLock};
 
 use image::ImageStatus;
 use section_decompress::CoreExtractor;
 
 use crate::{
-    PlatformInfo, config_tables::core_install_configuration_table, events::EVENT_DB,
+    PlatformInfo, config_tables::core_install_configuration_table, events::EVENT_DB, performance,
     pi_dispatcher::fv::device_path_bytes_for_fv_file, protocol_db::DXE_CORE_HANDLE, protocols::PROTOCOL_DB,
     systemtables::EfiSystemTable, tpl_mutex::TplMutex,
 };
@@ -88,6 +88,8 @@ pub(crate) struct PiDispatcher<P: PlatformInfo> {
     fv_data: TplMutex<fv::FvProtocolData<P>>,
     /// Section extractor used when working with firmware volumes.
     section_extractor: CoreExtractor<P::Extractor>,
+    /// Optional performance service reference.
+    performance: Once<&'static performance::CorePerformance>,
 }
 
 impl<P: PlatformInfo> PiDispatcher<P> {
@@ -99,7 +101,12 @@ impl<P: PlatformInfo> PiDispatcher<P> {
             debug_image_data: debug_image_info_table::DebugImageInfoData::new_locked(),
             fv_data: fv::FvProtocolData::new_locked(),
             section_extractor: CoreExtractor::new(section_extractor),
+            performance: Once::new(),
         }
+    }
+
+    pub(crate) fn set_performance(&self, performance: &'static performance::CorePerformance) {
+        let _ = self.performance.call_once(|| performance);
     }
 
     fn instance<'a>() -> &'a Self {
