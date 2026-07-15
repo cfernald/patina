@@ -277,7 +277,7 @@ impl<'a> PerformanceRecordIterator<'a> {
 }
 
 impl<'a> Iterator for PerformanceRecordIterator<'a> {
-    type Item = Result<GenericPerformanceRecord<&'a [u8]>, MmPerformanceError>;
+    type Item = Result<&'a GenericPerformanceRecord, MmPerformanceError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.bytes.len() < PerformanceRecordHeader::SIZE {
@@ -311,12 +311,13 @@ impl<'a> Iterator for PerformanceRecordIterator<'a> {
             ))));
         }
 
-        let data = self.bytes.get(PerformanceRecordHeader::SIZE..rec_len)?;
-        let record = GenericPerformanceRecord {
-            record_type: header.record_type,
-            length: header.length,
-            revision: header.revision,
-            data,
+        let record_bytes = self.bytes.get(..rec_len)?;
+        let record = match GenericPerformanceRecord::ref_from_bytes(record_bytes) {
+            Ok(record) => record,
+            Err(err) => {
+                self.bytes = &[];
+                return Some(Err(MmPerformanceError::RecordError(alloc::format!("Failed to parse record: {:?}", err))));
+            }
         };
 
         self.bytes = self.bytes.get(rec_len..).unwrap_or(&[]);
@@ -347,17 +348,22 @@ fn process_mm_performance_records(
             Ok(record) => {
                 record_count += 1;
 
+                // Copy packed header fields into locals to avoid unaligned references.
+                let record_type = record.header.record_type;
+                let length = record.header.length;
+                let revision = record.header.revision;
+
                 log::debug!(
                     "Performance: MM record #{} - type: 0x{:04X} ({}), length: {}, revision: {}, data_len: {}",
                     record_count,
-                    record.record_type,
-                    record_type_name(record.record_type),
-                    record.length,
-                    record.revision,
+                    record_type,
+                    record_type_name(record_type),
+                    length,
+                    revision,
                     record.data.len()
                 );
                 // Print detailed record information based on type
-                print_record_details(record.record_type, record_count, record.data);
+                print_record_details(record_type, record_count, &record.data);
 
                 if let Err(e) = performance.add_generic_record(record) {
                     error_count += 1;
@@ -609,7 +615,7 @@ mod tests {
         ) -> Result<(), Error> {
             Ok(())
         }
-        fn add_generic_record(&self, _record: GenericPerformanceRecord<&[u8]>) -> Result<(), Error> {
+        fn add_generic_record(&self, _record: &GenericPerformanceRecord) -> Result<(), Error> {
             self.records.fetch_add(1, Ordering::Relaxed);
             Ok(())
         }

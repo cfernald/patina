@@ -336,7 +336,7 @@ impl PerformanceManager for CorePerformance {
         self.create_measurement_inner(caller_identifier, guid, string, ticker, address, perf_id, attribute)
     }
 
-    fn add_generic_record(&self, record: GenericPerformanceRecord<&[u8]>) -> Result<(), Error> {
+    fn add_generic_record(&self, record: &GenericPerformanceRecord) -> Result<(), Error> {
         self.add_fbpt_record(record)
     }
 

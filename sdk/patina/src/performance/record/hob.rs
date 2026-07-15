@@ -94,10 +94,7 @@ pub mod tests {
     use scroll::Pwrite;
 
     use super::{HobPerformanceData, merge_hob_performance_buffer};
-    use crate::{
-        component::hob::FromHob,
-        performance::record::{GenericPerformanceRecord, PerformanceRecordBuffer},
-    };
+    use crate::{component::hob::FromHob, performance::record::PerformanceRecordBuffer};
 
     #[test]
     fn test_merge_hob_performance_buffer_with_none() {
@@ -120,9 +117,7 @@ pub mod tests {
         let mut offset = 0;
 
         let mut perf_record_buffer = PerformanceRecordBuffer::new();
-        perf_record_buffer
-            .push_record(GenericPerformanceRecord { record_type: 1, length: 5, revision: 1, data: [1_u8, 2, 3, 4, 5] })
-            .unwrap();
+        perf_record_buffer.push_generic(1, 1, &[1_u8, 2, 3, 4, 5]).unwrap();
 
         let size_of_all_entries = perf_record_buffer.size() as u32;
         let load_image_count = 12_u32;
@@ -152,19 +147,10 @@ pub mod tests {
     #[test]
     fn test_merge_hob_performance_buffer() {
         let mut perf_record_buffer_1 = PerformanceRecordBuffer::new();
-        perf_record_buffer_1
-            .push_record(GenericPerformanceRecord { record_type: 1, length: 5, revision: 1, data: [1_u8, 2, 3, 4, 5] })
-            .unwrap();
+        perf_record_buffer_1.push_generic(1, 1, &[1_u8, 2, 3, 4, 5]).unwrap();
 
         let mut perf_record_buffer_2 = PerformanceRecordBuffer::new();
-        perf_record_buffer_2
-            .push_record(GenericPerformanceRecord {
-                record_type: 1,
-                length: 9,
-                revision: 1,
-                data: [10_u8, 20, 30, 40, 50],
-            })
-            .unwrap();
+        perf_record_buffer_2.push_generic(1, 1, &[10_u8, 20, 30, 40, 50]).unwrap();
 
         let buffer = [
             HobPerformanceData { load_image_count: 1, records_data_buffer: perf_record_buffer_1.buffer().to_vec() },
@@ -174,17 +160,8 @@ pub mod tests {
         let (loaded_image_count, perf_record_buffer) = merge_hob_performance_buffer(buffer.iter()).unwrap();
 
         let mut expected_perf_record_buffer = PerformanceRecordBuffer::new();
-        expected_perf_record_buffer
-            .push_record(GenericPerformanceRecord { record_type: 1, length: 9, revision: 1, data: [1_u8, 2, 3, 4, 5] })
-            .unwrap();
-        expected_perf_record_buffer
-            .push_record(GenericPerformanceRecord {
-                record_type: 1,
-                length: 9,
-                revision: 1,
-                data: [10_u8, 20, 30, 40, 50],
-            })
-            .unwrap();
+        expected_perf_record_buffer.push_generic(1, 1, &[1_u8, 2, 3, 4, 5]).unwrap();
+        expected_perf_record_buffer.push_generic(1, 1, &[10_u8, 20, 30, 40, 50]).unwrap();
 
         assert_eq!(2, loaded_image_count);
         assert_eq!(expected_perf_record_buffer.buffer(), perf_record_buffer.buffer());

@@ -245,7 +245,7 @@ mod tests {
     use crate::{
         performance::{
             record::{
-                GenericPerformanceRecord, PERFORMANCE_RECORD_HEADER_SIZE,
+                PERFORMANCE_RECORD_HEADER_SIZE,
                 extended::{
                     DualGuidStringEventRecord, DynamicStringEventRecord, GuidEventRecord, GuidQwordEventRecord,
                     GuidQwordStringEventRecord,
@@ -287,9 +287,7 @@ mod tests {
     #[test]
     fn test_set_perf_records() {
         let mut performance_record_buffer = PerformanceRecordBuffer::new();
-        performance_record_buffer
-            .push_record(GenericPerformanceRecord { record_type: 1, length: 20, revision: 1, data: [0_u8; 16] })
-            .unwrap();
+        performance_record_buffer.push_generic(1, 1, &[0_u8; 16]).unwrap();
 
         let mut fbpt = FBPT::new();
         assert_eq!(&56, fbpt.length());
@@ -316,27 +314,19 @@ mod tests {
         fbpt.add_record(GuidQwordStringEventRecord::new(1, 0, 10, guid, 64, "test")).unwrap();
 
         for (i, record) in fbpt.perf_records().iter().enumerate() {
+            let actual = (record.header.record_type, record.header.revision);
             match i {
-                _ if i == 0 => assert_eq!(
-                    (GuidEventRecord::TYPE, GuidEventRecord::REVISION),
-                    (record.record_type, record.revision)
-                ),
-                _ if i == 1 => assert_eq!(
-                    (DynamicStringEventRecord::TYPE, DynamicStringEventRecord::REVISION),
-                    (record.record_type, record.revision)
-                ),
-                _ if i == 2 => assert_eq!(
-                    (DualGuidStringEventRecord::TYPE, DualGuidStringEventRecord::REVISION),
-                    (record.record_type, record.revision)
-                ),
-                _ if i == 3 => assert_eq!(
-                    (GuidQwordEventRecord::TYPE, GuidQwordEventRecord::REVISION),
-                    (record.record_type, record.revision)
-                ),
-                _ if i == 4 => assert_eq!(
-                    (GuidQwordStringEventRecord::TYPE, GuidQwordStringEventRecord::REVISION),
-                    (record.record_type, record.revision)
-                ),
+                _ if i == 0 => assert_eq!((GuidEventRecord::TYPE, GuidEventRecord::REVISION), actual),
+                _ if i == 1 => {
+                    assert_eq!((DynamicStringEventRecord::TYPE, DynamicStringEventRecord::REVISION), actual)
+                }
+                _ if i == 2 => {
+                    assert_eq!((DualGuidStringEventRecord::TYPE, DualGuidStringEventRecord::REVISION), actual)
+                }
+                _ if i == 3 => assert_eq!((GuidQwordEventRecord::TYPE, GuidQwordEventRecord::REVISION), actual),
+                _ if i == 4 => {
+                    assert_eq!((GuidQwordStringEventRecord::TYPE, GuidQwordStringEventRecord::REVISION), actual)
+                }
                 _ => unreachable!(),
             }
         }
