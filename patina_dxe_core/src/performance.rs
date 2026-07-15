@@ -58,6 +58,7 @@ pub(crate) static CORE_PERFORMANCE: Once<&'static CorePerformance> = Once::new()
 #[derive(IntoService)]
 #[service(dyn PerformanceManager)]
 pub(crate) struct CorePerformance {
+    enabled: AtomicBool,
     loaded_image_count: AtomicU32,
     perf_measurement_mask: AtomicU32,
     performance_table: TplMutex<FBPT>,
@@ -67,6 +68,7 @@ pub(crate) struct CorePerformance {
 impl CorePerformance {
     pub(crate) const fn new() -> Self {
         Self {
+            enabled: AtomicBool::new(false),
             loaded_image_count: AtomicU32::new(0),
             perf_measurement_mask: AtomicU32::new(0),
             performance_table: TplMutex::new(efi::TPL_NOTIFY, FBPT::new(), "PerformanceTableLock"),
@@ -75,10 +77,8 @@ impl CorePerformance {
     }
 
     fn measurement_enabled(&self, measurement: Measurement) -> bool {
-        if self.perf_measurement_mask.load(Ordering::Relaxed) & measurement as u32 == 0 {
-            return false;
-        }
-        true
+        self.enabled.load(Ordering::Relaxed)
+            && self.perf_measurement_mask.load(Ordering::Relaxed) & measurement as u32 != 0
     }
 
     /// Initializes the core performance service.
@@ -89,35 +89,22 @@ impl CorePerformance {
         hob_records: Option<(u32, PerformanceRecordBuffer)>,
     ) {
         if config.enabled == PerformanceConfig::DISABLED {
+            self.enabled.store(false, Ordering::Relaxed);
             return;
         }
 
+        self.enabled.store(true, Ordering::Relaxed);
         self.timer.set_frequency(frequency);
 
-        self.set_measurement_mask(config.enabled_measurements);
+        self.perf_measurement_mask.store(config.enabled_measurements, Ordering::Relaxed);
         if let Some((load_image_count, perf_records)) = hob_records {
-            self.set_load_image_count(load_image_count);
-            self.set_perf_records(perf_records);
+            self.loaded_image_count.store(load_image_count, Ordering::Relaxed);
+            self.performance_table.lock().set_perf_records(perf_records);
         }
     }
 
     pub(crate) fn enabled(&self) -> bool {
-        self.perf_measurement_mask.load(Ordering::Relaxed) != 0
-    }
-
-    /// Stores the bitmask of enabled measurements.
-    fn set_measurement_mask(&self, mask: u32) {
-        self.perf_measurement_mask.store(mask, Ordering::Relaxed);
-    }
-
-    /// Stores the running load-image count, typically restored from a HOB at startup.
-    fn set_load_image_count(&self, count: u32) {
-        self.loaded_image_count.store(count, Ordering::Relaxed);
-    }
-
-    /// Initializes the tracked performance records, typically restored from a HOB at startup.
-    fn set_perf_records(&self, perf_records: PerformanceRecordBuffer) {
-        self.performance_table.lock().set_perf_records(perf_records);
+        self.enabled.load(Ordering::Relaxed)
     }
 
     /// Begins performance measurement of start image in core.
@@ -589,6 +576,7 @@ mod tests {
     /// Builds a `CorePerformance` backed by a real FBPT and a fixed-frequency timer for host testing.
     fn test_core_performance() -> CorePerformance {
         CorePerformance {
+            enabled: AtomicBool::new(true),
             loaded_image_count: AtomicU32::new(0),
             perf_measurement_mask: AtomicU32::new(0),
             performance_table: TplMutex::new(efi::TPL_NOTIFY, FBPT::new(), "TestPerfTableLock"),
