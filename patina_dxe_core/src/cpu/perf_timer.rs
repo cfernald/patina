@@ -68,7 +68,12 @@ fn arch_cpu_count() -> u64 {
     {
         patina::arch::x64::rdtsc()
     }
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(all(target_arch = "aarch64", test))]
+    {
+        // Can't use `CNTPCT_EL0` in unit tests, so return a dummy value.
+        0
+    }
+    #[cfg(all(target_arch = "aarch64", not(test)))]
     {
         patina::read_sysreg!(CNTPCT_EL0)
     }
