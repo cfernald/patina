@@ -11,6 +11,7 @@
 //!
 use crate::{
     component::protocol::{create_performance_measurement_efiapi, set_performance_service},
+    component::table::find_previous_table_address,
     mm,
 };
 use alloc::{boxed::Box, string::String, vec::Vec};
@@ -28,7 +29,6 @@ use patina::{
     performance::{
         measurement::PerformanceProperty,
         record::{GenericPerformanceRecord, PerformanceRecordHeader, print_record_details, record_type_name},
-        table::find_previous_table_address,
     },
     pi::status_code::{EFI_PROGRESS_CODE, EFI_SOFTWARE_DXE_BS_DRIVER},
     runtime_services::{RuntimeServices, StandardRuntimeServices},
@@ -512,7 +512,7 @@ mod tests {
             c_ptr::{CMutPtr, CPtr},
         },
         component::service::{IntoService, Service},
-        performance::{error::Error, measurement::CallerIdentifier, table::FirmwarePerformanceVariable},
+        performance::{error::Error, measurement::CallerIdentifier},
         runtime_services::MockRuntimeServices,
         uefi_protocol::{
             ProtocolInterface,
@@ -756,7 +756,7 @@ mod tests {
 
         let mut runtime_services = MockRuntimeServices::new();
         runtime_services
-            .expect_get_variable::<FirmwarePerformanceVariable>()
+            .expect_get_variable::<crate::component::table::FirmwarePerformanceVariable>()
             .once()
             .returning(|_, _, _| Err(efi::Status::NOT_FOUND));
 

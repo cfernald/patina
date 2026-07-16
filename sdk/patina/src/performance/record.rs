@@ -8,7 +8,6 @@
 //!
 
 pub mod extended;
-pub mod hob;
 pub mod known;
 
 use crate::{BinaryGuid, performance::error::Error, performance_debug_assert};
@@ -273,21 +272,6 @@ impl PerformanceRecordBuffer {
 impl Default for PerformanceRecordBuffer {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[cfg(test)]
-#[cfg_attr(coverage_nightly, coverage(off))]
-impl PerformanceRecordBuffer {
-    /// Test helper: builds a generic record from its parts and pushes it into the buffer.
-    pub(crate) fn push_generic(&mut self, record_type: u16, revision: u8, data: &[u8]) -> Result<usize, Error> {
-        let length = (PERFORMANCE_RECORD_HEADER_SIZE + data.len()) as u8;
-        let mut bytes = Vec::with_capacity(length as usize);
-        bytes.extend_from_slice(&record_type.to_le_bytes());
-        bytes.push(length);
-        bytes.push(revision);
-        bytes.extend_from_slice(data);
-        self.push_record(GenericPerformanceRecord::ref_from_bytes(&bytes)?)
     }
 }
 

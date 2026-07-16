@@ -1,5 +1,4 @@
-//! Defines the API and default implementation of performance tables such as the Firmware Basic Boot Performance
-//! Table (FBPT).
+//! Defines the Firmware Basic Boot Performance Table (FBPT) owned by the DXE Core.
 //!
 //! ## License
 //!
@@ -8,19 +7,15 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-use alloc::vec::Vec;
 use core::{
     mem, ptr,
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-use crate::{
-    performance::{
-        self,
-        error::Error,
-        record::{PerformanceRecord, PerformanceRecordBuffer},
-    },
-    runtime_services::RuntimeServices,
+use patina::performance::{
+    self,
+    error::Error,
+    record::{PerformanceRecord, PerformanceRecordBuffer},
 };
 
 use scroll::Pwrite;
@@ -31,7 +26,8 @@ const PUBLISHED_FBPT_EXTRA_SPACE: usize = 0x40_000;
 
 /// Firmware Basic Boot Performance Table (FBPT)
 #[derive(Debug)]
-pub struct FBPT {
+#[allow(clippy::upper_case_acronyms)]
+pub(crate) struct FBPT {
     /// When the table will be reported, this will be the address where the fbpt table is.
     fbpt_address: usize,
     /// First value is the length when the table is not been reported and the second one is when the table is reported.
@@ -75,11 +71,13 @@ impl FBPT {
 
 impl FBPT {
     /// Return the address where the table is.
+    #[cfg(test)]
     pub fn fbpt_address(&self) -> usize {
         self.fbpt_address
     }
 
     /// Return every performance records that has been added to the table.
+    #[cfg(test)]
     pub fn perf_records(&self) -> &PerformanceRecordBuffer {
         &self.other_records
     }
@@ -127,47 +125,10 @@ impl Default for FBPT {
     }
 }
 
-/// Return the address where the FBPT has been allocated during the previous boot.
-pub fn find_previous_table_address(runtime_services: &impl RuntimeServices) -> Option<usize> {
-    runtime_services
-        .get_variable::<FirmwarePerformanceVariable>(
-            &[0],
-            &FirmwarePerformanceVariable::ADDRESS_VARIABLE_GUID,
-            Some(mem::size_of::<FirmwarePerformanceVariable>()),
-        )
-        .map(|(v, _)| v.boot_performance_table_pointer)
-        .ok()
-}
-
-/// Struct used to get the value from the FirmwarePerformanceVariable
-#[repr(C)]
-pub struct FirmwarePerformanceVariable {
-    boot_performance_table_pointer: usize,
-    _s3_performance_table_pointer: usize,
-}
-
-impl FirmwarePerformanceVariable {
-    const ADDRESS_VARIABLE_GUID: crate::BinaryGuid =
-        crate::BinaryGuid::from_string("C095791A-3001-47B2-80C9-EAC7319F2FA4");
-}
-
-impl TryFrom<Vec<u8>> for FirmwarePerformanceVariable {
-    type Error = ();
-
-    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        if value.len() == mem::size_of::<Self>() {
-            // SAFETY: This is safe because the value for ADDRESS_VARIABLE_GUID is an address where a FirmwarePerformanceVariable is.
-            Ok(unsafe { ptr::read_unaligned(value.as_ptr() as *const FirmwarePerformanceVariable) })
-        } else {
-            Err(())
-        }
-    }
-}
-
 #[derive(Clone)]
 #[repr(C)]
 /// Firmware Basic Boot Performance Record
-pub struct FirmwareBasicBootPerfDataRecord {
+pub(crate) struct FirmwareBasicBootPerfDataRecord {
     /// Timer value logged at the beginning of firmware image execution. This may not always be zero or near zero.
     pub reset_end: u64,
     /// Timer value logged just prior to loading the OS boot loader into memory. For non-UEFI compatible boots, this field must be zero.
@@ -214,7 +175,7 @@ impl PerformanceRecord for FirmwareBasicBootPerfDataRecord {
         Self::REVISION
     }
 
-    fn write_data_into(&self, buff: &mut [u8], offset: &mut usize) -> Result<(), crate::performance::error::Error> {
+    fn write_data_into(&self, buff: &mut [u8], offset: &mut usize) -> Result<(), Error> {
         if buff.gwrite_with([0_u8; 4], offset, scroll::NATIVE).is_err()
             || buff.gwrite_with(self.reset_end, offset, scroll::NATIVE).is_err()
             || buff.gwrite_with(self.os_loader_load_image_start, offset, scroll::NATIVE).is_err()
@@ -222,7 +183,7 @@ impl PerformanceRecord for FirmwareBasicBootPerfDataRecord {
             || buff.gwrite_with(self.exit_boot_services_entry, offset, scroll::NATIVE).is_err()
             || buff.gwrite_with(self.exit_boot_services_exit, offset, scroll::NATIVE).is_err()
         {
-            return Err(crate::performance::error::Error::Serialization);
+            return Err(Error::Serialization);
         }
         Ok(())
     }
@@ -242,52 +203,18 @@ mod tests {
     use core::{assert_eq, slice, unreachable};
     use scroll::Pread;
 
-    use crate::{
-        performance::{
-            record::{
-                PERFORMANCE_RECORD_HEADER_SIZE,
-                extended::{
-                    DualGuidStringEventRecord, DynamicStringEventRecord, GuidEventRecord, GuidQwordEventRecord,
-                    GuidQwordStringEventRecord,
-                },
-            },
-            table::FirmwareBasicBootPerfDataRecord,
+    use patina::performance::record::{
+        PERFORMANCE_RECORD_HEADER_SIZE,
+        extended::{
+            DualGuidStringEventRecord, DynamicStringEventRecord, GuidEventRecord, GuidQwordEventRecord,
+            GuidQwordStringEventRecord,
         },
-        runtime_services::MockRuntimeServices,
     };
-
-    #[test]
-    fn test_find_previous_address() {
-        let mut runtime_services = MockRuntimeServices::new();
-
-        runtime_services
-            .expect_get_variable::<FirmwarePerformanceVariable>()
-            .once()
-            .withf(|name, namespace, size_hint| {
-                assert_eq!(&[0], name);
-                assert_eq!(&FirmwarePerformanceVariable::ADDRESS_VARIABLE_GUID, namespace);
-                assert_eq!(&Some(16), size_hint);
-                true
-            })
-            .returning(|_, _, _| {
-                Ok((
-                    FirmwarePerformanceVariable {
-                        boot_performance_table_pointer: 0x12341234,
-                        _s3_performance_table_pointer: 0,
-                    },
-                    16,
-                ))
-            });
-
-        let address = find_previous_table_address(&runtime_services);
-
-        assert_eq!(Some(0x12341234), address);
-    }
 
     #[test]
     fn test_set_perf_records() {
         let mut performance_record_buffer = PerformanceRecordBuffer::new();
-        performance_record_buffer.push_generic(1, 1, &[0_u8; 16]).unwrap();
+        crate::performance::push_generic_record(&mut performance_record_buffer, 1, 1, &[0_u8; 16]);
 
         let mut fbpt = FBPT::new();
         assert_eq!(&56, fbpt.length());
@@ -302,7 +229,7 @@ mod tests {
         let address = buffer.as_ptr() as usize;
 
         let mut fbpt = FBPT::new();
-        let guid = crate::guids::ZERO;
+        let guid = patina::guids::ZERO;
         fbpt.add_record(GuidEventRecord::new(1, 0, 10, guid)).unwrap();
         fbpt.add_record(DynamicStringEventRecord::new(1, 0, 10, guid, "test")).unwrap();
 
@@ -339,7 +266,7 @@ mod tests {
         let mut fbpt = FBPT::new();
         let empty_size = fbpt.published_table_size();
 
-        let guid = crate::guids::ZERO;
+        let guid = patina::guids::ZERO;
         fbpt.add_record(GuidEventRecord::new(1, 0, 10, guid)).unwrap();
         fbpt.add_record(DynamicStringEventRecord::new(1, 0, 10, guid, "test")).unwrap();
 
@@ -353,7 +280,7 @@ mod tests {
         let address = buffer.as_ptr() as usize;
 
         let mut fbpt = FBPT::new();
-        let guid = crate::guids::ZERO;
+        let guid = patina::guids::ZERO;
         fbpt.add_record(GuidEventRecord::new(1, 0, 10, guid)).unwrap();
         fbpt.add_record(DynamicStringEventRecord::new(1, 0, 10, guid, "test")).unwrap();
 

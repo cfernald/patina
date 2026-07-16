@@ -30,10 +30,8 @@ use patina::{
                 DualGuidStringEventRecord, DynamicStringEventRecord, GuidEventRecord, GuidQwordEventRecord,
                 GuidQwordStringEventRecord,
             },
-            hob::{HobPerformanceData, merge_hob_performance_buffer},
             known::KnownPerfId,
         },
-        table::FBPT,
     },
     pi::hob::{Hob as PiHob, HobList},
     uefi_protocol::performance_measurement::PerfAttribute,
@@ -46,6 +44,12 @@ use r_efi::{
     efi,
     protocols::device_path::{Media, TYPE_MEDIA},
 };
+
+mod hob;
+mod table;
+
+use hob::{HobPerformanceData, merge_hob_performance_buffer};
+use table::FBPT;
 
 /// This is a temporary global reference for code that has not yet been converted to use the instanced
 /// core mechanisms. This should be removed once driver_services.rs is converted.
@@ -564,6 +568,19 @@ fn get_module_guid_from_handle(handle: efi::Handle) -> Result<BinaryGuid, efi::S
     }
 
     Ok(guid)
+}
+
+/// Test helper: builds a generic performance record from its parts and pushes it into `buffer`.
+#[cfg(test)]
+pub(crate) fn push_generic_record(buffer: &mut PerformanceRecordBuffer, record_type: u16, revision: u8, data: &[u8]) {
+    use patina::performance::record::PERFORMANCE_RECORD_HEADER_SIZE;
+    let length = (PERFORMANCE_RECORD_HEADER_SIZE + data.len()) as u8;
+    let mut bytes = Vec::with_capacity(length as usize);
+    bytes.extend_from_slice(&record_type.to_le_bytes());
+    bytes.push(length);
+    bytes.push(revision);
+    bytes.extend_from_slice(data);
+    buffer.push_record(GenericPerformanceRecord::ref_from_bytes(&bytes).unwrap()).unwrap();
 }
 
 #[cfg(test)]
