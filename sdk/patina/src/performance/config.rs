@@ -63,3 +63,55 @@ impl FromHob for PerformanceConfig {
         }
     }
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_performance_config_new_is_disabled_with_no_measurements() {
+        let config = PerformanceConfig::new();
+        assert_eq!(config.enabled, PerformanceConfig::DISABLED);
+        assert_eq!({ config.enabled_measurements }, PerformanceConfig::NO_MEASUREMENTS);
+    }
+
+    #[test]
+    fn test_performance_config_default_matches_new() {
+        let config = PerformanceConfig::default();
+        assert_eq!(config.enabled, PerformanceConfig::DISABLED);
+        assert_eq!({ config.enabled_measurements }, PerformanceConfig::NO_MEASUREMENTS);
+    }
+
+    #[test]
+    fn test_performance_config_with_measurement_enables_and_accumulates_mask() {
+        let config =
+            PerformanceConfig::new().with_measurement(Measurement::StartImage).with_measurement(Measurement::LoadImage);
+        assert_eq!(config.enabled, PerformanceConfig::ENABLED);
+        assert_eq!({ config.enabled_measurements }, Measurement::StartImage.as_u32() | Measurement::LoadImage.as_u32());
+    }
+
+    #[test]
+    fn test_performance_config_parse_reads_packed_fields() {
+        // Packed layout: enabled (u8) followed by enabled_measurements (u32, little-endian).
+        let bytes: [u8; 5] = [PerformanceConfig::ENABLED, 0x0A, 0x00, 0x00, 0x00];
+        let config = PerformanceConfig::parse(&bytes);
+        assert_eq!(config.enabled, PerformanceConfig::ENABLED);
+        assert_eq!({ config.enabled_measurements }, 0x0A);
+    }
+
+    #[test]
+    fn test_performance_config_parse_ignores_trailing_bytes() {
+        let bytes: [u8; 8] = [PerformanceConfig::DISABLED, 0x01, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF];
+        let config = PerformanceConfig::parse(&bytes);
+        assert_eq!(config.enabled, PerformanceConfig::DISABLED);
+        assert_eq!({ config.enabled_measurements }, 0x01);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_performance_config_parse_panics_on_short_buffer() {
+        let bytes: [u8; 2] = [PerformanceConfig::ENABLED, 0x00];
+        let _ = PerformanceConfig::parse(&bytes);
+    }
+}

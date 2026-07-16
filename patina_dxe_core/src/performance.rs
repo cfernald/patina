@@ -783,4 +783,268 @@ mod tests {
         })
         .unwrap();
     }
+
+    fn test_core_performance_with_mask(mask: u32) -> CorePerformance {
+        let perf = test_core_performance();
+        perf.perf_measurement_mask.store(mask, Ordering::Relaxed);
+        perf
+    }
+
+    fn install_loaded_image_with_fw_path(node_length: u16, file_guid: efi::Guid) -> efi::Handle {
+        #[repr(C)]
+        struct FwFilePathNode {
+            header: efi::protocols::device_path::Protocol,
+            guid: efi::Guid,
+        }
+
+        let node = alloc::boxed::Box::new(FwFilePathNode {
+            header: efi::protocols::device_path::Protocol {
+                r#type: TYPE_MEDIA,
+                sub_type: Media::SUBTYPE_PIWG_FIRMWARE_FILE,
+                length: node_length.to_le_bytes(),
+            },
+            guid: file_guid,
+        });
+        let node_ptr = alloc::boxed::Box::into_raw(node) as *mut efi::protocols::device_path::Protocol;
+
+        let loaded_image = alloc::boxed::Box::new(efi::protocols::loaded_image::Protocol {
+            revision: efi::protocols::loaded_image::REVISION,
+            parent_handle: ptr::null_mut(),
+            system_table: ptr::null_mut(),
+            device_handle: ptr::null_mut(),
+            file_path: node_ptr,
+            reserved: ptr::null_mut(),
+            load_options_size: 0,
+            load_options: ptr::null_mut(),
+            image_base: ptr::null_mut(),
+            image_size: 0,
+            image_code_type: efi::BOOT_SERVICES_CODE,
+            image_data_type: efi::BOOT_SERVICES_DATA,
+            unload: None,
+        });
+        let loaded_image_ptr = alloc::boxed::Box::into_raw(loaded_image) as *mut core::ffi::c_void;
+
+        let (handle, _) = PROTOCOL_DB
+            .install_protocol_interface(None, efi::protocols::loaded_image::PROTOCOL_GUID, loaded_image_ptr)
+            .unwrap();
+        handle
+    }
+
+    #[test]
+    fn test_core_performance_new_is_disabled() {
+        let perf = CorePerformance::new();
+        assert!(!perf.enabled());
+        assert_eq!(perf.loaded_image_count.load(Ordering::Relaxed), 0);
+        assert_eq!(perf.perf_measurement_mask.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn test_core_performance_perf_helpers_record_when_enabled() {
+        with_global_lock(|| {
+            const ALL_MEASUREMENTS: u32 = 0x1F;
+            let perf = test_core_performance_with_mask(ALL_MEASUREMENTS);
+
+            let module = 1_usize as efi::Handle;
+            let controller = 2_usize as efi::Handle;
+
+            perf.perf_image_start_begin(module);
+            perf.perf_image_start_end(module);
+            perf.perf_load_image_begin(module);
+            perf.perf_load_image_end(module);
+            perf.perf_driver_binding_support_begin(module, controller);
+            perf.perf_driver_binding_support_end(module, controller);
+            perf.perf_driver_binding_start_begin(module, controller);
+            perf.perf_driver_binding_start_end(module, controller);
+            perf.perf_driver_binding_stop_begin(module, controller);
+            perf.perf_driver_binding_stop_end(module, controller);
+
+            assert_eq!(perf.performance_table.lock().perf_records().iter().count(), 10);
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_core_performance_perf_helpers_noop_when_disabled() {
+        with_global_lock(|| {
+            let perf = test_core_performance_with_mask(0);
+
+            let module = 1_usize as efi::Handle;
+            let controller = 2_usize as efi::Handle;
+
+            perf.perf_image_start_begin(module);
+            perf.perf_image_start_end(module);
+            perf.perf_load_image_begin(module);
+            perf.perf_load_image_end(module);
+            perf.perf_driver_binding_support_begin(module, controller);
+            perf.perf_driver_binding_support_end(module, controller);
+            perf.perf_driver_binding_start_begin(module, controller);
+            perf.perf_driver_binding_start_end(module, controller);
+            perf.perf_driver_binding_stop_begin(module, controller);
+            perf.perf_driver_binding_stop_end(module, controller);
+
+            assert_eq!(perf.performance_table.lock().perf_records().iter().count(), 0);
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_core_performance_manager_trait_methods() {
+        with_global_lock(|| {
+            let perf = test_core_performance();
+
+            // create_measurement forwards to the inner implementation.
+            PerformanceManager::create_measurement(
+                &perf,
+                CallerIdentifier::Guid(efi::Guid::from_bytes(&[3; 16])),
+                None,
+                Some("measurement"),
+                0,
+                0,
+                KnownPerfId::PerfEvent.as_u16(),
+                PerfAttribute::PerfEntry,
+            )
+            .unwrap();
+
+            // add_generic_record appends a manually-built generic record.
+            let data = [0xAA_u8; 4];
+            let record_type = 0x1010_u16;
+            let length = (patina::performance::record::PERFORMANCE_RECORD_HEADER_SIZE + data.len()) as u8;
+            let mut bytes = Vec::new();
+            bytes.extend_from_slice(&record_type.to_le_bytes());
+            bytes.push(length);
+            bytes.push(0); // revision
+            bytes.extend_from_slice(&data);
+            let record = GenericPerformanceRecord::ref_from_bytes(&bytes).unwrap();
+            perf.add_generic_record(record).unwrap();
+
+            assert_eq!(perf.performance_table.lock().perf_records().iter().count(), 2);
+
+            // published_table_size reports a non-zero size, and publish_table writes into a large-enough buffer.
+            let size = perf.published_table_size().unwrap();
+            assert!(size > 0);
+            let buffer: &'static mut [u8] = alloc::boxed::Box::leak(alloc::vec![0u8; size].into_boxed_slice());
+            perf.publish_table(buffer).unwrap();
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_core_performance_manager_locked_table_returns_error() {
+        with_global_lock(|| {
+            let perf = test_core_performance();
+            let _guard = perf.performance_table.lock();
+
+            assert_eq!(perf.published_table_size().unwrap_err(), Error::Efi(EfiError::InvalidParameter));
+
+            let buffer: &'static mut [u8] = alloc::boxed::Box::leak(alloc::vec![0u8; 64].into_boxed_slice());
+            assert_eq!(perf.publish_table(buffer).unwrap_err(), Error::Efi(EfiError::InvalidParameter));
+
+            // A re-entrant record add cannot acquire the held table lock and drops the record.
+            let data = [0u8; 4];
+            let length = (patina::performance::record::PERFORMANCE_RECORD_HEADER_SIZE + data.len()) as u8;
+            let mut bytes = Vec::new();
+            bytes.extend_from_slice(&0x1010_u16.to_le_bytes());
+            bytes.push(length);
+            bytes.push(0);
+            bytes.extend_from_slice(&data);
+            let record = GenericPerformanceRecord::ref_from_bytes(&bytes).unwrap();
+            assert_eq!(perf.add_generic_record(record).unwrap_err(), Error::Efi(EfiError::InvalidParameter));
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_core_performance_report_add_record_error() {
+        assert_eq!(report_add_record_error(Error::OutOfResources), Error::OutOfResources);
+        assert_eq!(
+            report_add_record_error(Error::Efi(EfiError::InvalidParameter)),
+            Error::Efi(EfiError::InvalidParameter)
+        );
+    }
+
+    #[test]
+    fn test_get_module_guid_from_handle_resolves_fw_file_guid() {
+        with_global_lock(|| {
+            let file_guid = efi::Guid::from_bytes(&[0xAB; 16]);
+            let node_length =
+                (mem::size_of::<efi::protocols::device_path::Protocol>() + mem::size_of::<efi::Guid>()) as u16;
+            let handle = install_loaded_image_with_fw_path(node_length, file_guid);
+
+            let resolved = get_module_guid_from_handle(handle).unwrap();
+            assert_eq!(resolved, BinaryGuid::from(file_guid));
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_get_module_guid_from_handle_rejects_bad_node_length() {
+        with_global_lock(|| {
+            let file_guid = efi::Guid::from_bytes(&[0xCD; 16]);
+            // A node length that does not match the expected header + GUID size.
+            let handle = install_loaded_image_with_fw_path(4, file_guid);
+
+            assert_eq!(get_module_guid_from_handle(handle), Err(efi::Status::NOT_FOUND));
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_get_module_guid_from_handle_without_protocol_returns_zero() {
+        with_global_lock(|| {
+            let resolved = get_module_guid_from_handle(0x1234_usize as efi::Handle).unwrap();
+            assert_eq!(resolved, patina::guids::ZERO);
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_get_module_guid_from_handle_uses_driver_binding_fallback() {
+        extern "efiapi" fn stub_supported(
+            _: *mut efi::protocols::driver_binding::Protocol,
+            _: efi::Handle,
+            _: *mut efi::protocols::device_path::Protocol,
+        ) -> efi::Status {
+            efi::Status::SUCCESS
+        }
+        extern "efiapi" fn stub_start(
+            _: *mut efi::protocols::driver_binding::Protocol,
+            _: efi::Handle,
+            _: *mut efi::protocols::device_path::Protocol,
+        ) -> efi::Status {
+            efi::Status::SUCCESS
+        }
+        extern "efiapi" fn stub_stop(
+            _: *mut efi::protocols::driver_binding::Protocol,
+            _: efi::Handle,
+            _: usize,
+            _: *mut efi::Handle,
+        ) -> efi::Status {
+            efi::Status::SUCCESS
+        }
+
+        with_global_lock(|| {
+            let file_guid = efi::Guid::from_bytes(&[0xEF; 16]);
+            let node_length =
+                (mem::size_of::<efi::protocols::device_path::Protocol>() + mem::size_of::<efi::Guid>()) as u16;
+            let image_handle = install_loaded_image_with_fw_path(node_length, file_guid);
+
+            // A separate handle carries only a driver-binding protocol referencing the image handle above.
+            let driver_binding = alloc::boxed::Box::new(efi::protocols::driver_binding::Protocol {
+                supported: stub_supported,
+                start: stub_start,
+                stop: stub_stop,
+                version: 1,
+                image_handle,
+                driver_binding_handle: ptr::null_mut(),
+            });
+            let driver_binding_ptr = alloc::boxed::Box::into_raw(driver_binding) as *mut core::ffi::c_void;
+            let (db_handle, _) = PROTOCOL_DB
+                .install_protocol_interface(None, efi::protocols::driver_binding::PROTOCOL_GUID, driver_binding_ptr)
+                .unwrap();
+
+            let resolved = get_module_guid_from_handle(db_handle).unwrap();
+            assert_eq!(resolved, BinaryGuid::from(file_guid));
+        })
+        .unwrap();
+    }
 }
