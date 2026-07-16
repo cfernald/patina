@@ -49,7 +49,7 @@ mod hob;
 mod table;
 
 use hob::{HobPerformanceData, merge_hob_performance_buffer};
-use table::FBPT;
+use table::Fbpt;
 
 /// This is a temporary global reference for code that has not yet been converted to use the instanced
 /// core mechanisms. This should be removed once driver_services.rs is converted.
@@ -65,7 +65,7 @@ pub(crate) struct CorePerformance {
     enabled: AtomicBool,
     loaded_image_count: AtomicU32,
     perf_measurement_mask: AtomicU32,
-    performance_table: TplMutex<FBPT>,
+    performance_table: TplMutex<Fbpt>,
     timer: PerfTimer,
 }
 
@@ -75,7 +75,7 @@ impl CorePerformance {
             enabled: AtomicBool::new(false),
             loaded_image_count: AtomicU32::new(0),
             perf_measurement_mask: AtomicU32::new(0),
-            performance_table: TplMutex::new(efi::TPL_NOTIFY, FBPT::new(), "PerformanceTableLock"),
+            performance_table: TplMutex::new(efi::TPL_NOTIFY, Fbpt::new(), "PerformanceTableLock"),
             timer: PerfTimer::new(),
         }
     }
@@ -596,7 +596,7 @@ mod tests {
             enabled: AtomicBool::new(true),
             loaded_image_count: AtomicU32::new(0),
             perf_measurement_mask: AtomicU32::new(0),
-            performance_table: TplMutex::new(efi::TPL_NOTIFY, FBPT::new(), "TestPerfTableLock"),
+            performance_table: TplMutex::new(efi::TPL_NOTIFY, Fbpt::new(), "TestPerfTableLock"),
             timer: PerfTimer::with_frequency(100),
         }
     }

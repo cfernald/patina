@@ -26,8 +26,7 @@ const PUBLISHED_FBPT_EXTRA_SPACE: usize = 0x40_000;
 
 /// Firmware Basic Boot Performance Table (FBPT)
 #[derive(Debug)]
-#[allow(clippy::upper_case_acronyms)]
-pub(crate) struct FBPT {
+pub(crate) struct Fbpt {
     /// When the table will be reported, this will be the address where the fbpt table is.
     fbpt_address: usize,
     /// First value is the length when the table is not been reported and the second one is when the table is reported.
@@ -37,7 +36,7 @@ pub(crate) struct FBPT {
     other_records: PerformanceRecordBuffer,
 }
 
-impl FBPT {
+impl Fbpt {
     /// FBPT - Firmware Basic Boot Performance Table signature
     pub const SIGNATURE: u32 = u32::from_le_bytes([b'F', b'B', b'P', b'T']);
 
@@ -69,7 +68,7 @@ impl FBPT {
     }
 }
 
-impl FBPT {
+impl Fbpt {
     /// Return the address where the table is.
     #[cfg(test)]
     pub fn fbpt_address(&self) -> usize {
@@ -119,7 +118,7 @@ impl FBPT {
     }
 }
 
-impl Default for FBPT {
+impl Default for Fbpt {
     fn default() -> Self {
         Self::new()
     }
@@ -216,7 +215,7 @@ mod tests {
         let mut performance_record_buffer = PerformanceRecordBuffer::new();
         crate::performance::push_generic_record(&mut performance_record_buffer, 1, 1, &[0_u8; 16]);
 
-        let mut fbpt = FBPT::new();
+        let mut fbpt = Fbpt::new();
         assert_eq!(&56, fbpt.length());
 
         fbpt.set_perf_records(performance_record_buffer);
@@ -228,7 +227,7 @@ mod tests {
         let buffer: &'static mut [u8] = alloc::boxed::Box::leak(alloc::vec![0u8; 1000].into_boxed_slice());
         let address = buffer.as_ptr() as usize;
 
-        let mut fbpt = FBPT::new();
+        let mut fbpt = Fbpt::new();
         let guid = patina::guids::ZERO;
         fbpt.add_record(GuidEventRecord::new(1, 0, 10, guid)).unwrap();
         fbpt.add_record(DynamicStringEventRecord::new(1, 0, 10, guid, "test")).unwrap();
@@ -263,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_published_table_size() {
-        let mut fbpt = FBPT::new();
+        let mut fbpt = Fbpt::new();
         let empty_size = fbpt.published_table_size();
 
         let guid = patina::guids::ZERO;
@@ -279,7 +278,7 @@ mod tests {
         let buffer: &'static mut [u8] = alloc::boxed::Box::leak(alloc::vec![0u8; 1000].into_boxed_slice());
         let address = buffer.as_ptr() as usize;
 
-        let mut fbpt = FBPT::new();
+        let mut fbpt = Fbpt::new();
         let guid = patina::guids::ZERO;
         fbpt.add_record(GuidEventRecord::new(1, 0, 10, guid)).unwrap();
         fbpt.add_record(DynamicStringEventRecord::new(1, 0, 10, guid, "test")).unwrap();
@@ -296,7 +295,7 @@ mod tests {
 
         let mut offset = 0;
         let signature = buffer.gread_with::<u32>(&mut offset, scroll::NATIVE).unwrap();
-        assert_eq!(FBPT::SIGNATURE, signature);
+        assert_eq!(Fbpt::SIGNATURE, signature);
         let length = buffer.gread_with::<u32>(&mut offset, scroll::NATIVE).unwrap();
         assert_eq!(fbpt.length(), &length);
         let record_type = buffer.gread_with::<u16>(&mut offset, scroll::NATIVE).unwrap();
