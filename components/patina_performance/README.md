@@ -32,13 +32,11 @@ struct ExamplePlatform;
 
 impl PlatformInfo for ExamplePlatform {
     // Optional override if the platform does not publish the performance configuration HOB.
-    const DEFAULT_PERFORMANCE_CONFIG: PerformanceConfig = PerformanceConfig {
-        enabled: PerformanceConfig::ENABLED,
-        enabled_measurements: patina::performance::Measurement::DriverBindingStart // Adds driver binding start measurements.
-            | patina::performance::Measurement::DriverBindingStop // Adds driver binding stop measurements.
-            | patina::performance::Measurement::LoadImage         // Adds load image measurements.
-            | patina::performance::Measurement::StartImage,       // Adds start image measurements.
-    };
+    const DEFAULT_PERFORMANCE_CONFIG: PerformanceConfig = PerformanceConfig::new()
+        .with_measurement(patina::performance::Measurement::DriverBindingStart) // Adds driver binding start measurements.
+        .with_measurement(patina::performance::Measurement::DriverBindingStop)  // Adds driver binding stop measurements.
+        .with_measurement(patina::performance::Measurement::LoadImage)          // Adds load image measurements.
+        .with_measurement(patina::performance::Measurement::StartImage);        // Adds start image measurements.
 }
 
 impl ComponentInfo for ExamplePlatform {

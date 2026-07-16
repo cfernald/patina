@@ -94,9 +94,12 @@ impl CorePerformance {
     ) {
         if config.enabled == PerformanceConfig::DISABLED {
             self.enabled.store(false, Ordering::Relaxed);
+            log::info!("Performance measurement is disabled.");
             return;
         }
 
+        let enabled_measurements = config.enabled_measurements;
+        log::info!("Performance measurement is enabled. measurements: {:#X}", enabled_measurements);
         self.enabled.store(true, Ordering::Relaxed);
         self.timer.set_frequency(frequency);
 

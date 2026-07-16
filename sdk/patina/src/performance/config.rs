@@ -10,7 +10,7 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 //!
-use crate::{BinaryGuid, component::hob::FromHob};
+use crate::{BinaryGuid, component::hob::FromHob, performance::Measurement};
 
 /// The configuration for performance measurement.
 #[derive(Debug, Clone, Copy, zerocopy_derive::FromBytes)]
@@ -33,6 +33,13 @@ impl PerformanceConfig {
     /// Creates a new `PerformanceConfig` that is disabled with no measurements.
     pub const fn new() -> Self {
         Self { enabled: Self::DISABLED, enabled_measurements: Self::NO_MEASUREMENTS }
+    }
+
+    /// Returns this configuration with performance measurement enabled and `measurement`
+    /// added to the set of enabled  measurements. Intended for chaining from
+    /// [`PerformanceConfig::new`] to build a configuration in a const context.
+    pub const fn with_measurement(self, measurement: Measurement) -> Self {
+        Self { enabled: Self::ENABLED, enabled_measurements: self.enabled_measurements | measurement.as_u32() }
     }
 }
 
