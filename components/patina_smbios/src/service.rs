@@ -13,8 +13,8 @@
 extern crate alloc;
 use alloc::vec::Vec;
 use core::cell::Ref;
-use patina::boot_services::{BootServices, StandardBootServices};
 use patina::standard::efi::{self, Handle, SMBIOS3_TABLE_GUID};
+use patina::uefi::boot_services::{BootServices, StandardBootServices};
 use zerocopy_derive::*;
 
 #[cfg(any(test, feature = "mockall"))]
@@ -192,7 +192,7 @@ pub trait Smbios {
 #[derive(patina::component::service::IntoService)]
 #[service(dyn Smbios)]
 pub struct SmbiosImpl<B: BootServices + 'static = StandardBootServices> {
-    pub(crate) manager: patina::tpl_mutex::TplMutex<crate::manager::SmbiosManager, B>,
+    pub(crate) manager: patina::uefi::tpl_mutex::TplMutex<crate::manager::SmbiosManager, B>,
     pub(crate) boot_services: B,
     pub(crate) major_version: u8,
     pub(crate) minor_version: u8,
@@ -201,7 +201,7 @@ pub struct SmbiosImpl<B: BootServices + 'static = StandardBootServices> {
 impl<B: BootServices> SmbiosImpl<B> {
     /// Get a reference to the manager for unit tests
     #[allow(dead_code)] // Only used in tests
-    pub(crate) fn manager(&self) -> &patina::tpl_mutex::TplMutex<crate::manager::SmbiosManager, B> {
+    pub(crate) fn manager(&self) -> &patina::uefi::tpl_mutex::TplMutex<crate::manager::SmbiosManager, B> {
         &self.manager
     }
 
@@ -357,9 +357,9 @@ mod tests {
     };
     use mockall::predicate::*;
     use patina::{
-        boot_services::{MockBootServices, tpl::Tpl},
         component::service::{Service, memory::StdMemoryManager},
-        tpl_mutex::TplMutex,
+        uefi::boot_services::{MockBootServices, tpl::Tpl},
+        uefi::tpl_mutex::TplMutex,
     };
 
     #[test]

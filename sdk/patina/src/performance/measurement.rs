@@ -246,7 +246,7 @@ mod tests {
     /// ASSERT(FALSE) in the C parser at runtime.
     #[test]
     fn test_known_perf_id_record_types_match_edk2_dp() {
-        let guid = crate::guids::ZERO;
+        let guid = crate::base::guid::constants::ZERO;
 
         // Expected mappings derived from the switch/case in Dp.c:
         //   FPDT_GUID_EVENT_TYPE           (0x1010): MODULE_START_ID, MODULE_END_ID

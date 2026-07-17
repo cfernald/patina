@@ -7,7 +7,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 use core::fmt::Display;
 
-use crate::error::EfiError;
+use crate::base::error::EfiError;
 
 /// Macro to assert an expression and return an error if the assertion fails.
 #[doc(hidden)]

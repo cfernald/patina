@@ -11,8 +11,13 @@ use super::gdt;
 use crate::interrupts;
 #[cfg(not(test))]
 use core::arch::asm;
-use patina::arch as interrupts;
-use patina::error::EfiError;
+use patina::{
+    base::error::EfiError,
+    pi::protocols::cpu_arch::{CpuFlushType, CpuInitType},
+};
+use r_efi::efi;
+
+pub const CACHE_WRITEBACK_GRANULE: u32 = 4; // Using 4 bytes following precedence set by Tianocore
 
 /// Struct to implement X64 Cpu Init.
 ///

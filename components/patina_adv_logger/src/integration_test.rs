@@ -10,7 +10,7 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 //!
-use patina::boot_services::{BootServices, StandardBootServices};
+use patina::uefi::boot_services::{BootServices, StandardBootServices};
 use patina_test::{patina_test, u_assert, u_assert_eq};
 
 use patina::standard::efi;

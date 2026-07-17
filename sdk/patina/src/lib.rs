@@ -2,11 +2,7 @@
 //!
 //! This crate implements the core SDK for Patina and is only part of the Patina
 //! solution. For general knowledge on Patina, refer to the [Patina book](https://opendevicepartnership.github.io/patina/).
-//!
-//! ## Features
-//!
-//! - `core`: Exposes additional items in the [component] module necessary to
-//!   manage and execute components and their dependencies.
+
 //!
 //! ## License
 //!
@@ -22,50 +18,25 @@
 #[cfg(any(test, feature = "alloc"))]
 extern crate alloc;
 
+pub use base::error;
 pub use base::guid::{BinaryGuid, Guid, GuidError, OwnedGuid};
 pub use base::string::{Char8Array, Char8Str, Char16Array, Char16Str, StringError};
 
 #[cfg(any(test, feature = "alloc"))]
 pub use base::string::{Char8String, Char16String};
 
-/// Common GUID constants
-pub mod guid_constants {
-    pub use super::base::guid::OwnedGuid;
-    /// Zero GUID constant (00000000-0000-0000-0000-000000000000)
-    pub const ZERO_GUID: OwnedGuid = OwnedGuid::ZERO;
-}
-
-#[macro_use]
-pub mod macros;
-
 pub mod arch;
 pub mod base;
 #[cfg(any(test, feature = "alloc"))]
-pub mod boot_services;
-#[cfg(any(test, feature = "alloc"))]
 pub mod component;
-#[cfg(any(test, feature = "alloc"))]
-pub mod device_path;
-#[cfg(any(test, feature = "alloc"))]
-pub mod driver_binding;
-pub mod efi_types;
-pub mod error;
-pub mod guids;
-pub mod hash;
-pub mod log;
+pub mod debug;
 pub mod management_mode;
 #[cfg(any(test, feature = "alloc"))]
 pub mod performance;
+pub mod peripheral;
 pub mod pi;
-#[cfg(any(test, feature = "alloc"))]
-pub mod runtime_services;
-pub mod serial;
 pub mod standard;
-#[cfg(any(test, feature = "alloc"))]
-pub mod tpl_mutex;
-pub mod uefi_decompress;
-#[cfg(any(test, feature = "alloc"))]
-pub mod uefi_protocol;
+pub mod uefi;
 
 /// Re-export of the [`safe-mmio`](https://crates.io/crates/safe-mmio) crate.
 ///

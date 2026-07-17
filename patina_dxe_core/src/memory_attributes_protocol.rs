@@ -15,7 +15,7 @@ use core::{
     sync::atomic::{AtomicPtr, AtomicUsize, Ordering},
 };
 use patina::standard::efi;
-use patina::{base::UEFI_PAGE_MASK, error::EfiError, function};
+use patina::{base::UEFI_PAGE_MASK, base::error::EfiError, function};
 
 #[repr(C)]
 pub struct EfiMemoryAttributesProtocolImpl {

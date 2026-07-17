@@ -60,7 +60,7 @@
 //! ### Example Option Usage
 //!
 //! ``` rust
-//! # use patina::{error::Result, component::params::{ConfigMut, Config}};
+//! # use patina::{base::error::Result, component::params::{ConfigMut, Config}};
 //! // This component will execute even if the config is already locked. If the interface was just
 //! // `config: ConfigMut<u32>`, and the config was locked, this component would never execute.
 //! fn my_driver(mut config: Option<ConfigMut<u32>>) -> Result<()> {
@@ -103,13 +103,13 @@ use core::{
 use alloc::{borrow::Cow, boxed::Box};
 
 use crate::{
-    boot_services::StandardBootServices,
     component::{
         metadata::MetaData,
         service::IntoService,
         storage::{Deferred, Storage, UnsafeStorageCell},
     },
-    runtime_services::StandardRuntimeServices,
+    uefi::boot_services::StandardBootServices,
+    uefi::runtime_services::StandardRuntimeServices,
 };
 
 use super::storage::ConfigRaw;
@@ -191,7 +191,7 @@ impl ComponentInput for () {}
     note = "1. The first parameter must be Self, &Self, or &mut Self.",
     note = "2. The remaining parameters must implement patina::component::params::Param",
     note = "3. Only a function with up to 5 parameters, excluding self, is supported.",
-    note = "4. The return type must be patina::error::Result<()>"
+    note = "4. The return type must be patina::base::error::Result<()>"
 )]
 pub trait ParamFunction<Marker>: Send + Sync + 'static {
     /// All parameters of the function that are retrievable from [Storage].
@@ -730,8 +730,8 @@ unsafe impl Param for StandardRuntimeServices {
 ///
 /// ```rust,ignore
 /// use patina::component::{component, params::Handle};
-/// use patina::boot_services::BootServices;
-/// use patina::error::Result;
+/// use patina::uefi::boot_services::BootServices;
+/// use patina::base::error::Result;
 ///
 /// struct BootLoader;
 ///
@@ -854,8 +854,8 @@ mod tests {
     use core::sync::atomic::AtomicBool;
 
     use crate::{
+        base::error::Result,
         component::{IntoComponent, component, storage::Storage},
-        error::Result,
     };
 
     use crate as patina;
@@ -1010,7 +1010,7 @@ mod tests {
 
         <StandardBootServices as Param>::init_state(&mut storage, &mut mock_metadata).unwrap();
         assert_eq!(
-            Err(Cow::from("patina::boot_services::StandardBootServices not available.")),
+            Err(Cow::from("patina::uefi::boot_services::StandardBootServices not available.")),
             <StandardBootServices as Param>::try_validate(&(), (&storage).into())
         );
     }
@@ -1039,7 +1039,7 @@ mod tests {
 
         <StandardRuntimeServices as Param>::init_state(&mut storage, &mut mock_metadata).unwrap();
         assert_eq!(
-            Err(Cow::from("patina::runtime_services::StandardRuntimeServices not available.")),
+            Err(Cow::from("patina::uefi::runtime_services::StandardRuntimeServices not available.")),
             <StandardRuntimeServices as Param>::try_validate(&(), (&storage).into())
         );
     }
@@ -1124,7 +1124,7 @@ mod tests {
         // override the next level up, `try_validate`.
         assert!(<(StandardBootServices, Config<i32>) as Param>::validate(&((), 0), (&storage).into()));
         assert_eq!(
-            Err(Cow::from("patina::boot_services::StandardBootServices")),
+            Err(Cow::from("patina::uefi::boot_services::StandardBootServices")),
             <(StandardBootServices, Config<i32>) as Param>::try_validate(&((), 1), (&storage).into())
         );
     }

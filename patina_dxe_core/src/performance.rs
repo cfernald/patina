@@ -14,11 +14,11 @@ use alloc::vec::Vec;
 
 use patina::{
     BinaryGuid,
+    base::error::EfiError,
     component::{
         hob::FromHob,
         service::{IntoService, Service, perf_timer::ArchTimerFunctionality, performance::PerformanceManager},
     },
-    error::EfiError,
     performance::{
         Measurement,
         config::PerformanceConfig,
@@ -34,7 +34,7 @@ use patina::{
         },
     },
     pi::hob::{Hob as PiHob, HobList},
-    uefi_protocol::performance_measurement::PerfAttribute,
+    uefi::protocol::performance_measurement::PerfAttribute,
 };
 
 use crate::{cpu::PerfTimer, protocols::PROTOCOL_DB, tpl_mutex::TplMutex};
@@ -515,7 +515,7 @@ fn report_add_record_error(error: Error) -> Error {
 
 /// Resolves the firmware file GUID for the module backing the given handle.
 fn get_module_guid_from_handle(handle: efi::Handle) -> Result<BinaryGuid, efi::Status> {
-    let mut guid = patina::guids::ZERO;
+    let mut guid = patina::base::guid::constants::ZERO;
 
     let loaded_image_ptr = 'find_loaded_image_protocol: {
         if let Ok(interface) = PROTOCOL_DB.get_interface_for_handle(handle, efi::protocols::loaded_image::PROTOCOL_GUID)
@@ -991,7 +991,7 @@ mod tests {
     fn test_get_module_guid_from_handle_without_protocol_returns_zero() {
         with_global_lock(|| {
             let resolved = get_module_guid_from_handle(0x1234_usize as efi::Handle).unwrap();
-            assert_eq!(resolved, patina::guids::ZERO);
+            assert_eq!(resolved, patina::base::guid::constants::ZERO);
         })
         .unwrap();
     }

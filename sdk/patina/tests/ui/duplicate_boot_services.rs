@@ -1,10 +1,6 @@
 //! Test that duplicate StandardBootServices parameters are rejected at compile time.
 
-use patina::{
-    boot_services::StandardBootServices,
-    component::component,
-    error::Result,
-};
+use patina::{base::error::Result, component::component, uefi::boot_services::StandardBootServices};
 
 pub struct TestComponent;
 

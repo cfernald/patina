@@ -9,7 +9,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 use patina::standard::efi;
-use patina::{error::EfiError, writelncrlf};
+use patina::{base::error::EfiError, writelncrlf};
 
 use super::{AllocationStatistics, AllocationStrategy, PageAllocator};
 use core::{

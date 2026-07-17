@@ -1,8 +1,8 @@
 //! Test that duplicate ConfigMut<T> parameters are rejected at compile time.
 
 use patina::{
+    base::error::Result,
     component::{component, params::ConfigMut},
-    error::Result,
 };
 
 pub struct TestComponent;

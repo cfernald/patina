@@ -17,18 +17,18 @@ use alloc::vec::Vec;
 use core::mem;
 
 use patina::{
-    boot_services::{BootServices, StandardBootServices},
     component::{Storage, component},
+    uefi::boot_services::{BootServices, StandardBootServices},
     uefi_size_to_pages,
 };
 
 use patina::{
+    base::error::EfiError,
     component::{
         hob::Hob,
         service::{Service, memory::MemoryManager},
     },
-    efi_types::EfiMemoryType,
-    error::EfiError,
+    uefi::memory::EfiMemoryType,
 };
 
 use crate::{
@@ -77,7 +77,7 @@ impl AcpiComponent {
         boot_services: StandardBootServices,
         acpi_hob: Option<Hob<AcpiMemoryHob>>,
         memory_manager: Service<dyn MemoryManager>,
-    ) -> patina::error::Result<()> {
+    ) -> patina::base::error::Result<()> {
         // Produce the EDKII ACPI protocol interfaces.
         boot_services.install_protocol_interface(None, Box::new(AcpiTableProtocol::new()))?;
         boot_services.install_protocol_interface(None, Box::new(AcpiGetProtocol::new()))?;

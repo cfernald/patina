@@ -23,10 +23,7 @@
 //!
 //! The implementation avoids heap allocations, using stack-allocated buffers for formatting.
 
-use patina::{
-    base::guid::{Guid, GuidError, OwnedGuid},
-    guids::*,
-};
+use patina::base::guid::{Guid, GuidError, OwnedGuid, constants::*};
 
 /// Demonstrates formatting GUIDs from `efi::Guid` references.
 fn demonstrate_reference_formatting() {

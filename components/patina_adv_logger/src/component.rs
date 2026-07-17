@@ -12,13 +12,13 @@
 use alloc::boxed::Box;
 use patina::standard::efi;
 use patina::{
-    boot_services::{BootServices, StandardBootServices},
+    base::error::{EfiError, Result},
     component::{
         component,
         service::{Service, perf_timer::ArchTimerFunctionality},
     },
-    error::{EfiError, Result},
-    serial::SerialIO,
+    peripheral::serial::SerialIO,
+    uefi::boot_services::{BootServices, StandardBootServices},
 };
 
 use crate::{logger::AdvancedLogger, protocol::AdvancedLoggerProtocol};
@@ -119,8 +119,8 @@ mod tests {
     };
     use patina::{
         component::service::{IntoService, Service, perf_timer::ArchTimerFunctionality},
-        log::Format,
-        serial::uart::UartNull,
+        debug::log::Format,
+        peripheral::serial::uart::UartNull,
     };
     use serial_test::serial;
 

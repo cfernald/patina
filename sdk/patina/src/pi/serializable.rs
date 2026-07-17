@@ -2,7 +2,7 @@
 //!
 //! Contains custom definitions for serializing HOBs to and from JSON format, using `serde`.
 //! This is not required by the UEFI/PI specifications, but is provided for convenience in visualizing and encoding HOBs.
-//! This crate is gated behind the `serde` feature flag. Serialization is only available when the feature is enabled.
+//! This module is gated behind the `serde` feature flag. Serialization is only available when the feature is enabled.
 //!
 //! For information on the standard HOB format, see `hob.rs`.
 //!

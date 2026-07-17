@@ -21,13 +21,13 @@ use core::{
 
 use patina::{
     base::SIZE_4GB,
-    boot_services::{BootServices, StandardBootServices, tpl::Tpl},
     component::{
         hob::Hob,
         service::{IntoService, Service, memory::MemoryManager},
     },
-    efi_types::EfiMemoryType,
-    tpl_mutex::TplMutex,
+    uefi::boot_services::{BootServices, StandardBootServices, tpl::Tpl},
+    uefi::memory::EfiMemoryType,
+    uefi::tpl_mutex::TplMutex,
     uefi_size_to_pages,
 };
 
@@ -820,8 +820,8 @@ mod tests {
     use mockall::predicate::always;
     use patina::standard::efi;
     use patina::{
-        boot_services::MockBootServices,
         component::service::memory::{MockMemoryManager, StdMemoryManager},
+        uefi::boot_services::MockBootServices,
     };
     use std::{
         boxed::Box,

@@ -9,7 +9,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 use crate::paging::{CacheAttributeValue, PatinaPageTable};
-use patina::{error::EfiError, standard::efi};
+use patina::{base::error::EfiError, standard::efi};
 use patina_mtrr::{Mtrr, create_mtrr_lib, error::MtrrError, structs::MtrrMemoryCacheType};
 use patina_paging::{
     MemoryAttributes, PageTable, PagingType, PtError, page_allocator::PageAllocator, x64::X64PageTable,

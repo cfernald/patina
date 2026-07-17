@@ -428,7 +428,7 @@ impl CommunicateBuffer {
             }
             None => {
                 // If no recipient is set privately, the memory should contain all zeros for the GUID
-                if memory_guid != patina::guids::ZERO {
+                if memory_guid != patina::base::guid::constants::ZERO {
                     log::error!(target: "mm_comm", "Buffer {} unexpected GUID in memory when none set privately", self.id);
                     return Err(CommunicateBufferStatus::InvalidRecipient);
                 }

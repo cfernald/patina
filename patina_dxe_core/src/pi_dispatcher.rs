@@ -24,14 +24,14 @@ use core::{cmp::Ordering, ffi::c_void};
 use patina::standard::efi;
 use patina::{
     BinaryGuid, Char16Str, OwnedGuid,
+    base::error::EfiError,
     component::service::Service,
-    device_path::walker::concat_device_path_to_boxed_slice,
-    error::EfiError,
     pi::{
         fw_fs::ffs,
         hob::{Hob, HobList},
         protocols::firmware_volume_block,
     },
+    uefi::device_path::walker::concat_device_path_to_boxed_slice,
 };
 use patina_ffs::{
     section::{Section, SectionExtractor},
@@ -666,7 +666,7 @@ impl DispatcherContext {
     /// not provided, the HOBs will have the zero GUID.
     fn has_pre_extracted_fv_hob(&self, file_name: efi::Guid, fv_name: Option<BinaryGuid>) -> bool {
         self.pre_extracted_fv_hobs
-            .contains(&(file_name.into(), fv_name.unwrap_or(patina::guid_constants::ZERO_GUID.into())))
+            .contains(&(file_name.into(), fv_name.unwrap_or(patina::base::guid::constants::ZERO_GUID.into())))
     }
 
     fn add_fv_handles(
@@ -903,7 +903,7 @@ mod tests {
     use std::{fs::File, io::Read, vec};
 
     use log::{Level, LevelFilter, Metadata, Record};
-    use patina::{device_path::walker::DevicePathWalker, pi};
+    use patina::{pi, uefi::device_path::walker::DevicePathWalker};
     use patina_ffs_extractors::NullSectionExtractor;
     use uuid::uuid;
 

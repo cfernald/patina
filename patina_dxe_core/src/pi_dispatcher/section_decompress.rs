@@ -5,7 +5,7 @@ extern crate alloc;
 use alloc::vec;
 use patina::{
     pi::fw_fs::{self, ffs},
-    uefi_decompress::{DecompressionAlgorithm, decompress_into_with_algo},
+    uefi::decompress::{DecompressionAlgorithm, decompress_into_with_algo},
 };
 use patina_ffs::{
     FirmwareFileSystemError,

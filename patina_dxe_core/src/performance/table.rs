@@ -228,7 +228,7 @@ mod tests {
         let address = buffer.as_ptr() as usize;
 
         let mut fbpt = Fbpt::new();
-        let guid = patina::guids::ZERO;
+        let guid = patina::base::guid::constants::ZERO;
         fbpt.add_record(GuidEventRecord::new(1, 0, 10, guid)).unwrap();
         fbpt.add_record(DynamicStringEventRecord::new(1, 0, 10, guid, "test")).unwrap();
 
@@ -265,7 +265,7 @@ mod tests {
         let mut fbpt = Fbpt::new();
         let empty_size = fbpt.published_table_size();
 
-        let guid = patina::guids::ZERO;
+        let guid = patina::base::guid::constants::ZERO;
         fbpt.add_record(GuidEventRecord::new(1, 0, 10, guid)).unwrap();
         fbpt.add_record(DynamicStringEventRecord::new(1, 0, 10, guid, "test")).unwrap();
 
@@ -279,7 +279,7 @@ mod tests {
         let address = buffer.as_ptr() as usize;
 
         let mut fbpt = Fbpt::new();
-        let guid = patina::guids::ZERO;
+        let guid = patina::base::guid::constants::ZERO;
         fbpt.add_record(GuidEventRecord::new(1, 0, 10, guid)).unwrap();
         fbpt.add_record(DynamicStringEventRecord::new(1, 0, 10, guid, "test")).unwrap();
 

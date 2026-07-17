@@ -21,7 +21,7 @@ use patina::{
         Service,
         memory::{AllocationOptions, MemoryManager, PageAllocationStrategy},
     },
-    efi_types::EfiMemoryType,
+    uefi::memory::EfiMemoryType,
     uefi_size_to_pages,
 };
 

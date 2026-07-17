@@ -13,7 +13,7 @@
 //! # struct ExampleComponent;
 //! # #[patina::component::component]
 //! # impl ExampleComponent {
-//! #     fn entry_point(self) -> patina::error::Result<()> { Ok(()) }
+//! #     fn entry_point(self) -> patina::base::error::Result<()> { Ok(()) }
 //! # }
 //! struct ExamplePlatform;
 //!
@@ -122,16 +122,16 @@ use gcd::SpinLockedGcd;
 use memory_manager::CoreMemoryManager;
 use patina::standard::efi;
 use patina::{
-    boot_services::StandardBootServices,
+    base::error::{self, Result},
     component::{IntoComponent, service::performance::PerformanceManager},
-    error::{self, Result},
     performance::config::PerformanceConfig,
     pi::{
         hob::{HobList, get_pi_hob_list_size},
         protocols::{bds, status_code},
         status_code::{EFI_PROGRESS_CODE, EFI_SOFTWARE_DXE_CORE, EFI_SW_DXE_CORE_PC_HANDOFF_TO_NEXT},
     },
-    runtime_services::StandardRuntimeServices,
+    uefi::boot_services::StandardBootServices,
+    uefi::runtime_services::StandardRuntimeServices,
 };
 use patina_ffs::section::SectionExtractor;
 use protocols::PROTOCOL_DB;
@@ -277,7 +277,7 @@ type MockCore = Core<MockPlatformInfo>;
 /// # struct ExampleComponent;
 /// # #[patina::component::component]
 /// # impl ExampleComponent {
-/// #     fn entry_point(self) -> patina::error::Result<()> { Ok(()) }
+/// #     fn entry_point(self) -> patina::base::error::Result<()> { Ok(()) }
 /// # }
 /// struct ExamplePlatform;
 ///
@@ -500,7 +500,7 @@ impl<P: PlatformInfo> Core<P> {
         if performance.enabled() {
             // Record the PEI-end / DXE-begin cross-module markers. This runs during core memory initialization, as early
             // as the performance engine can record into its table, so the DXE span is captured close to the phase boundary.
-            let dxe_core_guid = patina::guids::DXE_CORE.into_inner();
+            let dxe_core_guid = patina::base::guid::constants::DXE_CORE.into_inner();
             performance.perf_cross_module_end("PEI", &dxe_core_guid);
             performance.perf_cross_module_begin("DXE", &dxe_core_guid);
 
@@ -567,8 +567,12 @@ impl<P: PlatformInfo> Core<P> {
         st.checksum_all();
 
         // Install HobList configuration table
-        config_tables::core_install_configuration_table(patina::guids::HOB_LIST.into_inner(), physical_hob_list, st)
-            .expect("Unable to create configuration table due to invalid table entry.");
+        config_tables::core_install_configuration_table(
+            patina::base::guid::constants::HOB_LIST.into_inner(),
+            physical_hob_list,
+            st,
+        )
+        .expect("Unable to create configuration table due to invalid table entry.");
 
         // Install Memory Type Info configuration table.
         allocator::install_memory_type_info_table(st).expect("Unable to create Memory Type Info Table");
@@ -676,7 +680,7 @@ fn call_bds() -> ! {
             if let Some(status_code_protocol_ptr) = NonNull::new(status_code_ptr) {
                 // SAFETY: Some(status_code_protocol_ptr) guarantees that the pointer is non-NULL
                 let status_code_protocol = unsafe { status_code_protocol_ptr.cast::<status_code::Protocol>().as_ref() };
-                let dxe_core_guid = patina::guids::DXE_CORE.into_inner();
+                let dxe_core_guid = patina::base::guid::constants::DXE_CORE.into_inner();
                 (status_code_protocol.report_status_code)(
                     EFI_PROGRESS_CODE,
                     EFI_SOFTWARE_DXE_CORE | EFI_SW_DXE_CORE_PC_HANDOFF_TO_NEXT,

@@ -45,10 +45,11 @@ use patina::standard::efi::{self, TPL_HIGH_LEVEL};
 pub use uefi_allocator::UefiAllocator;
 
 use patina::{
+    base::error::EfiError,
+    base::guid::constants as guids,
     base::{SIZE_4KB, UEFI_PAGE_MASK, UEFI_PAGE_SIZE},
-    efi_types::EFI_MAX_MEMORY_TYPE,
-    error::EfiError,
-    guids, uefi_size_to_pages, writelncrlf,
+    uefi::memory::EFI_MAX_MEMORY_TYPE,
+    uefi_size_to_pages, writelncrlf,
 };
 
 // Type alias for a UefiAllocator with a SpinLockedFixedSizeBlockAllocator

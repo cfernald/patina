@@ -14,7 +14,7 @@ use core::{
     ptr::{NonNull, slice_from_raw_parts_mut},
     slice::{from_raw_parts, from_raw_parts_mut},
 };
-use patina::error::EfiError;
+use patina::base::error::EfiError;
 use patina::standard::efi;
 
 use crate::{

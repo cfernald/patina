@@ -32,8 +32,8 @@ extern crate alloc;
 
 use alloc::{string::String, vec};
 use patina::{
+    base::error::Result,
     component::{component, service::Service},
-    error::Result,
 };
 use patina_macro::SmbiosRecord;
 use patina_smbios::{
@@ -184,7 +184,7 @@ impl SmbiosExampleComponent {
 
         let handle = smbios.add_record(None, &bios_info).map_err(|e| {
             log::error!("Failed to add BIOS info: {:?}", e);
-            patina::error::EfiError::DeviceError
+            patina::base::error::EfiError::DeviceError
         })?;
 
         log::info!("  Type 0 (BIOS Info) - Handle 0x{:04X}", handle);
@@ -217,7 +217,7 @@ impl SmbiosExampleComponent {
 
         let handle = smbios.add_record(None, &system_info).map_err(|e| {
             log::error!("Failed to add system info: {:?}", e);
-            patina::error::EfiError::DeviceError
+            patina::base::error::EfiError::DeviceError
         })?;
 
         log::info!("  Type 1 (System Info) - Handle 0x{:04X}", handle);
@@ -252,7 +252,7 @@ impl SmbiosExampleComponent {
 
         let handle = smbios.add_record(None, &baseboard_info).map_err(|e| {
             log::error!("Failed to add baseboard info: {:?}", e);
-            patina::error::EfiError::DeviceError
+            patina::base::error::EfiError::DeviceError
         })?;
 
         log::info!("  Type 2 (Baseboard Info) - Handle 0x{:04X}", handle);
@@ -289,7 +289,7 @@ impl SmbiosExampleComponent {
 
         let handle = smbios.add_record(None, &enclosure_info).map_err(|e| {
             log::error!("Failed to add system enclosure: {:?}", e);
-            patina::error::EfiError::DeviceError
+            patina::base::error::EfiError::DeviceError
         })?;
 
         log::info!("  Type 3 (System Enclosure) - Handle 0x{:04X}", handle);
@@ -309,7 +309,7 @@ impl SmbiosExampleComponent {
 
         let handle = smbios.add_record(None, &vendor_record).map_err(|e| {
             log::error!("Failed to add vendor OEM record: {:?}", e);
-            patina::error::EfiError::DeviceError
+            patina::base::error::EfiError::DeviceError
         })?;
 
         log::info!("  Type 0x80 (Vendor OEM) - Handle 0x{:04X}", handle);

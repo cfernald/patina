@@ -16,10 +16,10 @@ use crate::{
 };
 use alloc::boxed::Box;
 use patina::{
-    boot_services::tpl::Tpl,
+    base::error::Result,
     component::{Storage, component, service::memory::MemoryManager},
-    error::Result,
-    tpl_mutex::TplMutex,
+    uefi::boot_services::tpl::Tpl,
+    uefi::tpl_mutex::TplMutex,
 };
 
 /// Internal configuration for SMBIOS service
@@ -101,7 +101,8 @@ impl SmbiosProvider {
         let manager = SmbiosManager::new(cfg.major_version, cfg.minor_version)?;
 
         // Get the MemoryManager service for memory allocations
-        let memory_manager = storage.get_service::<dyn MemoryManager>().ok_or(patina::error::EfiError::Unsupported)?;
+        let memory_manager =
+            storage.get_service::<dyn MemoryManager>().ok_or(patina::base::error::EfiError::Unsupported)?;
 
         // Allocate buffers and add Type 127 End-of-Table marker
         // This must be done before protocol installation to avoid allocate_pages during Add()

@@ -29,7 +29,7 @@
 //!
 //! ```rust,ignore
 //! use patina::component::component;
-//! use patina::error::Result;
+//! use patina::base::error::Result;
 //!
 //! pub struct MyComponent {
 //!     data: u32,
@@ -85,14 +85,14 @@
 //!
 //! ### Compiled Examples
 //!
-//! This crate has multiple example binaries in it's `example` folder that can be compiled and executed. These show
+//! This crate has multiple example binaries in its `examples` folder that can be compiled and executed. These show
 //! implementations of common use cases and usage models for components and their parameters.
 //!
 //! ### Struct Component Example
 //!
 //! ```rust
 //! use patina::{
-//!     error::Result,
+//!     base::error::Result,
 //!     component::{
 //!         component,
 //!         params::Config,
@@ -144,7 +144,7 @@ mod storage;
 mod struct_component;
 mod type_name;
 
-use crate::error::Result;
+use crate::base::error::Result;
 
 pub use metadata::MetaData;
 pub use storage::{Storage, UnsafeStorageCell};
@@ -201,13 +201,13 @@ pub trait IntoComponent<Input> {
 /// A prelude module that re-exports commonly used items from the `component` module.
 pub mod prelude {
     pub use crate::{
+        base::error::{EfiError, Result},
         component::{
             IntoComponent,
             hob::{FromHob, Hob},
             params::{Commands, Config, ConfigMut, Handle},
             service::{IntoService, Service},
         },
-        error::{EfiError, Result},
     };
 }
 
@@ -220,12 +220,12 @@ mod tests {
     use crate as patina;
     use crate::{
         BinaryGuid,
+        base::error::{EfiError, Result},
         component::{
             component,
             hob::{FromHob, Hob},
             params::ConfigMut,
         },
-        error::{EfiError, Result},
     };
 
     struct ComponentSuccess;

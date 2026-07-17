@@ -12,7 +12,7 @@ use core::{
     mem,
     slice::{self, from_raw_parts},
 };
-use patina::error::EfiError;
+use patina::base::error::EfiError;
 use patina_ffs::volume::VolumeRef;
 
 use patina::pi::dxe_services;
@@ -2161,7 +2161,7 @@ mod tests {
             static CORE: MockCore = MockCore::new(NullSectionExtractor::new());
             CORE.override_instance();
             // Any GUID is fine; there are no pending drivers in this test harness
-            let guid: efi::Guid = patina::guids::ZERO.into();
+            let guid: efi::Guid = patina::base::guid::constants::ZERO.into();
             let s = MockCore::schedule_efiapi(core::ptr::null_mut(), &guid);
             assert_eq!(s, efi::Status::NOT_FOUND);
         });

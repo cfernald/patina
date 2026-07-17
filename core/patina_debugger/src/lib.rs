@@ -29,8 +29,8 @@
 //! # use patina_internal_cpu::interrupts::{Interrupts, InterruptManager};
 //! # use patina::component::service::perf_timer::ArchTimerFunctionality;
 //!
-//! static DEBUGGER: patina_debugger::PatinaDebugger<patina::serial::uart::UartNull> =
-//!     patina_debugger::PatinaDebugger::new(patina::serial::uart::UartNull{})
+//! static DEBUGGER: patina_debugger::PatinaDebugger<patina::peripheral::serial::uart::UartNull> =
+//!     patina_debugger::PatinaDebugger::new(patina::peripheral::serial::uart::UartNull{})
 //!         .with_timeout(30); // Set initial break timeout to 30 seconds.
 //!
 //! fn entry() {
@@ -124,7 +124,7 @@ pub use debugger::PatinaDebugger;
 
 #[cfg(not(test))]
 use arch::{DebuggerArch, SystemArch};
-use patina::{component::service::perf_timer::ArchTimerFunctionality, serial::SerialIO};
+use patina::{component::service::perf_timer::ArchTimerFunctionality, peripheral::serial::SerialIO};
 use patina_internal_cpu::interrupts::{ExceptionContext, InterruptManager};
 
 /// Global instance of the debugger.
@@ -197,7 +197,7 @@ enum DebugError {
     /// Failure from the GDB stub initialization.
     GdbStubInit,
     /// Failure from the GDB stub.
-    GdbStubError(gdbstub::stub::GdbStubError<(), patina::error::EfiError>),
+    GdbStubError(gdbstub::stub::GdbStubError<(), patina::base::error::EfiError>),
     /// Failure to reboot the system.
     RebootFailure,
     /// Failure in the transport layer.
@@ -386,8 +386,8 @@ mod tests {
     use super::*;
     use serial_test::serial;
 
-    static DUMMY_DEBUGGER: PatinaDebugger<patina::serial::uart::UartNull> =
-        PatinaDebugger::new(patina::serial::uart::UartNull {});
+    static DUMMY_DEBUGGER: PatinaDebugger<patina::peripheral::serial::uart::UartNull> =
+        PatinaDebugger::new(patina::peripheral::serial::uart::UartNull {});
 
     fn reset() {
         // Reset the global debugger for testing.

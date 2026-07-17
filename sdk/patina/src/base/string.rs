@@ -60,7 +60,7 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 
-use crate::error::EfiError;
+use crate::base::error::EfiError;
 
 pub mod char16;
 pub mod char8;

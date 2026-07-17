@@ -28,8 +28,8 @@ use crate::allocator::{DEFAULT_PAGE_ALLOCATION_GRANULARITY, RUNTIME_PAGE_ALLOCAT
 use patina::standard::efi;
 use patina::{
     base::{UEFI_PAGE_SHIFT, align_up},
-    efi_types::{EFI_MAX_MEMORY_TYPE, INVALID_INFORMATION_INDEX},
     pi::hob::{self, EFiMemoryTypeInformation, Hob, HobList, MEMORY_TYPE_INFO_HOB_GUID},
+    uefi::memory::{EFI_MAX_MEMORY_TYPE, INVALID_INFORMATION_INDEX},
     uefi_pages_to_size, uefi_size_to_pages,
 };
 

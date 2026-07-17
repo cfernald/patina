@@ -21,13 +21,13 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 use crate::{
+    base::error::Result,
     component::{
         Component,
         metadata::MetaData,
         params::{ComponentInput, Param, ParamFunction},
         storage::{Storage, UnsafeStorageCell},
     },
-    error::Result,
 };
 use core::marker::PhantomData;
 
@@ -131,7 +131,7 @@ mod tests {
 
     #[component]
     impl TestStructSuccess {
-        fn entry_point(self, _cfg: crate::component::params::Config<i32>) -> crate::error::Result<()> {
+        fn entry_point(self, _cfg: crate::component::params::Config<i32>) -> crate::base::error::Result<()> {
             Ok(())
         }
     }
@@ -144,7 +144,7 @@ mod tests {
 
     #[component]
     impl TestEnumSuccess {
-        fn entry_point(self, _cfg: Config<i32>) -> crate::error::Result<()> {
+        fn entry_point(self, _cfg: Config<i32>) -> crate::base::error::Result<()> {
             Ok(())
         }
     }
@@ -156,7 +156,7 @@ mod tests {
 
     #[component]
     impl TestStructNotDispatched {
-        fn entry_point(self, _cfg: ConfigMut<u32>) -> crate::error::Result<()> {
+        fn entry_point(self, _cfg: ConfigMut<u32>) -> crate::base::error::Result<()> {
             Ok(())
         }
     }
@@ -168,8 +168,8 @@ mod tests {
 
     #[component]
     impl TestStructFail {
-        fn entry_point(self) -> crate::error::Result<()> {
-            Err(crate::error::EfiError::NotReady)
+        fn entry_point(self) -> crate::base::error::Result<()> {
+            Err(crate::base::error::EfiError::NotReady)
         }
     }
 
@@ -208,7 +208,7 @@ mod tests {
 
         let mut test_struct = TestStructFail { x: 5 }.into_component();
         test_struct.initialize(&mut storage);
-        assert!(test_struct.run(&mut storage).is_err_and(|res| res == crate::error::EfiError::NotReady));
+        assert!(test_struct.run(&mut storage).is_err_and(|res| res == crate::base::error::EfiError::NotReady));
     }
 
     //Test structs that use generics and where clause
@@ -221,7 +221,7 @@ mod tests {
 
     #[component]
     impl<T> GenericStruct<T> {
-        fn entry_point(self, _cfg: Config<u32>) -> crate::error::Result<()> {
+        fn entry_point(self, _cfg: Config<u32>) -> crate::base::error::Result<()> {
             Ok(())
         }
     }
@@ -238,7 +238,7 @@ mod tests {
 
     #[component]
     impl<T: 'static> GenericStruct2<T> {
-        fn entry_point(self, _cfg: Config<u32>) -> crate::error::Result<()> {
+        fn entry_point(self, _cfg: Config<u32>) -> crate::base::error::Result<()> {
             Ok(())
         }
     }
@@ -258,7 +258,7 @@ mod tests {
 
         #[component]
         impl ByValue {
-            fn entry_point(self, _cfg: Config<u32>) -> crate::error::Result<()> {
+            fn entry_point(self, _cfg: Config<u32>) -> crate::base::error::Result<()> {
                 Ok(())
             }
         }
@@ -275,7 +275,7 @@ mod tests {
 
         #[component]
         impl ByRef {
-            fn entry_point(&self, _cfg: Config<u32>) -> crate::error::Result<()> {
+            fn entry_point(&self, _cfg: Config<u32>) -> crate::base::error::Result<()> {
                 Ok(())
             }
         }
@@ -292,7 +292,7 @@ mod tests {
 
         #[component]
         impl ByMut {
-            fn entry_point(&mut self, _cfg: Config<u32>) -> crate::error::Result<()> {
+            fn entry_point(&mut self, _cfg: Config<u32>) -> crate::base::error::Result<()> {
                 Ok(())
             }
         }

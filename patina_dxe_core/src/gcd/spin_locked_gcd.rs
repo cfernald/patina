@@ -9,13 +9,13 @@
 use crate::pecoff::UefiPeInfo;
 use alloc::{boxed::Box, slice, vec, vec::Vec};
 use core::{fmt::Display, ptr};
-use patina::{base::DEFAULT_CACHE_ATTR, error::EfiError, log_debug_assert};
+use patina::{base::DEFAULT_CACHE_ATTR, base::error::EfiError, log_debug_assert};
 
 use patina::standard::efi;
 use patina::{
+    base::guid::constants::{self as guids, CACHE_ATTRIBUTE_CHANGE_EVENT_GROUP},
     base::{SIZE_4GB, UEFI_PAGE_MASK, UEFI_PAGE_SHIFT, UEFI_PAGE_SIZE, align_up},
     function,
-    guids::{self, CACHE_ATTRIBUTE_CHANGE_EVENT_GROUP},
     pi::{
         dxe_services::{self, GcdMemoryType, MemorySpaceDescriptor},
         hob,

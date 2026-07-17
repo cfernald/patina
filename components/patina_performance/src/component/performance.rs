@@ -19,27 +19,27 @@ use core::ffi::c_void;
 use patina::standard::efi::EVENT_GROUP_READY_TO_BOOT;
 use patina::{
     base::UEFI_PAGE_SIZE,
-    boot_services::{BootServices, StandardBootServices, allocation::AllocType, event::EventType, tpl::Tpl},
+    base::error::EfiError,
+    base::guid::constants::{EDKII_FPDT_EXTENDED_FIRMWARE_PERFORMANCE, PERFORMANCE_PROTOCOL},
     component::{
         component,
         service::{Service, perf_timer::ArchTimerFunctionality, performance::PerformanceManager},
     },
-    efi_types::EfiMemoryType,
-    error::EfiError,
-    guids::{EDKII_FPDT_EXTENDED_FIRMWARE_PERFORMANCE, PERFORMANCE_PROTOCOL},
     performance::{
         measurement::PerformanceProperty,
         record::{GenericPerformanceRecord, PerformanceRecordHeader, print_record_details, record_type_name},
     },
     pi::status_code::{EFI_PROGRESS_CODE, EFI_SOFTWARE_DXE_BS_DRIVER},
-    runtime_services::{RuntimeServices, StandardRuntimeServices},
-    uefi_protocol::{performance_measurement::EdkiiPerformanceMeasurement, status_code::StatusCodeRuntimeProtocol},
+    uefi::boot_services::{BootServices, StandardBootServices, allocation::AllocType, event::EventType, tpl::Tpl},
+    uefi::memory::EfiMemoryType,
+    uefi::protocol::{performance_measurement::EdkiiPerformanceMeasurement, status_code::StatusCodeRuntimeProtocol},
+    uefi::runtime_services::{RuntimeServices, StandardRuntimeServices},
 };
 use patina_mm::component::communicator::MmCommunication;
 
 use patina::function;
 
-use patina::guids::EVENT_GROUP_END_OF_DXE;
+use patina::base::guid::constants::EVENT_GROUP_END_OF_DXE;
 
 /// Context parameter for the Ready-to-Boot event callback that fetches MM performance records.
 type MmPerformanceEventContext<B> = Box<(B, Service<dyn PerformanceManager>, Service<dyn MmCommunication>)>;
@@ -449,7 +449,7 @@ where
         EFI_PROGRESS_CODE,
         EFI_SOFTWARE_DXE_BS_DRIVER,
         0,
-        patina::guids::CALLER_ID.as_efi_guid(),
+        patina::base::guid::constants::CALLER_ID.as_efi_guid(),
         *EDKII_FPDT_EXTENDED_FIRMWARE_PERFORMANCE.as_efi_guid(),
         fbpt_address,
     );
@@ -521,18 +521,16 @@ mod tests {
 
     use alloc::sync::Arc;
     use patina::{
-        boot_services::{
-            MockBootServices,
-            c_ptr::{CMutPtr, CPtr},
-        },
+        base::c_ptr::{CMutPtr, CPtr},
         component::service::{IntoService, Service},
         performance::{error::Error, measurement::CallerIdentifier},
-        runtime_services::MockRuntimeServices,
-        uefi_protocol::{
+        uefi::boot_services::MockBootServices,
+        uefi::protocol::{
             ProtocolInterface,
             performance_measurement::{EDKII_PERFORMANCE_MEASUREMENT_PROTOCOL_GUID, PerfAttribute},
             status_code::StatusCodeRuntimeProtocol,
         },
+        uefi::runtime_services::MockRuntimeServices,
     };
     use patina_mm::component::communicator::{MmCommunication, Status};
 

@@ -10,7 +10,7 @@
 use alloc::vec::Vec;
 use core::{mem, ptr};
 
-use patina::{BinaryGuid, runtime_services::RuntimeServices};
+use patina::{BinaryGuid, uefi::runtime_services::RuntimeServices};
 
 /// Return the address where the FBPT has been allocated during the previous boot.
 pub(crate) fn find_previous_table_address(runtime_services: &impl RuntimeServices) -> Option<usize> {
@@ -51,7 +51,7 @@ impl TryFrom<Vec<u8>> for FirmwarePerformanceVariable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use patina::runtime_services::MockRuntimeServices;
+    use patina::uefi::runtime_services::MockRuntimeServices;
 
     #[test]
     fn test_find_previous_address() {

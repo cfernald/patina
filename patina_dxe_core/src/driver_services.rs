@@ -12,8 +12,8 @@ use alloc::{
 };
 use core::ptr::NonNull;
 use patina::{
-    device_path::walker::{concat_device_path_to_boxed_slice, copy_device_path_to_boxed_slice},
-    error::EfiError,
+    base::error::EfiError,
+    uefi::device_path::walker::{concat_device_path_to_boxed_slice, copy_device_path_to_boxed_slice},
 };
 
 use patina::standard::efi::{self, protocols::device_path::Protocol};

@@ -10,18 +10,18 @@ use core::{ffi::c_void, mem::size_of, num::NonZeroUsize, ptr::NonNull, slice};
 
 use alloc::{boxed::Box, collections::BTreeMap};
 use patina::{
-    device_path::{
-        fv_types::{FvMemMapDevicePath, FvPiWgDevicePath},
-        walker::concat_device_path_to_boxed_slice,
-    },
     pi::{
         self,
         fw_fs::{ffs, fv, fvb},
         hob,
     },
+    uefi::device_path::{
+        fv_types::{FvMemMapDevicePath, FvPiWgDevicePath},
+        walker::concat_device_path_to_boxed_slice,
+    },
 };
 
-use patina::error::EfiError;
+use patina::base::error::EfiError;
 use patina::standard::efi::{self, MEMORY_MAPPED_IO};
 use patina_ffs::{file::FileRef, section::SectionExtractor, volume::VolumeRef};
 

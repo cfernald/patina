@@ -52,7 +52,7 @@
 //! ## Example: Using MemoryMapTestScenario
 //!
 //! ```rust
-//! use patina::guids::ZERO;
+//! use patina::base::guid::constants::ZERO;
 //! use patina::pi::hob;
 //! use patina::standard::efi;
 //!
@@ -148,12 +148,13 @@ mod tests {
     use alloc::vec::Vec;
     use patina::standard::efi;
     use patina::{
+        base::guid::constants::ZERO,
         base::*,
-        guids::ZERO,
         pi::{
             BootMode,
             hob::{self, HobList, PhaseHandoffInformationTable, ResourceDescriptor, header},
         },
+        uefi::memory_map,
     };
     use serial_test::serial;
     use std::panic::RefUnwindSafe;
@@ -425,7 +426,7 @@ mod tests {
                         reserved: 0,
                     },
                     alloc_descriptor: hob::header::MemoryAllocation {
-                        name: patina::guids::HOB_MEMORY_ALLOC_STACK,
+                        name: patina::base::guid::constants::HOB_MEMORY_ALLOC_STACK,
                         memory_base_address: stack_base,
                         memory_length: stack_size,
                         memory_type: efi::BOOT_SERVICES_DATA,
@@ -635,7 +636,7 @@ mod tests {
                 memory_type: efi::BOOT_SERVICES_DATA,
                 memory_base_address: SIZE_2MB as u64,
                 memory_length: SIZE_512KB as u64,
-                name: patina::guids::HOB_MEMORY_ALLOC_STACK,
+                name: patina::base::guid::constants::HOB_MEMORY_ALLOC_STACK,
             })
             .with_memory_allocation(MemoryAllocationConfig {
                 memory_type: efi::BOOT_SERVICES_CODE,

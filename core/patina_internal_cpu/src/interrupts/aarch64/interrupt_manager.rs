@@ -9,9 +9,9 @@
 
 use patina::{
     arch::{disable_interrupts, enable_interrupts},
+    base::error::EfiError,
     base::{UEFI_PAGE_MASK, UEFI_PAGE_SIZE},
     bit,
-    error::EfiError,
 };
 use patina_paging::PageTable;
 

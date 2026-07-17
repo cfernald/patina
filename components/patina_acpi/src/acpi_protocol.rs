@@ -15,7 +15,7 @@ use crate::{
 
 use core::{ffi::c_void, mem};
 use patina::standard::efi;
-use patina::uefi_protocol::ProtocolInterface;
+use patina::uefi::protocol::ProtocolInterface;
 
 use crate::{
     acpi::STANDARD_ACPI_PROVIDER,

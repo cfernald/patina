@@ -10,7 +10,8 @@ use core::{ffi::c_void, slice::from_raw_parts, sync::atomic::Ordering};
 use patina::arch as interrupts;
 use patina::standard::efi;
 use patina::{
-    guids, log_debug_assert,
+    base::guid::constants as guids,
+    log_debug_assert,
     pi::{protocols, status_code},
 };
 use spin::Once;

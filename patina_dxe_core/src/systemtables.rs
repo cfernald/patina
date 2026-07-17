@@ -12,7 +12,7 @@ use core::{ffi::c_void, mem::size_of, slice::from_raw_parts};
 
 use alloc::boxed::Box;
 use patina::standard::efi;
-use patina::{boot_services::BootServices, component::component, pi::error_codes::EFI_NOT_AVAILABLE_YET};
+use patina::{component::component, pi::error_codes::EFI_NOT_AVAILABLE_YET, uefi::boot_services::BootServices};
 
 use crate::{allocator::EFI_RUNTIME_SERVICES_DATA_ALLOCATOR, tpl_mutex};
 
@@ -884,7 +884,7 @@ pub(crate) struct SystemTableChecksumInstaller;
 
 #[component]
 impl SystemTableChecksumInstaller {
-    fn entry_point(self, bs: patina::boot_services::StandardBootServices) -> patina::error::Result<()> {
+    fn entry_point(self, bs: patina::uefi::boot_services::StandardBootServices) -> patina::base::error::Result<()> {
         extern "efiapi" fn callback(_event: efi::Event, _: *mut c_void) {
             SYSTEM_TABLE.lock().as_mut().expect("System Table is initialized").checksum_all();
         }
@@ -910,8 +910,8 @@ impl SystemTableChecksumInstaller {
 
         for guid in &GUIDS {
             let event = bs.create_event(
-                patina::boot_services::event::EventType::NOTIFY_SIGNAL,
-                patina::boot_services::tpl::Tpl::CALLBACK,
+                patina::uefi::boot_services::event::EventType::NOTIFY_SIGNAL,
+                patina::uefi::boot_services::tpl::Tpl::CALLBACK,
                 Some(callback),
                 core::ptr::null_mut(),
             )?;

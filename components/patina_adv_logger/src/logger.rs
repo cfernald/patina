@@ -17,11 +17,11 @@ use core::{ffi::c_void, marker::Send, ptr};
 use log::Level;
 use patina::standard::efi;
 use patina::{
+    base::error::EfiError,
     component::service::{Service, perf_timer::ArchTimerFunctionality},
-    error::EfiError,
-    log::Format,
+    debug::log::Format,
+    peripheral::serial::{SerialIO, shared::SharedSerial},
     pi::hob::{Hob, PhaseHandoffInformationTable},
-    serial::{SerialIO, shared::SharedSerial},
 };
 use spin::RwLock;
 
@@ -357,9 +357,9 @@ mod tests {
     use patina::standard::efi;
     use patina::{
         component::service::{IntoService, perf_timer::ArchTimerFunctionality},
-        log::Format,
+        debug::log::Format,
+        peripheral::serial::uart::UartNull,
         pi::hob::{GUID_EXTENSION, GuidHob, header},
-        serial::uart::UartNull,
     };
 
     use crate::{
@@ -408,7 +408,7 @@ mod tests {
     }
 
     static TEST_LOGGER: AdvancedLogger<UartNull> =
-        AdvancedLogger::new(patina::log::Format::Standard, &[], log::LevelFilter::Trace, UartNull {});
+        AdvancedLogger::new(patina::debug::log::Format::Standard, &[], log::LevelFilter::Trace, UartNull {});
 
     fn create_adv_logger_hob_list() -> (u64, *const c_void) {
         const LOG_LEN: usize = 0x2000;

@@ -38,7 +38,12 @@ use core::{
 
 use crate::standard::efi;
 
-use crate::{base::UEFI_PAGE_SIZE, efi_types::EfiMemoryType, error::EfiError};
+use crate::{
+    base::{UEFI_PAGE_SIZE, error::EfiError},
+    log_debug_assert,
+    uefi::memory::EfiMemoryType,
+    uefi_pages_to_size,
+};
 
 #[cfg(any(test, feature = "alloc"))]
 use core::alloc::Allocator;
@@ -93,7 +98,7 @@ pub trait MemoryManager {
     ///
     /// ```rust
     /// #![cfg_attr(feature = "alloc", feature(allocator_api))]
-    /// # use patina::{efi_types::*, component::service::memory::*};
+    /// # use patina::{uefi::memory::*, component::service::memory::*};
     ///
     /// fn component(memory_manager: &dyn MemoryManager) -> Result<(), MemoryError> {
     ///     // Allocate a page of memory and leak it.
@@ -124,7 +129,7 @@ pub trait MemoryManager {
     /// options will be interpretted as the default for the implementation.
     ///
     /// ```rust
-    /// # use patina::{efi_types::*, component::service::memory::*};
+    /// # use patina::{uefi::memory::*, component::service::memory::*};
     ///
     /// fn component(memory_manager: &dyn MemoryManager) -> Result<(), MemoryError> {
     ///     let options = AllocationOptions::new()
@@ -211,7 +216,7 @@ pub trait MemoryManager {
     ///
     /// ```rust
     /// #![feature(allocator_api)]
-    /// # use patina::{efi_types::*, component::service::memory::*};
+    /// # use patina::{uefi::memory::*, component::service::memory::*};
     ///
     /// fn component(memory_manager: &dyn MemoryManager) -> Result<(), MemoryError> {
     ///     // Acquire the heap allocator for the specified memory type.

@@ -16,8 +16,8 @@ use alloc::boxed::Box;
 use core::{cell::Cell, ffi::c_void, ops::Range};
 use patina::standard::efi;
 use patina::{
+    base::error::EfiError,
     base::{DEFAULT_CACHE_ATTR, align_down, align_up},
-    error::EfiError,
     pi::{
         dxe_services::{GcdIoType, GcdMemoryType, MemorySpaceDescriptor},
         hob::{self, Hob, HobList, MEMORY_TYPE_INFO_HOB_GUID, PhaseHandoffInformationTable},

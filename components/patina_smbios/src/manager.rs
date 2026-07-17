@@ -14,7 +14,7 @@
 
 extern crate alloc;
 
-use patina::uefi_protocol::ProtocolInterface;
+use patina::uefi::protocol::ProtocolInterface;
 
 mod core;
 mod protocol;
@@ -28,8 +28,8 @@ use alloc::boxed::Box;
 
 use patina::standard::efi;
 use patina::{
-    boot_services::{BootServices, StandardBootServices},
-    tpl_mutex::TplMutex,
+    uefi::boot_services::{BootServices, StandardBootServices},
+    uefi::tpl_mutex::TplMutex,
 };
 
 use crate::error::SmbiosError;

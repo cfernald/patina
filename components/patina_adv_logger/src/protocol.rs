@@ -8,7 +8,7 @@
 //!
 
 use patina::standard::efi;
-use patina::uefi_protocol::ProtocolInterface;
+use patina::uefi::protocol::ProtocolInterface;
 
 /// C struct for the Advanced Logger protocol version 2.
 #[repr(C)]

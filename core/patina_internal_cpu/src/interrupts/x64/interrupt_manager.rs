@@ -8,9 +8,9 @@
 //!
 
 use patina::{
+    base::error::EfiError,
     base::{UEFI_PAGE_MASK, UEFI_PAGE_SIZE},
     bit,
-    error::EfiError,
     pi::protocols::cpu_arch::EfiSystemContext,
 };
 #[cfg(target_arch = "x86_64")]

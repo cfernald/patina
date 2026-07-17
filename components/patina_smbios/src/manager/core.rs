@@ -137,7 +137,7 @@ impl SmbiosManager {
             return Ok(());
         }
 
-        use patina::{component::service::memory::AllocationOptions, efi_types::EfiMemoryType};
+        use patina::{component::service::memory::AllocationOptions, uefi::memory::EfiMemoryType};
 
         // Allocate table buffer
         let table_pages = uefi_size_to_pages!(self.table_buffer_max_size);
@@ -465,7 +465,7 @@ impl SmbiosManager {
     /// that a simple checksum would miss. Not for cryptographic integrity.
     fn calculate_table_checksum(data: &[u8]) -> u64 {
         use core::hash::Hasher;
-        let mut hasher = patina::hash::Xorshift64starHasher::default();
+        let mut hasher = patina::base::hash::Xorshift64starHasher::default();
         hasher.write(data);
         hasher.finish()
     }

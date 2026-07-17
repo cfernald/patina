@@ -28,9 +28,9 @@
 //!
 use criterion::{Bencher, Criterion, criterion_group, criterion_main};
 use patina::{
-    boot_services::StandardBootServices,
+    base::error::Result,
     component::{Component, IntoComponent, Storage, component, params::*},
-    error::Result,
+    uefi::boot_services::StandardBootServices,
 };
 
 struct TestComponent;
