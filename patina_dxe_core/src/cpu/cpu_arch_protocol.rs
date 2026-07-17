@@ -12,13 +12,13 @@ use crate::{dxe_services, protocols::PROTOCOL_DB};
 use alloc::boxed::Box;
 use core::ffi::c_void;
 use patina::{
-    boot_services::{BootServices, StandardBootServices},
+    base::error::{EfiError, Result},
     component::{
         Storage, component,
         service::{IntoService, Service},
     },
-    error::{EfiError, Result},
-    uefi_protocol::ProtocolInterface,
+    uefi::boot_services::{BootServices, StandardBootServices},
+    uefi::protocol::ProtocolInterface,
 };
 use patina_internal_cpu::{
     cpu::{Cpu, EfiCpu},

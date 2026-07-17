@@ -8,6 +8,7 @@
 //!
 use alloc::boxed::Box;
 use patina::{
+    base::error::EfiError,
     base::{UEFI_PAGE_MASK, UEFI_PAGE_SIZE},
     component::service::{
         IntoService, Service,
@@ -16,8 +17,7 @@ use patina::{
             PageAllocationStrategy,
         },
     },
-    efi_types::EfiMemoryType,
-    error::EfiError,
+    uefi::memory::EfiMemoryType,
     uefi_pages_to_size,
 };
 use patina_test::{patina_test, u_assert, u_assert_eq};

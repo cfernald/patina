@@ -12,8 +12,8 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 use patina::{
+    base::error::Result,
     component::service::{IntoService, dxe_dispatch::DxeDispatch},
-    error::Result,
 };
 
 use crate::{Core, PlatformInfo};

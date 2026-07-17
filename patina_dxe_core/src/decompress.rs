@@ -10,10 +10,10 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 use patina::{
-    boot_services::BootServices,
+    base::error::EfiError,
     component::{Storage, component},
-    error::EfiError,
-    uefi_protocol::decompress,
+    uefi::boot_services::BootServices,
+    uefi::protocol::decompress,
 };
 
 /// Component to install the UEFI Decompress Protocol.
@@ -22,7 +22,7 @@ pub(crate) struct DecompressProtocolInstaller;
 
 #[component]
 impl DecompressProtocolInstaller {
-    fn entry_point(self, storage: &mut Storage) -> patina::error::Result<()> {
+    fn entry_point(self, storage: &mut Storage) -> patina::base::error::Result<()> {
         let protocol = Box::new(decompress::EfiDecompressProtocol::new());
 
         match storage.boot_services().install_protocol_interface(None, protocol) {

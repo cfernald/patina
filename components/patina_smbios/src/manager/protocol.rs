@@ -15,7 +15,7 @@
 
 use core::ffi::c_char;
 
-use patina::{tpl_mutex::TplMutex, uefi_protocol::ProtocolInterface};
+use patina::{uefi::protocol::ProtocolInterface, uefi::tpl_mutex::TplMutex};
 use r_efi::efi;
 
 use crate::service::{SMBIOS_HANDLE_PI_RESERVED, SmbiosHandle, SmbiosTableHeader, SmbiosType};
@@ -39,10 +39,10 @@ pub(super) struct SmbiosProtocolInternal {
     pub(super) protocol: SmbiosProtocol,
 
     // Internal component access only! Does not exist in C definition
-    pub(super) manager: &'static TplMutex<SmbiosManager, patina::boot_services::StandardBootServices>,
+    pub(super) manager: &'static TplMutex<SmbiosManager, patina::uefi::boot_services::StandardBootServices>,
 
     // Boot services needed for table republishing after Add/Update/Remove
-    pub(super) boot_services: &'static patina::boot_services::StandardBootServices,
+    pub(super) boot_services: &'static patina::uefi::boot_services::StandardBootServices,
 }
 
 // SAFETY: SmbiosProtocol implements the SMBIOS protocol interface. The struct layout
@@ -89,8 +89,8 @@ impl SmbiosProtocolInternal {
     pub(super) fn new(
         major_version: u8,
         minor_version: u8,
-        manager: &'static TplMutex<SmbiosManager, patina::boot_services::StandardBootServices>,
-        boot_services: &'static patina::boot_services::StandardBootServices,
+        manager: &'static TplMutex<SmbiosManager, patina::uefi::boot_services::StandardBootServices>,
+        boot_services: &'static patina::uefi::boot_services::StandardBootServices,
     ) -> Self {
         Self { protocol: SmbiosProtocol::new(major_version, minor_version), manager, boot_services }
     }
@@ -470,7 +470,7 @@ mod tests {
 
     #[test]
     fn test_protocol_guid() {
-        use patina::uefi_protocol::ProtocolInterface;
+        use patina::uefi::protocol::ProtocolInterface;
 
         // Verify the GUID matches the EDK2 SMBIOS protocol GUID
         let expected_guid = patina::BinaryGuid::from_string("03583FF6-CB36-4940-947E-B9B39F4AFAF7");

@@ -24,7 +24,7 @@ use gdbstub::{
 };
 use patina::{
     component::service::perf_timer::ArchTimerFunctionality,
-    serial::{SerialIO, shared::SharedSerial},
+    peripheral::serial::{SerialIO, shared::SharedSerial},
 };
 use patina_internal_cpu::interrupts::{ExceptionType, HandlerType, InterruptHandler, InterruptManager};
 use spin::Mutex;

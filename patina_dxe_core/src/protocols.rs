@@ -11,8 +11,8 @@ use core::{ffi::c_void, mem::size_of, ptr::NonNull};
 use alloc::{slice, vec, vec::Vec};
 use patina::{
     OwnedGuid,
-    device_path::walker::{is_device_path_end, remaining_device_path},
-    error::EfiError,
+    base::error::EfiError,
+    uefi::device_path::walker::{is_device_path_end, remaining_device_path},
 };
 use r_efi::{efi, protocols::device_path::Protocol};
 use tpl_mutex::TplMutex;

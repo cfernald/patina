@@ -11,7 +11,7 @@
 use core::{cell::UnsafeCell, mem::size_of, ptr, slice, sync::atomic::Ordering};
 use patina::{
     base::align_up,
-    error::{EfiError, Result},
+    base::error::{EfiError, Result},
 };
 use r_efi::efi;
 use zerocopy::IntoBytes;

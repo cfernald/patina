@@ -21,7 +21,7 @@ use alloc::string::ToString;
 use patina::{
     component::service::{Service, performance::PerformanceManager},
     performance::{error::Error, measurement::CallerIdentifier, record::known::KnownPerfId},
-    uefi_protocol::performance_measurement::PerfAttribute,
+    uefi::protocol::performance_measurement::PerfAttribute,
 };
 use r_efi::efi;
 

@@ -1,6 +1,9 @@
 //! Test that &mut Storage and &Storage parameters cannot be mixed (reverse order).
 
-use patina::{component::{component, Storage}, error::Result};
+use patina::{
+    base::error::Result,
+    component::{Storage, component},
+};
 
 pub struct TestComponent;
 

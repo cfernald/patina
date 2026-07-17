@@ -15,10 +15,10 @@ use core::ffi::c_void;
 
 use alloc::vec::Vec;
 use patina::{
+    base::guid::constants as guids,
     component::service::memory::{AllocationOptions, MemoryManager, PageAllocationStrategy},
-    guids,
     pi::hob::{self},
-    uefi_decompress::{DecompressionAlgorithm, decompress_into_with_algo},
+    uefi::decompress::{DecompressionAlgorithm, decompress_into_with_algo},
     uefi_size_to_pages, writelncrlf,
 };
 

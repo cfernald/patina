@@ -73,7 +73,7 @@ pub struct PeHeaderInfo {
 impl From<FirmwareVolume<'_>> for FirmwareVolumeSerDe {
     fn from(fv: FirmwareVolume) -> Self {
         // Get the FV name, length, base address, and attributes
-        let fv_name = format_guid(&fv.fv_name().unwrap_or(crate::guids::ZERO));
+        let fv_name = format_guid(&fv.fv_name().unwrap_or(crate::base::guid::constants::ZERO));
         let fv_length = fv.size() as usize;
         let fv_attributes = fv.attributes();
         let files = fv

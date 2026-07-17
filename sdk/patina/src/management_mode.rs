@@ -1,6 +1,6 @@
-//! Management Mode (MM) SDK for Patina
+//! Management Mode (MM) definitions for Patina.
 //!
-//! This crate provides the Management Mode (MM) related definitions for Patina.
+//! This module provides the Management Mode (MM) related definitions for Patina.
 //!
 //! ## License
 //!

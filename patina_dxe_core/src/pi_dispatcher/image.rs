@@ -16,17 +16,18 @@ use core::{
     slice::from_raw_parts,
 };
 use patina::{
+    base::error::EfiError,
+    base::guid::constants as guids,
     base::{DEFAULT_CACHE_ATTR, UEFI_PAGE_SIZE, align_up},
     component::service::memory::{AllocationOptions, MemoryManager, PageFree},
-    device_path::walker::{DevicePathWalker, copy_device_path_to_boxed_slice, device_path_node_count},
-    efi_types::EfiMemoryType,
-    error::EfiError,
-    guids, log_debug_assert,
+    log_debug_assert,
     pi::{
         self,
         fw_fs::FfsSectionRawType::PE32,
         hob::{Hob, HobList},
     },
+    uefi::device_path::walker::{DevicePathWalker, copy_device_path_to_boxed_slice, device_path_node_count},
+    uefi::memory::EfiMemoryType,
     uefi_size_to_pages,
 };
 use r_efi::{efi, protocols::device_path::Protocol};
@@ -1604,8 +1605,8 @@ mod tests {
     };
     use core::{ffi::c_void, sync::atomic::AtomicBool};
     use patina::{
-        error::EfiError,
-        guids,
+        base::error::EfiError,
+        base::guid::constants as guids,
         pi::{
             self,
             hob::{HobList, MemoryAllocationModule, header::MemoryAllocation},

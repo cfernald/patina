@@ -22,7 +22,7 @@ use core::{
     fmt,
     ops::{Deref, DerefMut},
 };
-use patina::{error::EfiError, log_debug_assert};
+use patina::{base::error::EfiError, log_debug_assert};
 use r_efi::efi;
 
 use crate::{runtime, tpl_mutex};

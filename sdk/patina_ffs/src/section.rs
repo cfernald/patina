@@ -12,7 +12,7 @@
 use alloc::{boxed::Box, vec, vec::Vec};
 use patina::{
     base::align_up,
-    boot_services::c_ptr::CPtr,
+    base::c_ptr::CPtr,
     pi::fw_fs::ffs::{self, section},
 };
 

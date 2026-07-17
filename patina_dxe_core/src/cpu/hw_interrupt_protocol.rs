@@ -9,10 +9,10 @@ use spin::rwlock::RwLock;
 use arm_gic::{InterruptGroup, Trigger, gicv3::GicCpuInterface};
 use patina::{
     BinaryGuid,
-    boot_services::{BootServices, StandardBootServices},
+    base::guid::constants::{HARDWARE_INTERRUPT_PROTOCOL, HARDWARE_INTERRUPT_PROTOCOL_V2},
     component::{component, service::Service},
-    guids::{HARDWARE_INTERRUPT_PROTOCOL, HARDWARE_INTERRUPT_PROTOCOL_V2},
-    uefi_protocol::ProtocolInterface,
+    uefi::boot_services::{BootServices, StandardBootServices},
+    uefi::protocol::ProtocolInterface,
 };
 
 use super::GicBases;
@@ -501,7 +501,7 @@ impl HwInterruptProtocolInstaller {
         self,
         interrupt_manager: Service<dyn InterruptManager>,
         boot_services: StandardBootServices,
-    ) -> patina::error::Result<()> {
+    ) -> patina::base::error::Result<()> {
         log::info!("GIC initializing {:x?}", (self.gic_bases.gicd, self.gic_bases.gicr));
         // SAFETY: The invariants of the `GicBases` struct upholds the safety requirements for this function.
         let aarch64_int = unsafe {

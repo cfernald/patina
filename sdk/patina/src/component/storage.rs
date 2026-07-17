@@ -8,10 +8,10 @@
 //!
 use crate::{
     component::{metadata::MetaData, params::Param},
-    runtime_services::StandardRuntimeServices,
+    uefi::runtime_services::StandardRuntimeServices,
 };
 
-use crate::{BinaryGuid, boot_services::StandardBootServices};
+use crate::{BinaryGuid, uefi::boot_services::StandardBootServices};
 use alloc::{borrow::Cow, boxed::Box, collections::BTreeMap, vec::Vec};
 use core::{
     any::{Any, TypeId},

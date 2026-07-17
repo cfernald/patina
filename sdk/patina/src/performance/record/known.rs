@@ -13,7 +13,7 @@ use core::convert::TryFrom;
 
 use crate::standard::efi;
 
-use crate::uefi_protocol::performance_measurement::PerfAttribute;
+use crate::uefi::protocol::performance_measurement::PerfAttribute;
 
 /// Performance tokens for well-known performance events.
 #[derive(Debug, Eq, PartialEq)]

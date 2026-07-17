@@ -2,8 +2,9 @@
 
 The Patina Debugger provides a `no_std` GDB Remote client that is intended to be installed in a Patina boot-time core
 environment, such as the DXE Core (the [`patina_dxe_core`](https://crates.io/crates/patina_dxe_core) crate). It
-consumes a [patina::serial::SerialIO](https://docs.rs/patina/latest/patina/serial/trait.SerialIO.html) transport,
-registers architecture-specific exception handlers through
+consumes a
+[patina::peripheral::serial::SerialIO](https://docs.rs/patina/latest/patina/peripheral/serial/trait.SerialIO.html)
+transport, registers architecture-specific exception handlers through
 [patina_internal_cpu::interrupts](https://docs.rs/patina_internal_cpu/latest/patina_internal_cpu/interrupts/index.html),
 and exposes a policy-driven interface for bringing up interactive debugging.
 

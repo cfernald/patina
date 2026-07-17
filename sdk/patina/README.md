@@ -15,10 +15,27 @@ Add the crate to your manifest and enable the features needed by your firmware o
 
 ```toml
 [dependencies]
-patina = { version = "13.1.0", default-features = false }
+patina = { version = "X.X.X", default-features = false }
 ```
 
 The crate is `no_std` unless `std` is selected. Tests or host utilities can enable `std` or `mockall` as needed.
+
+## Modules
+
+The SDK is organized into the following modules.
+
+| Module | Description |
+|--------|-------------|
+| **arch** | Abstractions for architecture specific functionality (e.g. caching) and architecture specific functions. |
+| **base** | Basic definitions and utilities: errors, GUIDs (and GUID constants), hashing, C-pointer helpers, size constants, and macro utilities. |
+| **component** | Component and service definitions. |
+| **debug** | Macros and definitions for logging and diagnostics. |
+| **management_mode** | Definitions for management mode interactions and implementations. |
+| **mmio** | Re-export of the `safe-mmio` crate for memory-mapped I/O access. |
+| **performance** | TODO: will also move, but in another refactor |
+| **peripheral** | Abstractions and implementations for core device operations. |
+| **pi** | Platform Initialization (PI) specification definitions and wrappers. |
+| **uefi** | UEFI specification definitions and wrappers. |
 
 ## Feature Overview
 

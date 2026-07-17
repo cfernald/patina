@@ -59,7 +59,7 @@ impl<'a> FileRef<'a> {
     /// use patina_ffs::section::{Section, SectionHeader};
     ///
     /// // Build a file and then parse the resulting bytes back.
-    /// let guid = patina::guids::ZERO;
+    /// let guid = patina::base::guid::constants::ZERO;
     /// let mut file = File::new(guid, 0x07);
     /// let data = b"hello".to_vec();
     /// let section = Section::new_from_header_with_data(
@@ -249,7 +249,7 @@ impl<'a> FileRef<'a> {
     /// }
     ///
     /// // Build a simple file containing a single RAW section and parse it back.
-    /// let guid = patina::guids::ZERO;
+    /// let guid = patina::base::guid::constants::ZERO;
     /// let mut file = File::new(guid, 0x07);
     /// let data = b"hello".to_vec();
     /// let section = Section::new_from_header_with_data(
@@ -325,7 +325,7 @@ impl File {
     /// use patina_ffs::file::File;
     /// use patina_ffs::section::{Section, SectionHeader};
     ///
-    /// let guid = patina::guids::ZERO;
+    /// let guid = patina::base::guid::constants::ZERO;
     /// let mut file = File::new(guid, 0x07);
     /// file.set_data_checksum(true);
     ///
@@ -536,7 +536,7 @@ impl File {
     ///     }
     /// }
     ///
-    /// let guid = patina::guids::ZERO;
+    /// let guid = patina::base::guid::constants::ZERO;
     /// let mut file = File::new(guid, 0x07);
     /// let data = b"hello".to_vec();
     /// file.sections_mut().push(Section::new_from_header_with_data(
@@ -572,7 +572,7 @@ impl File {
     ///     }
     /// }
     ///
-    /// let guid = patina::guids::ZERO;
+    /// let guid = patina::base::guid::constants::ZERO;
     /// let mut file = File::new(guid, 0x07);
     /// let data = b"hello".to_vec();
     /// file.sections_mut().push(Section::new_from_header_with_data(

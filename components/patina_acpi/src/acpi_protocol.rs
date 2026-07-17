@@ -14,7 +14,7 @@ use crate::{
 };
 
 use core::{ffi::c_void, mem};
-use patina::uefi_protocol::ProtocolInterface;
+use patina::uefi::protocol::ProtocolInterface;
 use r_efi::efi;
 
 use crate::{

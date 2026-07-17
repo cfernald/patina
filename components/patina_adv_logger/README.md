@@ -42,7 +42,7 @@ below.
 
 ```rust
 use patina_dxe_core::*;
-use patina::{log::Format, serial::uart::UartNull};
+use patina::{debug::log::Format, peripheral::serial::uart::UartNull};
 use patina_adv_logger::{component::AdvancedLoggerComponent, logger::{AdvancedLogger, TargetFilter}};
 
 use log::LevelFilter;

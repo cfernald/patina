@@ -657,7 +657,7 @@ mod tests {
 
     #[test]
     fn test_performance_record_buffer_push_record() {
-        let guid = crate::guids::ZERO;
+        let guid = crate::base::guid::constants::ZERO;
         let mut performance_record_buffer = PerformanceRecordBuffer::new();
         let mut size = 0;
 
@@ -682,7 +682,7 @@ mod tests {
 
     #[test]
     fn test_performance_record_buffer_iter() {
-        let guid = crate::guids::ZERO;
+        let guid = crate::base::guid::constants::ZERO;
         let mut performance_record_buffer = PerformanceRecordBuffer::new();
 
         performance_record_buffer.push_record(GuidEventRecord::new(1, 0, 10, guid)).unwrap();
@@ -712,7 +712,7 @@ mod tests {
 
     #[test]
     fn test_performance_record_buffer_reported_table() {
-        let guid = crate::guids::ZERO;
+        let guid = crate::base::guid::constants::ZERO;
         let mut performance_record_buffer = PerformanceRecordBuffer::new();
 
         performance_record_buffer.push_record(GuidEventRecord::new(1, 0, 10, guid)).unwrap();

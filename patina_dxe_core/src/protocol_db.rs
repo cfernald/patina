@@ -16,7 +16,7 @@ use alloc::{
     vec::Vec,
 };
 use core::{cmp::Ordering, ffi::c_void, hash::Hasher};
-use patina::{error::EfiError, hash::Xorshift64starHasher};
+use patina::{base::error::EfiError, base::hash::Xorshift64starHasher};
 use r_efi::efi;
 
 use crate::tpl_mutex;

@@ -17,7 +17,7 @@ use crate::{
         measurement::CallerIdentifier,
         record::{GenericPerformanceRecord, known::KnownPerfId},
     },
-    uefi_protocol::performance_measurement::PerfAttribute,
+    uefi::protocol::performance_measurement::PerfAttribute,
 };
 
 /// Service that records firmware performance measurements into the Firmware Basic Boot Performance Table (FBPT).

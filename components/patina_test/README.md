@@ -46,8 +46,8 @@ use patina_test::{
     error::Result,
 };
 
-use patina::boot_services::StandardBootServices;
-use patina::guids::CACHE_ATTRIBUTE_CHANGE_EVENT_GROUP;
+use patina::uefi::boot_services::StandardBootServices;
+use patina::base::guid::constants::CACHE_ATTRIBUTE_CHANGE_EVENT_GROUP;
 
 #[cfg_attr(target_arch = "aarch64", patina_test)]
 fn test_case() -> Result {

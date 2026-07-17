@@ -37,7 +37,7 @@
 //!
 //! ```rust
 //! use patina::{
-//!    error::Result,
+//!    base::error::Result,
 //!    component::{
 //!        service::{IntoService, Service},
 //!        Storage,
@@ -72,7 +72,7 @@
 //!
 //! ```rust
 //! use patina::{
-//!   error::Result,
+//!   base::error::Result,
 //!   component::{
 //!     service::{IntoService, Service},
 //!     Storage,
@@ -201,7 +201,7 @@ impl<T: ?Sized + 'static> Service<T> {
     /// ## Example
     ///
     /// ```rust
-    /// # use patina::{error::Result, component::service::Service};
+    /// # use patina::{base::error::Result, component::service::Service};
     /// # trait MyService {}
     /// static MY_SERVICE: Service<dyn MyService> = Service::new_uninit();
     ///

@@ -1,10 +1,6 @@
 //! Test that duplicate StandardRuntimeServices parameters are rejected at compile time.
 
-use patina::{
-    component::component,
-    error::Result,
-    runtime_services::StandardRuntimeServices,
-};
+use patina::{base::error::Result, component::component, uefi::runtime_services::StandardRuntimeServices};
 
 pub struct TestComponent;
 
