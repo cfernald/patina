@@ -66,7 +66,7 @@ pub enum EfiError {
     /// A protocol error occurred during the network operation.
     ProtocolError,
     /// A function encountered an internal version that was incompatible with a version requested by the caller.
-    IncompatibleError,
+    IncompatibleVersion,
     /// The function was not performed due to a security violation.
     SecurityViolation,
     /// A CRC error was detected.
@@ -121,7 +121,7 @@ impl EfiError {
             efi::Status::ICMP_ERROR => Err(EfiError::IcmpError),
             efi::Status::TFTP_ERROR => Err(EfiError::TftpError),
             efi::Status::PROTOCOL_ERROR => Err(EfiError::ProtocolError),
-            efi::Status::INCOMPATIBLE_VERSION => Err(EfiError::IncompatibleError),
+            efi::Status::INCOMPATIBLE_VERSION => Err(EfiError::IncompatibleVersion),
             efi::Status::SECURITY_VIOLATION => Err(EfiError::SecurityViolation),
             efi::Status::CRC_ERROR => Err(EfiError::CrcError),
             efi::Status::END_OF_MEDIA => Err(EfiError::EndOfMedia),
@@ -162,7 +162,7 @@ impl From<EfiError> for efi::Status {
             EfiError::IcmpError => efi::Status::ICMP_ERROR,
             EfiError::TftpError => efi::Status::TFTP_ERROR,
             EfiError::ProtocolError => efi::Status::PROTOCOL_ERROR,
-            EfiError::IncompatibleError => efi::Status::INCOMPATIBLE_VERSION,
+            EfiError::IncompatibleVersion => efi::Status::INCOMPATIBLE_VERSION,
             EfiError::SecurityViolation => efi::Status::SECURITY_VIOLATION,
             EfiError::CrcError => efi::Status::CRC_ERROR,
             EfiError::EndOfMedia => efi::Status::END_OF_MEDIA,
