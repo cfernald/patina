@@ -14,8 +14,8 @@ use crate::{
 };
 
 use core::{ffi::c_void, mem};
+use patina::standard::efi;
 use patina::uefi_protocol::ProtocolInterface;
-use r_efi::efi;
 
 use crate::{
     acpi::STANDARD_ACPI_PROVIDER,
@@ -54,12 +54,12 @@ impl AcpiTableProtocol {
     ///
     /// # Errors
     ///
-    /// Returns [`INVALID_PARAMETER`](r_efi::efi::Status::INVALID_PARAMETER) the table buffer is null or too small to contain the ACPI table header.
-    /// Returns [`UNSUPPORTED`](r_efi::efi::Status::UNSUPPORTED) if the system page size is not 64B-aligned (required for FACS in ACPI 2.0+).
-    /// Returns [`UNSUPPORTED`](r_efi::efi::Status::UNSUPPORTED) if boot services cannot install the given table format.
-    /// Returns [`OUT_OF_RESOURCES`](r_efi::efi::Status::OUT_OF_RESOURCES) if allocating memory for the table fails.
-    /// Returns [`ALREADY_STARTED`](r_efi::efi::Status::ALREADY_STARTED) if the FADT already exists and `install` is called on a FADT again.
-    /// Returns [`NOT_STARTED`](r_efi::efi::Status::NOT_STARTED) if memory or boot services are not properly initialized.
+    /// Returns [`INVALID_PARAMETER`](efi::Status::INVALID_PARAMETER) the table buffer is null or too small to contain the ACPI table header.
+    /// Returns [`UNSUPPORTED`](efi::Status::UNSUPPORTED) if the system page size is not 64B-aligned (required for FACS in ACPI 2.0+).
+    /// Returns [`UNSUPPORTED`](efi::Status::UNSUPPORTED) if boot services cannot install the given table format.
+    /// Returns [`OUT_OF_RESOURCES`](efi::Status::OUT_OF_RESOURCES) if allocating memory for the table fails.
+    /// Returns [`ALREADY_STARTED`](efi::Status::ALREADY_STARTED) if the FADT already exists and `install` is called on a FADT again.
+    /// Returns [`NOT_STARTED`](efi::Status::NOT_STARTED) if memory or boot services are not properly initialized.
     extern "efiapi" fn install_acpi_table_ext(
         _protocol: *const AcpiTableProtocol,
         acpi_table_buffer: *const c_void,
@@ -139,8 +139,8 @@ impl AcpiTableProtocol {
     ///
     /// # Errors
     ///
-    /// Returns [`INVALID_PARAMETER`](r_efi::efi::Status::INVALID_PARAMETER) if the table key does not correspond to an installed table.
-    /// Returns [`OUT_OF_RESOURCES`](r_efi::efi::Status::OUT_OF_RESOURCES) if memory operations fail.
+    /// Returns [`INVALID_PARAMETER`](efi::Status::INVALID_PARAMETER) if the table key does not correspond to an installed table.
+    /// Returns [`OUT_OF_RESOURCES`](efi::Status::OUT_OF_RESOURCES) if memory operations fail.
     extern "efiapi" fn uninstall_acpi_table_ext(_protocol: *const AcpiTableProtocol, table_key: usize) -> efi::Status {
         match STANDARD_ACPI_PROVIDER.uninstall_acpi_table(TableKey(table_key)) {
             Ok(_) => {
@@ -188,9 +188,9 @@ impl AcpiGetProtocol {
     ///
     /// # Errors
     ///
-    /// Returns [`INVALID_PARAMETER`](r_efi::efi::Status::INVALID_PARAMETER) the index is out of bounds of the list of installed tables.
-    /// Returns [`INVALID_PARAMETER`](r_efi::efi::Status::INVALID_PARAMETER) any input or output parameters are null.
-    /// Returns [`OUT_OF_RESOURCES`](r_efi::efi::Status::OUT_OF_RESOURCES) if memory operations fail.
+    /// Returns [`INVALID_PARAMETER`](efi::Status::INVALID_PARAMETER) the index is out of bounds of the list of installed tables.
+    /// Returns [`INVALID_PARAMETER`](efi::Status::INVALID_PARAMETER) any input or output parameters are null.
+    /// Returns [`OUT_OF_RESOURCES`](efi::Status::OUT_OF_RESOURCES) if memory operations fail.
     extern "efiapi" fn get_acpi_table_ext(
         index: usize,
         table: *mut *mut AcpiTableHeader,
@@ -236,8 +236,8 @@ impl AcpiGetProtocol {
     ///
     /// # Errors
     ///
-    /// Returns [`INVALID_PARAMETER`](r_efi::efi::Status::INVALID_PARAMETER) if there is an attempt to unregister a notify function that was never registered.
-    /// Returns [`INVALID_PARAMETER`](r_efi::efi::Status::INVALID_PARAMETER) if the notify function pointer is null or does not match the standard notify function signature.
+    /// Returns [`INVALID_PARAMETER`](efi::Status::INVALID_PARAMETER) if there is an attempt to unregister a notify function that was never registered.
+    /// Returns [`INVALID_PARAMETER`](efi::Status::INVALID_PARAMETER) if the notify function pointer is null or does not match the standard notify function signature.
     extern "efiapi" fn register_notify_ext(register: bool, notify_fn: *const AcpiNotifyFnExt) -> efi::Status {
         // SAFETY: the caller must pass in a valid pointer to a notify function
         let rust_fn: AcpiNotifyFn = match unsafe { notify_fn.as_ref() } {

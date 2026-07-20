@@ -8,7 +8,7 @@
 //!
 use core::{ffi::c_void, ptr::NonNull};
 
-use r_efi::efi;
+use crate::standard::efi;
 
 /// Represents a registration handle for protocol notifications in the UEFI system.
 pub type Registration = NonNull<c_void>;

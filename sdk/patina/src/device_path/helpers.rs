@@ -9,6 +9,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
+use crate::standard::efi;
 use crate::{
     boot_services::BootServices,
     device_path::{
@@ -17,7 +18,6 @@ use crate::{
     },
     error::{EfiError, Result},
 };
-use r_efi::efi;
 
 /// Returns true if the device path is a partial (short-form) device path.
 ///

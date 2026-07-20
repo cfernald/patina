@@ -18,13 +18,13 @@ use core::{
 };
 
 use alloc::string::ToString;
+use patina::standard::efi;
 use patina::{
     Char8Str,
     component::service::{Service, performance::PerformanceManager},
     performance::{error::Error, measurement::CallerIdentifier, record::known::KnownPerfId},
     uefi_protocol::performance_measurement::PerfAttribute,
 };
-use r_efi::efi;
 
 /// Global holder for the performance service so the C-ABI protocol function can reach it.
 ///

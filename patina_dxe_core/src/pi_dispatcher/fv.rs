@@ -22,8 +22,8 @@ use patina::{
 };
 
 use patina::error::EfiError;
+use patina::standard::efi::{self, MEMORY_MAPPED_IO};
 use patina_ffs::{file::FileRef, section::SectionExtractor, volume::VolumeRef};
-use r_efi::efi::{self, MEMORY_MAPPED_IO};
 
 use crate::{
     Core, PlatformInfo,

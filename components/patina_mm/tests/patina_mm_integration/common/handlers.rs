@@ -17,7 +17,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 
 use crate::patina_mm_integration::common::constants::*;
-use r_efi::efi;
+use patina::standard::efi;
 
 extern crate alloc;
 use alloc::{string::String, vec::Vec};

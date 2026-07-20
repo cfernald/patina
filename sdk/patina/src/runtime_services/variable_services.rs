@@ -1,8 +1,8 @@
 use core::mem;
 
+use crate::standard::efi::{self, Guid};
 use alloc::{vec, vec::Vec};
 use fallible_streaming_iterator::FallibleStreamingIterator;
-use r_efi::efi::{self, Guid};
 
 use super::RuntimeServices;
 
@@ -155,7 +155,7 @@ impl<R: RuntimeServices> FallibleStreamingIterator for VariableNameIterator<'_, 
 #[cfg(test)]
 #[cfg_attr(coverage, coverage(off))]
 mod test {
-    use r_efi::efi;
+    use crate::standard::efi;
 
     use super::*;
     use crate::runtime_services::{

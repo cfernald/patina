@@ -16,7 +16,7 @@ use patina::error::EfiError;
 use patina_ffs::volume::VolumeRef;
 
 use patina::pi::dxe_services;
-use r_efi::efi;
+use patina::standard::efi;
 
 use crate::{Core, GCD, PlatformInfo, allocator::core_allocate_pool, config_tables, gcd, systemtables::EfiSystemTable};
 

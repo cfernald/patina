@@ -11,7 +11,7 @@
 //!
 use core::{mem::size_of, slice, sync::atomic::Ordering};
 use patina::error::{EfiError, Result};
-use r_efi::efi;
+use patina::standard::efi;
 use zerocopy::FromBytes;
 
 use crate::memory_log::{AdvLoggerInfoRef, AdvLoggerMessageEntry, LogEntry};

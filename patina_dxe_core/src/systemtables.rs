@@ -11,8 +11,8 @@
 use core::{ffi::c_void, mem::size_of, slice::from_raw_parts};
 
 use alloc::boxed::Box;
+use patina::standard::efi;
 use patina::{boot_services::BootServices, component::component, pi::error_codes::EFI_NOT_AVAILABLE_YET};
-use r_efi::efi;
 
 use crate::{allocator::EFI_RUNTIME_SERVICES_DATA_ALLOCATOR, tpl_mutex};
 

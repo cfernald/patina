@@ -71,7 +71,7 @@ pub enum SmbiosError {
     TableDirectlyModified,
 }
 
-impl From<SmbiosError> for r_efi::efi::Status {
+impl From<SmbiosError> for patina::standard::efi::Status {
     fn from(error: SmbiosError) -> Self {
         let efi_error: patina::error::EfiError = error.into();
         efi_error.into()
@@ -225,7 +225,7 @@ mod tests {
 
     #[test]
     fn test_smbios_error_to_efi_status_conversion() {
-        use r_efi::efi;
+        use patina::standard::efi;
 
         // Verify the SmbiosError -> efi::Status conversion produces the same result
         // as going through SmbiosError -> EfiError -> efi::Status manually.

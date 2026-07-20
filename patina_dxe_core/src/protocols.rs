@@ -9,12 +9,12 @@
 use core::{ffi::c_void, mem::size_of, ptr::NonNull};
 
 use alloc::{slice, vec, vec::Vec};
+use patina::standard::efi::{self, protocols::device_path::Protocol};
 use patina::{
     OwnedGuid,
     device_path::walker::{is_device_path_end, remaining_device_path},
     error::EfiError,
 };
-use r_efi::{efi, protocols::device_path::Protocol};
 use tpl_mutex::TplMutex;
 
 use crate::{
@@ -888,7 +888,7 @@ pub fn core_locate_device_path(
     protocol: efi::Guid,
     device_path: NonNull<Protocol>,
 ) -> Result<(NonNull<Protocol>, efi::Handle), EfiError> {
-    let device_path_protocol_guid = &r_efi::protocols::device_path::PROTOCOL_GUID as *const _ as *mut efi::Guid;
+    let device_path_protocol_guid = &efi::protocols::device_path::PROTOCOL_GUID as *const _ as *mut efi::Guid;
 
     let mut best_device: efi::Handle = core::ptr::null_mut();
     let mut best_match: isize = -1;
@@ -897,7 +897,7 @@ pub fn core_locate_device_path(
     let handles = PROTOCOL_DB.locate_handles(Some(protocol))?;
 
     for handle in handles {
-        let mut temp_device_path: *mut r_efi::protocols::device_path::Protocol = core::ptr::null_mut();
+        let mut temp_device_path: *mut efi::protocols::device_path::Protocol = core::ptr::null_mut();
         let temp_device_path_ptr: *mut *mut c_void = &mut temp_device_path as *mut _ as *mut *mut c_void;
         // SAFETY: `handle` comes from `locate_handles` and is valid. `device_path_protocol_guid`
         // points to a valid static GUID. `temp_device_path_ptr` is derived from a local variable
@@ -947,7 +947,7 @@ pub fn core_locate_device_path(
 /// referenced memory is the caller's responsibility.
 unsafe extern "efiapi" fn locate_device_path(
     protocol: *mut efi::Guid,
-    device_path: *mut *mut r_efi::protocols::device_path::Protocol,
+    device_path: *mut *mut efi::protocols::device_path::Protocol,
     device: *mut efi::Handle,
 ) -> efi::Status {
     if protocol.is_null() || device_path.is_null() {

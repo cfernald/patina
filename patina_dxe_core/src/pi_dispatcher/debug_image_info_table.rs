@@ -11,7 +11,7 @@ use core::{
     fmt,
     ptr::{self, NonNull},
 };
-use r_efi::efi;
+use patina::standard::efi;
 use spin::rwlock::RwLock;
 
 /// Default allocation size for the debug image info table.

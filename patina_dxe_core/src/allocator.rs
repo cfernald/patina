@@ -41,7 +41,7 @@ use patina::pi::{
     dxe_services::GcdMemoryType,
     hob::{self, EFiMemoryTypeInformation, Hob, HobList, MEMORY_TYPE_INFO_HOB_GUID},
 };
-use r_efi::{efi, system::TPL_HIGH_LEVEL};
+use patina::standard::efi::{self, TPL_HIGH_LEVEL};
 pub use uefi_allocator::UefiAllocator;
 
 use patina::{
@@ -1642,7 +1642,7 @@ mod tests {
         dxe_services,
         hob::{GUID_EXTENSION, GuidHob, Hob, header},
     };
-    use r_efi::efi;
+    use patina::standard::efi;
 
     enum GcdInit {
         /// Initializes a simple test GCD (via init_test_gcd()) with the given size.

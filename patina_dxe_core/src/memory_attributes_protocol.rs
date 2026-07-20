@@ -14,8 +14,8 @@ use core::{
     ffi::c_void,
     sync::atomic::{AtomicPtr, AtomicUsize, Ordering},
 };
+use patina::standard::efi;
 use patina::{base::UEFI_PAGE_MASK, error::EfiError, function};
-use r_efi::efi;
 
 #[repr(C)]
 pub struct EfiMemoryAttributesProtocolImpl {

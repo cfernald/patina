@@ -16,7 +16,7 @@
 //!
 
 use core::ops::{Deref, DerefMut};
-use patina::{error::EfiError, pi::protocols::cpu_arch::EfiSystemContext};
+use patina::{error::EfiError, pi::protocols::cpu_arch::EfiSystemContext, standard};
 
 mod exception_handling;
 
@@ -47,9 +47,9 @@ cfg_if::cfg_if! {
 }
 
 /// Republished structure for x64 exception context as defined by the UEFI specification.
-pub type ExceptionContextX64 = r_efi::protocols::debug_support::SystemContextX64;
+pub type ExceptionContextX64 = standard::efi::protocols::debug_support::SystemContextX64;
 /// Republished structure for AArch64 exception context as defined by the UEFI specification.
-pub type ExceptionContextAArch64 = r_efi::protocols::debug_support::SystemContextAArch64;
+pub type ExceptionContextAArch64 = standard::efi::protocols::debug_support::SystemContextAArch64;
 
 cfg_if::cfg_if! {
     if #[cfg(any(test, doc))] {

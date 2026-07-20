@@ -11,7 +11,7 @@ use core::{ffi::c_void, ptr};
 
 use alloc::collections::LinkedList;
 use patina::error::EfiError;
-use r_efi::efi;
+use patina::standard::efi;
 use spin::Mutex;
 
 use crate::{events::EVENT_DB, pecoff::relocation::RelocationBlock, protocols::PROTOCOL_DB};

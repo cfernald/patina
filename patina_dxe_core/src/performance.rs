@@ -39,8 +39,8 @@ use patina::{
 
 use crate::{cpu::PerfTimer, protocols::PROTOCOL_DB, tpl_mutex::TplMutex};
 
-use r_efi::{
-    efi,
+use patina::standard::efi::{
+    self,
     protocols::device_path::{Media, TYPE_MEDIA},
 };
 
@@ -590,7 +590,7 @@ pub(crate) fn push_generic_record(buffer: &mut PerformanceRecordBuffer, record_t
 mod tests {
     use super::*;
     use crate::test_support::with_global_lock;
-    use r_efi::efi;
+    use patina::standard::efi;
 
     /// Builds a `CorePerformance` backed by a real FBPT and a fixed-frequency timer for host testing.
     fn test_core_performance() -> CorePerformance {

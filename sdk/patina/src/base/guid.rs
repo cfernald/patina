@@ -43,14 +43,13 @@
 //! > `struct offset 0: [discriminant tag] + [16 bytes efi::Guid data]`
 //!
 //! Note that the enum discriminant adds extra bytes, making it incompatible with C layouts. However, the actual
-//! GUID data inside the enum is still binary compatible with the UEFI Specification and `r_efi::efi::Guid`, it is
-//! just the enum wrapper that adds overhead.
+//! GUID data inside the enum is still binary compatible with the UEFI Specification and `patina::standard::efi::Guid`,
+//! it is just the enum wrapper that adds overhead.
 //!
 //! ## Examples
 //!
 //! ```rust
-//! use patina::{Guid, OwnedGuid, GuidError};
-//! use r_efi::efi;
+//! use patina::{standard::efi, Guid, OwnedGuid, GuidError};
 //!
 //! // Creating from existing efi::Guid reference
 //! let efi_guid = efi::Guid::from_fields(0x550e8400, 0xe29b, 0x41d4, 0xa7, 0x16, &[0x44, 0x66, 0x55, 0x44, 0x00, 0x00]);
@@ -84,7 +83,7 @@
 //!
 
 use crate::error::EfiError;
-use r_efi::efi;
+use crate::standard::efi;
 
 /// The expected number of hexadecimal characters in a valid GUID string representation
 const EXPECTED_HEX_CHARS: usize = 32;
@@ -164,7 +163,7 @@ pub type OwnedGuid = Guid<'static>;
 
 /// A binary-compatible GUID wrapper for use in `#[repr(C)]` structures.
 ///
-/// This type is a transparent wrapper around `r_efi::efi::Guid` that maintains binary
+/// This type is a transparent wrapper around `patina::standard::efi::Guid` that maintains binary
 /// compatibility with C structures while providing zerocopy safety through derive macros.
 ///
 /// # When to use `BinaryGuid`
@@ -183,7 +182,7 @@ pub type OwnedGuid = Guid<'static>;
 ///
 /// ```rust
 /// use patina::BinaryGuid;
-/// use r_efi::efi;
+/// use patina::standard::efi;
 ///
 /// // In structure definitions
 /// #[repr(C)]
@@ -260,23 +259,23 @@ impl BinaryGuid {
         self.0.as_fields()
     }
 
-    /// Get the underlying `r_efi::efi::Guid` value.
+    /// Get the underlying `patina::standard::efi::Guid` value.
     pub const fn into_inner(&self) -> efi::Guid {
         self.0
     }
 
-    /// Get a reference to the underlying `r_efi::efi::Guid`.
+    /// Get a reference to the underlying `patina::standard::efi::Guid`.
     pub const fn as_efi_guid(&self) -> &efi::Guid {
         &self.0
     }
 
-    /// Get a mutable reference to the underlying `r_efi::efi::Guid`.
+    /// Get a mutable reference to the underlying `patina::standard::efi::Guid`.
     pub fn as_mut_efi_guid(&mut self) -> &mut efi::Guid {
         &mut self.0
     }
 }
 
-// Conversions from r_efi::efi::Guid
+// Conversions from crate::standard::efi::Guid
 impl From<efi::Guid> for BinaryGuid {
     fn from(guid: efi::Guid) -> Self {
         Self(guid)
@@ -289,7 +288,7 @@ impl From<&efi::Guid> for BinaryGuid {
     }
 }
 
-// Conversions to r_efi::efi::Guid
+// Conversions to crate::standard::efi::Guid
 impl From<BinaryGuid> for efi::Guid {
     fn from(guid: BinaryGuid) -> Self {
         guid.0
@@ -401,10 +400,10 @@ impl<'a> Guid<'a> {
         }
     }
 
-    /// Convert this GUID to an r_efi::efi::Guid for compatibility with code that directly
+    /// Convert this GUID to an crate::standard::efi::Guid for compatibility with code that directly
     /// interacts with that interface.
     ///
-    /// Creates a new r_efi::efi::Guid with the same value.
+    /// Creates a new crate::standard::efi::Guid with the same value.
     pub fn to_efi_guid(&self) -> efi::Guid {
         match self {
             Self::Borrowed(guid) => **guid,
@@ -578,7 +577,7 @@ macro_rules! parse_hex {
 // All byte accesses are guarded by `while i < s.len()` and `char_count < EXPECTED_HEX_CHARS`.
 // .get() cannot be used here because it is not const-stable.
 #[allow(clippy::indexing_slicing)]
-const fn guid_from_str(s: &str) -> core::result::Result<r_efi::efi::Guid, GuidError> {
+const fn guid_from_str(s: &str) -> core::result::Result<crate::standard::efi::Guid, GuidError> {
     let mut chars = [' '; EXPECTED_HEX_CHARS];
     let mut char_count = 0;
     let bytes = s.as_bytes();
@@ -621,7 +620,14 @@ const fn guid_from_str(s: &str) -> core::result::Result<r_efi::efi::Guid, GuidEr
         parse_hex!(chars, 30, 2, u8),
     ];
 
-    Ok(r_efi::efi::Guid::from_fields(time_low, time_mid, time_hi_and_version, clk_seq_hi_res, clk_seq_low, &node))
+    Ok(crate::standard::efi::Guid::from_fields(
+        time_low,
+        time_mid,
+        time_hi_and_version,
+        clk_seq_hi_res,
+        clk_seq_low,
+        &node,
+    ))
 }
 
 /// Converts a single hex character (represented as a char) to its corresponding u8 value
@@ -642,8 +648,8 @@ const fn char_to_val(c: char) -> u8 {
 #[cfg_attr(coverage, coverage(off))]
 mod tests {
     use super::*;
+    use crate::standard::efi as r_efi_base;
     use core::mem::{align_of, size_of};
-    use r_efi::base as r_efi_base;
 
     const TEST_GUID_FIELDS: (u32, u16, u16, u8, u8, &[u8; 6]) =
         (0x550e8400, 0xe29b, 0x41d4, 0xa7, 0x16, &[0x44, 0x66, 0x55, 0x44, 0x00, 0x00]);
@@ -687,7 +693,7 @@ mod tests {
         // Both variants must produce identical byte representation
         assert_eq!(patina_guid_from_ref.as_bytes(), patina_guid_from_string.as_bytes());
 
-        // Memory layout with r_efi::efi::Guid should be the same
+        // Memory layout with crate::standard::efi::Guid should be the same
         assert_eq!(patina_guid_from_ref.as_bytes(), *r_efi_guid.as_bytes());
         assert_eq!(patina_guid_from_string.as_bytes(), *r_efi_guid.as_bytes());
 
@@ -701,7 +707,7 @@ mod tests {
         }
 
         let bytes_from_patina = patina_guid_from_ref.as_bytes();
-        let roundtrip_r_efi = r_efi::efi::Guid::from_bytes(&bytes_from_patina);
+        let roundtrip_r_efi = crate::standard::efi::Guid::from_bytes(&bytes_from_patina);
         assert_eq!(roundtrip_r_efi.as_bytes(), r_efi_guid.as_bytes());
     }
 
@@ -1206,7 +1212,7 @@ mod tests {
         assert_eq!(from_bytes_guid.as_bytes(), expected_bytes);
         assert_eq!(r_efi_guid.as_bytes(), &expected_bytes);
 
-        // SAFETY: r_efi_ptr points to a valid r_efi::Guid with a known size of 16 bytes.
+        // SAFETY: r_efi_ptr points to a valid crate::standard::Guid with a known size of 16 bytes.
         // The memory representation is being read to verify it matches the expected bytes.
         unsafe {
             let r_efi_ptr = &r_efi_guid as *const r_efi_base::Guid;
@@ -1732,12 +1738,12 @@ mod tests {
 
         // 6: Check transmutation is as expected
         //    This doesn't perform an actual transmute, but checks that the memory
-        //    representation is identical with `r_efi::efi::Guid`
+        //    representation is identical with `patina::standard::efi::Guid`
         let efi_guid = create_test_r_efi_guid();
         let binary_guid_from_efi = BinaryGuid::from(efi_guid);
 
         // SAFETY: Both pointers reference valid GUID structures. \16 bytes from each to verify that
-        // BinaryGuid maintains binary compatibility with r_efi::efi::Guid.
+        // BinaryGuid maintains binary compatibility with crate::standard::efi::Guid.
         unsafe {
             let efi_bytes = core::slice::from_raw_parts(&efi_guid as *const _ as *const u8, 16);
             let binary_bytes = core::slice::from_raw_parts(&binary_guid_from_efi as *const _ as *const u8, 16);

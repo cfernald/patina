@@ -17,11 +17,11 @@ use core::{
     mem::size_of,
     sync::atomic::{AtomicU32, AtomicU64, Ordering},
 };
+use patina::standard::efi;
 use patina::{
     base::align_up,
     error::{EfiError, Result},
 };
-use r_efi::efi;
 use zerocopy_derive::*;
 
 // { 0x4d60cfb5, 0xf481, 0x4a98, {0x9c, 0x81, 0xbf, 0xf8, 0x64, 0x60, 0xc4, 0x3e }}

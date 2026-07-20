@@ -11,6 +11,7 @@
 extern crate alloc;
 
 use crate::tpl_mutex::TplMutex;
+use patina::standard::efi;
 use patina::{
     boot_services::StandardBootServices,
     component::{IntoComponent, Storage, service::IntoService},
@@ -18,7 +19,6 @@ use patina::{
     pi::hob::HobList,
     runtime_services::StandardRuntimeServices,
 };
-use r_efi::efi;
 
 use alloc::{borrow::Cow, boxed::Box, vec::Vec};
 

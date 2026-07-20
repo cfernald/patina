@@ -20,7 +20,7 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use r_efi::efi;
+use patina::standard::efi;
 
 use crate::events::{raise_tpl, restore_tpl};
 
@@ -146,7 +146,7 @@ mod tests {
     };
 
     use super::TplMutex;
-    use r_efi::efi;
+    use patina::standard::efi;
 
     fn with_reset_state<F: Fn() + std::panic::RefUnwindSafe>(f: F) {
         let result = crate::test_support::with_global_lock(|| {

@@ -12,7 +12,6 @@ log = { workspace = true }
 mockall = { workspace = true, optional = true }
 patina = { workspace = true }
 patina_macro = { workspace = true }
-r-efi = { workspace = true }
 zerocopy = { workspace = true }
 zerocopy-derive = { workspace = true }
 bitfield-struct = { workspace = true }

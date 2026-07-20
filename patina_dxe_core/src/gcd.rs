@@ -14,6 +14,7 @@ use goblin::pe::section_table;
 
 use alloc::boxed::Box;
 use core::{cell::Cell, ffi::c_void, ops::Range};
+use patina::standard::efi;
 use patina::{
     base::{DEFAULT_CACHE_ATTR, align_down, align_up},
     error::EfiError,
@@ -23,7 +24,6 @@ use patina::{
     },
 };
 use patina_internal_cpu::paging::{PatinaPageTable, create_cpu_paging};
-use r_efi::efi;
 
 #[cfg(feature = "compatibility_mode_allowed")]
 use patina::base::{UEFI_PAGE_SIZE, align_range};

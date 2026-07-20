@@ -7,6 +7,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 use alloc::boxed::Box;
+use patina::standard::efi;
 use patina::{
     base::{UEFI_PAGE_MASK, UEFI_PAGE_SIZE},
     component::service::{
@@ -21,7 +22,6 @@ use patina::{
     uefi_pages_to_size,
 };
 use patina_test::{patina_test, u_assert, u_assert_eq};
-use r_efi::efi;
 
 use crate::{
     GCD,

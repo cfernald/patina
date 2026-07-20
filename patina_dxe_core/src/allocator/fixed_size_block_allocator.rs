@@ -27,13 +27,13 @@ use core::{
     result::Result,
 };
 use linked_list_allocator::{align_down_size, align_up_size};
+use patina::standard::efi;
 use patina::{
     base::{UEFI_PAGE_SIZE, align_up, page_shift_from_alignment},
     error::EfiError,
     pi::dxe_services::GcdMemoryType,
     uefi_pages_to_size, uefi_size_to_pages, writelncrlf,
 };
-use r_efi::efi;
 
 /// Type for describing errors that this implementation can produce.
 #[derive(Debug, PartialEq)]

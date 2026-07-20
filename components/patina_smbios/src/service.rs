@@ -14,7 +14,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use core::cell::Ref;
 use patina::boot_services::{BootServices, StandardBootServices};
-use r_efi::{efi::Handle, system::SMBIOS3_TABLE_GUID};
+use patina::standard::efi::{self, Handle, SMBIOS3_TABLE_GUID};
 use zerocopy_derive::*;
 
 #[cfg(any(test, feature = "mockall"))]
@@ -132,7 +132,7 @@ pub trait Smbios {
     /// Returns `SmbiosError` if no records, allocation fails, or installation fails.
     fn publish_table(
         &self,
-    ) -> core::result::Result<(r_efi::efi::PhysicalAddress, r_efi::efi::PhysicalAddress), crate::error::SmbiosError>;
+    ) -> core::result::Result<(efi::PhysicalAddress, efi::PhysicalAddress), crate::error::SmbiosError>;
 
     /// Updates a string in an existing SMBIOS record.
     ///
@@ -165,7 +165,7 @@ pub trait Smbios {
     /// * `bytes` - Serialized SMBIOS record bytes
     fn add_from_bytes(
         &self,
-        producer_handle: Option<r_efi::efi::Handle>,
+        producer_handle: Option<efi::Handle>,
         bytes: &[u8],
     ) -> core::result::Result<SmbiosHandle, crate::error::SmbiosError>;
 }
@@ -222,8 +222,7 @@ impl<B: BootServices> Smbios for SmbiosImpl<B> {
 
     fn publish_table(
         &self,
-    ) -> core::result::Result<(r_efi::efi::PhysicalAddress, r_efi::efi::PhysicalAddress), crate::error::SmbiosError>
-    {
+    ) -> core::result::Result<(efi::PhysicalAddress, efi::PhysicalAddress), crate::error::SmbiosError> {
         // Table addresses are stored before calling install_configuration_table.
         // install_configuration_table triggers EVENT_DB.signal_group, which may invoke
         // event handlers that call SMBIOS Add/Update/Remove, triggering republish_table.
@@ -276,7 +275,7 @@ impl<B: BootServices> Smbios for SmbiosImpl<B> {
 
     fn add_from_bytes(
         &self,
-        producer_handle: Option<r_efi::efi::Handle>,
+        producer_handle: Option<efi::Handle>,
         bytes: &[u8],
     ) -> core::result::Result<SmbiosHandle, crate::error::SmbiosError> {
         let handle = {
@@ -322,7 +321,7 @@ pub trait SmbiosExt {
     /// Returns the assigned SMBIOS handle for the newly added record.
     fn add_record<T>(
         &self,
-        producer_handle: Option<r_efi::efi::Handle>,
+        producer_handle: Option<efi::Handle>,
         record: &T,
     ) -> core::result::Result<SmbiosHandle, crate::error::SmbiosError>
     where
@@ -333,7 +332,7 @@ pub trait SmbiosExt {
 impl SmbiosExt for patina::component::service::Service<dyn Smbios> {
     fn add_record<T>(
         &self,
-        producer_handle: Option<r_efi::efi::Handle>,
+        producer_handle: Option<efi::Handle>,
         record: &T,
     ) -> core::result::Result<SmbiosHandle, crate::error::SmbiosError>
     where
@@ -519,8 +518,7 @@ mod tests {
 
         fn publish_table(
             &self,
-        ) -> core::result::Result<(r_efi::efi::PhysicalAddress, r_efi::efi::PhysicalAddress), crate::error::SmbiosError>
-        {
+        ) -> core::result::Result<(efi::PhysicalAddress, efi::PhysicalAddress), crate::error::SmbiosError> {
             Ok((0x1000, 0x2000))
         }
 
@@ -539,7 +537,7 @@ mod tests {
 
         fn add_from_bytes(
             &self,
-            _producer_handle: Option<r_efi::efi::Handle>,
+            _producer_handle: Option<efi::Handle>,
             bytes: &[u8],
         ) -> core::result::Result<SmbiosHandle, crate::error::SmbiosError> {
             // Verify expected bytes if provided

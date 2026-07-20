@@ -8,9 +8,8 @@
 //!
 use core::{ffi::c_void, mem, ops::BitOr};
 
+use crate::standard::efi;
 use crate::{bit, performance::record::known::KnownPerfId};
-
-use r_efi::efi;
 
 /// Represents the `caller_identifier` used in performance measurements.
 /// Due to legacy reasons, this can either be an handle or a pointer to a GUID.

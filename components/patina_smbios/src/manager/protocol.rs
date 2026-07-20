@@ -18,8 +18,8 @@ extern crate alloc;
 use core::ffi::c_char;
 
 use alloc::string::ToString;
+use patina::standard::efi;
 use patina::{Char8Str, tpl_mutex::TplMutex, uefi_protocol::ProtocolInterface};
-use r_efi::efi;
 
 use crate::service::{SMBIOS_HANDLE_PI_RESERVED, SmbiosHandle, SmbiosTableHeader, SmbiosType};
 

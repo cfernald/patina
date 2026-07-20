@@ -30,7 +30,7 @@ use patina::{
     writelncrlf,
 };
 
-use r_efi::efi::EVENT_GROUP_READY_TO_BOOT;
+use patina::standard::efi::EVENT_GROUP_READY_TO_BOOT;
 
 /// A structure containing all necessary data to execute a test at any time.
 #[derive(Clone)]
@@ -152,7 +152,10 @@ impl TestRecord {
     }
 
     /// EFIAPI event callback to locate a specific test and run it.
-    extern "efiapi" fn run_test(_: r_efi::efi::Event, &(test, mut storage): &'static (&'static str, NonNull<Storage>)) {
+    extern "efiapi" fn run_test(
+        _: patina::standard::efi::Event,
+        &(test, mut storage): &'static (&'static str, NonNull<Storage>),
+    ) {
         // SAFETY: Storage is a valid pointer as the pointer is generated from a static reference.
         let storage = unsafe { storage.as_mut() };
 
@@ -163,9 +166,10 @@ impl TestRecord {
 
     #[cfg_attr(coverage, coverage(off))]
     /// An EFIAPI compatible event callback to disable a timer event at ReadyToBoot
-    extern "efiapi" fn disable_timer(rtb_event: r_efi::efi::Event, context: *mut core::ffi::c_void) {
+    extern "efiapi" fn disable_timer(rtb_event: patina::standard::efi::Event, context: *mut core::ffi::c_void) {
         // SAFETY: We set up the context pointer in `run_tests` to point to a valid tuple of (Event, StandardBootServices).
-        let (timer_event, boot_services) = unsafe { &mut *(context as *mut (r_efi::efi::Event, StandardBootServices)) };
+        let (timer_event, boot_services) =
+            unsafe { &mut *(context as *mut (patina::standard::efi::Event, StandardBootServices)) };
         let _ = boot_services.set_timer(*timer_event, EventTimerType::Cancel, 0);
         let _ = boot_services.close_event(rtb_event);
     }
@@ -257,7 +261,7 @@ impl Recorder {
     }
 
     /// An EFIAPI compatible event callback to run the manually triggered tests and log the current results of patina-test
-    extern "efiapi" fn run_tests_and_report(event: r_efi::efi::Event, mut storage: NonNull<Storage>) {
+    extern "efiapi" fn run_tests_and_report(event: patina::standard::efi::Event, mut storage: NonNull<Storage>) {
         // SAFETY: event callbacks are executed in series, so there exists no other mutable access to storage.
         let storage = unsafe { storage.as_mut() };
 
@@ -399,13 +403,13 @@ mod tests {
 
     #[test]
     fn test_efiapi_run_tests_and_report() {
-        let bs: MaybeUninit<r_efi::efi::BootServices> = MaybeUninit::uninit();
+        let bs: MaybeUninit<patina::standard::efi::BootServices> = MaybeUninit::uninit();
         // SAFETY: This is very unsafe, because it is not initialized, however this code path only calls create_event
         // create_event_ex, and set_timer which we will fill in with no-op functions.
         let mut bs = unsafe { bs.assume_init() };
 
-        extern "efiapi" fn noop_close_event(_: r_efi::efi::Event) -> r_efi::efi::Status {
-            r_efi::efi::Status::SUCCESS
+        extern "efiapi" fn noop_close_event(_: patina::standard::efi::Event) -> patina::standard::efi::Status {
+            patina::standard::efi::Status::SUCCESS
         }
 
         bs.close_event = noop_close_event;

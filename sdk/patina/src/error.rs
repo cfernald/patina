@@ -10,7 +10,7 @@
 /// A specialized [`Result`](core::result::Result) type for EFI operations.
 pub type Result<T> = core::result::Result<T, EfiError>;
 
-use r_efi::efi;
+use crate::standard::efi;
 // TODO: Handle difference between warning and error
 
 /// EDK II Error Code equivalent as a Rust Error enum
@@ -89,7 +89,7 @@ pub enum EfiError {
 }
 
 impl EfiError {
-    /// Converts an `r_efi::efi::Status` to a `Result`.
+    /// Converts an `patina::standard::efi::Status` to a `Result`.
     ///
     /// If the status is `SUCCESS`, it returns `Ok(val)`.
     /// Otherwise, it returns an `Err` with the corresponding `EfiError`.

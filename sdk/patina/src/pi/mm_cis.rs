@@ -11,14 +11,14 @@
 //!
 
 use crate::pi::spec_version;
-use core::ffi::c_void;
-use r_efi::{
+use crate::standard::{
     efi,
     efi::{
         BootAllocatePages, BootAllocatePool, BootFreePages, BootFreePool, BootHandleProtocol,
         BootInstallProtocolInterface, BootLocateHandle, BootLocateProtocol, BootUninstallProtocolInterface,
     },
 };
+use core::ffi::c_void;
 
 /// MMST signature: `'S', 'M', 'S', 'T'` (same as C `MM_MMST_SIGNATURE`).
 pub const MM_MMST_SIGNATURE: u32 = u32::from_le_bytes([b'S', b'M', b'S', b'T']);
@@ -119,22 +119,22 @@ pub type MmInstallConfigurationTableFn = unsafe extern "efiapi" fn(
 
 /// Allocates pool memory from the specified memory type.
 ///
-/// This function matches the C typedef `EFI_MM_ALLOCATE_POOL`, which is already defined in `r_efi::efi` as `BootAllocatePool`.
+/// This function matches the C typedef `EFI_MM_ALLOCATE_POOL`, which is already defined in `patina::standard::efi` as `BootAllocatePool`.
 pub type MmAllocatePoolFn = BootAllocatePool;
 
 /// Frees pool memory.
 ///
-/// This function matches the C typedef `EFI_MM_FREE_POOL`, which is already defined in `r_efi::efi` as `BootFreePool`.
+/// This function matches the C typedef `EFI_MM_FREE_POOL`, which is already defined in `patina::standard::efi` as `BootFreePool`.
 pub type MmFreePoolFn = BootFreePool;
 
 /// Allocates memory pages from the system.
 ///
-/// This function matches the C typedef `EFI_ALLOCATE_PAGES`, which is already defined in `r_efi::efi` as `BootAllocatePages`.
+/// This function matches the C typedef `EFI_ALLOCATE_PAGES`, which is already defined in `patina::standard::efi` as `BootAllocatePages`.
 pub type MmAllocatePagesFn = BootAllocatePages;
 
 /// Frees memory pages.
 ///
-/// This function matches the C typedef `EFI_FREE_PAGES`, which is already defined in `r_efi::efi` as `BootFreePages`.
+/// This function matches the C typedef `EFI_FREE_PAGES`, which is already defined in `patina::standard::efi` as `BootFreePages`.
 pub type MmFreePagesFn = BootFreePages;
 
 /// `EFI_MM_STARTUP_THIS_AP`
@@ -143,17 +143,17 @@ pub type MmStartupThisApFn =
 
 /// Installs a protocol interface on a device handle.
 ///
-/// This function matches the C typedef `EFI_INSTALL_PROTOCOL_INTERFACE`, which is already defined in `r_efi::efi` as `BootInstallProtocolInterface`.
+/// This function matches the C typedef `EFI_INSTALL_PROTOCOL_INTERFACE`, which is already defined in `patina::standard::efi` as `BootInstallProtocolInterface`.
 pub type MmInstallProtocolInterfaceFn = BootInstallProtocolInterface;
 
 /// Removes a protocol interface from a device handle.
 ///
-/// This function matches the C typedef `EFI_UNINSTALL_PROTOCOL_INTERFACE`, which is already defined in `r_efi::efi` as `BootUninstallProtocolInterface`.
+/// This function matches the C typedef `EFI_UNINSTALL_PROTOCOL_INTERFACE`, which is already defined in `patina::standard::efi` as `BootUninstallProtocolInterface`.
 pub type MmUninstallProtocolInterfaceFn = BootUninstallProtocolInterface;
 
 /// Queries a handle to determine if it supports a specified protocol.
 ///
-/// This function matches the C typedef `EFI_HANDLE_PROTOCOL`, which is already defined in `r_efi::efi` as `BootHandleProtocol`.
+/// This function matches the C typedef `EFI_HANDLE_PROTOCOL`, which is already defined in `patina::standard::efi` as `BootHandleProtocol`.
 pub type MmHandleProtocolFn = BootHandleProtocol;
 
 /// Register a callback function be called when a particular protocol interface is installed.
@@ -176,12 +176,12 @@ pub type MmRegisterProtocolNotifyFn = unsafe extern "efiapi" fn(
 
 /// Returns an array of handles that support a specified protocol.
 ///
-/// This function matches the C typedef `EFI_LOCATE_HANDLE`, which is already defined in `r_efi::efi` as `BootLocateHandle`.
+/// This function matches the C typedef `EFI_LOCATE_HANDLE`, which is already defined in `patina::standard::efi` as `BootLocateHandle`.
 pub type MmLocateHandleFn = BootLocateHandle;
 
 /// Returns the first protocol instance that matches the given protocol.
 ///
-/// This function matches the C typedef `EFI_LOCATE_PROTOCOL`, which is already defined in `r_efi::efi` as `BootLocateProtocol`.
+/// This function matches the C typedef `EFI_LOCATE_PROTOCOL`, which is already defined in `patina::standard::efi` as `BootLocateProtocol`.
 pub type MmLocateProtocolFn = BootLocateProtocol;
 
 /// Manage MMI of a particular type.

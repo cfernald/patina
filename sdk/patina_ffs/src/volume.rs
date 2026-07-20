@@ -465,7 +465,7 @@ impl Volume {
     /// use patina_ffs::volume::Volume;
     /// use patina_ffs::file::File;
     /// use patina::pi::fw_fs::{ffs, fv::BlockMapEntry};
-    /// use r_efi::efi;
+    /// use patina::standard::efi;
     ///
     /// let mut fv = Volume::new(vec![BlockMapEntry { num_blocks: 1, length: 4096 }]);
     /// fv.files_mut().push(File::new(patina::BinaryGuid::from_bytes(&[0u8; 16]), ffs::file::raw::r#type::FFS_PAD));
@@ -490,7 +490,7 @@ impl Volume {
     /// use patina_ffs::file::File;
     /// use patina_ffs::section::{Section, SectionHeader};
     /// use patina::pi::fw_fs::{ffs, fv::BlockMapEntry};
-    /// use r_efi::efi;
+    /// use patina::standard::efi;
     ///
     /// // Create a volume and add several files, each with a RAW section.
     /// let mut fv = Volume::new(vec![BlockMapEntry { num_blocks: 4, length: 4096 }]);
@@ -696,7 +696,7 @@ impl Volume {
     /// use patina_ffs::volume::Volume;
     /// use patina_ffs::section::{Section, SectionComposer, SectionHeader};
     /// use patina::pi::fw_fs::{ffs, fv::BlockMapEntry};
-    /// use r_efi::efi;
+    /// use patina::standard::efi;
     ///
     /// struct Passthrough;
     /// impl SectionComposer for Passthrough {
@@ -776,7 +776,7 @@ mod test {
     use log::{self, Level, LevelFilter, Metadata, Record};
     use lzma_rust2::{LzmaOptions, LzmaReader, LzmaWriter, Read, Write};
     use patina::pi::fw_fs::{self, ffs, fv};
-    use r_efi::efi;
+    use patina::standard::efi;
     use serde::Deserialize;
     use std::{
         collections::HashMap,

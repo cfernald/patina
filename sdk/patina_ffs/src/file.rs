@@ -54,7 +54,7 @@ impl<'a> FileRef<'a> {
     ///
     /// ```rust no_run
     /// use patina_ffs::file::{File, FileRef};
-    /// use r_efi::efi;
+    /// use patina::standard::efi;
     /// use patina::pi::fw_fs::ffs;
     /// use patina_ffs::section::{Section, SectionHeader};
     ///
@@ -235,7 +235,7 @@ impl<'a> FileRef<'a> {
     ///
     /// ```rust no_run
     /// use patina::pi::fw_fs::ffs;
-    /// use r_efi::efi;
+    /// use patina::standard::efi;
     /// use patina_ffs::file::{File, FileRef};
     /// use patina_ffs::FirmwareFileSystemError;
     /// use patina_ffs::section::{Section, SectionHeader, SectionExtractor};
@@ -321,7 +321,7 @@ impl File {
     ///
     /// ```rust no_run
     /// use patina::pi::fw_fs::ffs;
-    /// use r_efi::efi;
+    /// use patina::standard::efi;
     /// use patina_ffs::file::File;
     /// use patina_ffs::section::{Section, SectionHeader};
     ///
@@ -522,7 +522,7 @@ impl File {
     ///
     /// ```rust no_run
     /// use patina::pi::fw_fs::ffs;
-    /// use r_efi::efi;
+    /// use patina::standard::efi;
     /// use patina_ffs::file::File;
     /// use patina_ffs::section::{Section, SectionHeader, SectionComposer};
     /// use patina_ffs::section::{SectionHeader as SH};
@@ -559,7 +559,7 @@ impl File {
     ///
     /// ```rust no_run
     /// use patina::pi::fw_fs::ffs;
-    /// use r_efi::efi;
+    /// use patina::standard::efi;
     /// use patina_ffs::file::File;
     /// use patina_ffs::section::{Section, SectionHeader, SectionComposer};
     /// use patina_ffs::section::SectionHeader as SH;

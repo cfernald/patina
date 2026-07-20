@@ -14,7 +14,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-use r_efi::efi;
+use crate::standard::efi;
 
 /// Security Arch Protocol GUID.
 pub const PROTOCOL_GUID: crate::BinaryGuid = crate::BinaryGuid::from_string("A46423E3-4617-49F1-B9FF-D1BFA9115839");

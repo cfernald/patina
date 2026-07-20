@@ -60,6 +60,7 @@ pub mod pi;
 #[cfg(any(test, feature = "alloc"))]
 pub mod runtime_services;
 pub mod serial;
+pub mod standard;
 #[cfg(any(test, feature = "alloc"))]
 pub mod tpl_mutex;
 pub mod uefi_decompress;

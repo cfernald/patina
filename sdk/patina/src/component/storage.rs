@@ -215,7 +215,7 @@ pub struct Storage {
     // Standard Runtime Services.
     runtime_services: StandardRuntimeServices,
     // Image handle for the DXE Core (used as parent for LoadImage calls).
-    image_handle: Option<r_efi::efi::Handle>,
+    image_handle: Option<crate::standard::efi::Handle>,
 }
 
 impl Default for Storage {
@@ -284,12 +284,12 @@ impl Storage {
     ///
     /// This handle is used as the parent image handle for `LoadImage()` calls
     /// when loading boot applications.
-    pub fn set_image_handle(&mut self, handle: r_efi::efi::Handle) {
+    pub fn set_image_handle(&mut self, handle: crate::standard::efi::Handle) {
         self.image_handle = Some(handle);
     }
 
     /// Returns the image handle for the DXE Core, if set.
-    pub fn image_handle(&self) -> Option<r_efi::efi::Handle> {
+    pub fn image_handle(&self) -> Option<crate::standard::efi::Handle> {
         self.image_handle
     }
 

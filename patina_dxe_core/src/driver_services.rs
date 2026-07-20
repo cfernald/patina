@@ -16,7 +16,7 @@ use patina::{
     error::EfiError,
 };
 
-use r_efi::{efi, protocols::device_path::Protocol};
+use patina::standard::efi::{self, protocols::device_path::Protocol};
 
 use crate::{performance::CORE_PERFORMANCE, protocols::PROTOCOL_DB, systemtables::EfiSystemTable};
 

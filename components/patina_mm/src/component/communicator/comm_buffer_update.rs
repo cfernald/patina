@@ -15,6 +15,7 @@ use patina::{
     base::UEFI_PAGE_SIZE,
     boot_services::{BootServices, StandardBootServices, event::EventType, tpl::Tpl},
     management_mode::protocol::mm_comm_buffer_update::{self, MmCommBufferUpdateProtocol},
+    standard::efi,
 };
 use zerocopy::FromBytes;
 
@@ -164,7 +165,7 @@ pub(super) fn apply_pending_buffer_update(
 ///
 /// ELements of the protocol update process are unit tested but the notification function as a whole is not.
 #[cfg_attr(coverage, coverage(off))]
-extern "efiapi" fn protocol_notify_callback(_event: r_efi::efi::Event, context: &'static ProtocolNotifyContext) {
+extern "efiapi" fn protocol_notify_callback(_event: efi::Event, context: &'static ProtocolNotifyContext) {
     log::trace!(target: "mm_comm", "=== Protocol callback ENTRY ===");
     log::info!(target: "mm_comm", "Protocol notify callback triggered for {}", mm_comm_buffer_update::GUID);
 
@@ -284,8 +285,8 @@ mod tests {
 
     /// Helper to create a test protocol notify context without boot services
     fn create_test_context(updatable_buffer_id: u8) -> Box<ProtocolNotifyContext> {
-        let mock_bs = Box::leak(Box::new([0u8; core::mem::size_of::<r_efi::system::BootServices>()]));
-        let bs_ptr = mock_bs.as_mut_ptr() as *mut r_efi::system::BootServices;
+        let mock_bs = Box::leak(Box::new([0u8; core::mem::size_of::<patina::standard::efi::BootServices>()]));
+        let bs_ptr = mock_bs.as_mut_ptr() as *mut patina::standard::efi::BootServices;
         let bs = StandardBootServices::new(bs_ptr);
 
         Box::new(ProtocolNotifyContext {

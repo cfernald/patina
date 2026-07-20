@@ -54,7 +54,7 @@
 //! ```rust
 //! use patina::guids::ZERO;
 //! use patina::pi::hob;
-//! use r_efi::efi;
+//! use patina::standard::efi;
 //!
 //! let scenario = MemoryMapTestScenario::new("Test Name", 64 * 1024 * 1024) // 64MB
 //!     .with_resource_descriptor(ResourceDescriptorConfig {
@@ -86,7 +86,7 @@
 //!
 //! ```rust
 //! use crate::allocator::memory_map_integration_tests::{MemoryMapTestScenario, MemoryMapValidation};
-//! use r_efi::efi;
+//! use patina::standard::efi;
 //!
 //! // Set up test scenario
 //! let scenario = MemoryMapTestScenario::new("Runtime Services Test", 256 * 1024 * 1024)
@@ -146,6 +146,7 @@ mod tests {
         test_support,
     };
     use alloc::vec::Vec;
+    use patina::standard::efi;
     use patina::{
         base::*,
         guids::ZERO,
@@ -154,7 +155,6 @@ mod tests {
             hob::{self, HobList, PhaseHandoffInformationTable, ResourceDescriptor, header},
         },
     };
-    use r_efi::efi;
     use serial_test::serial;
     use std::panic::RefUnwindSafe;
 
@@ -428,7 +428,7 @@ mod tests {
                         name: patina::guids::HOB_MEMORY_ALLOC_STACK,
                         memory_base_address: stack_base,
                         memory_length: stack_size,
-                        memory_type: r_efi::efi::BOOT_SERVICES_DATA,
+                        memory_type: efi::BOOT_SERVICES_DATA,
                         reserved: Default::default(),
                     },
                 };

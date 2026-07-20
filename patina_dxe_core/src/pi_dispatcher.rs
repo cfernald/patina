@@ -21,6 +21,7 @@ use alloc::{
     vec::Vec,
 };
 use core::{cmp::Ordering, ffi::c_void};
+use patina::standard::efi;
 use patina::{
     BinaryGuid, Char16Str, OwnedGuid,
     component::service::Service,
@@ -37,7 +38,6 @@ use patina_ffs::{
     volume::VolumeRef,
 };
 use patina_internal_core::depex::{AssociatedDependency, Depex, Opcode};
-use r_efi::efi;
 use spin::RwLock;
 
 use image::ImageStatus;
@@ -761,17 +761,17 @@ impl DispatcherContext {
                             // In this case, this is sizeof(guid) + sizeof(protocol) = 20, so it should always fit an u8
                             const FILENAME_NODE_SIZE: usize =
                                 core::mem::size_of::<efi::protocols::device_path::Protocol>()
-                                    + core::mem::size_of::<r_efi::efi::Guid>();
+                                    + core::mem::size_of::<efi::Guid>();
                             // In this case, this is sizeof(protocol) = 4, so it should always fit an u8
                             const END_NODE_SIZE: usize = core::mem::size_of::<efi::protocols::device_path::Protocol>();
 
                             let filename_node = efi::protocols::device_path::Protocol {
-                                r#type: r_efi::protocols::device_path::TYPE_MEDIA,
-                                sub_type: r_efi::protocols::device_path::Media::SUBTYPE_PIWG_FIRMWARE_FILE,
+                                r#type: efi::protocols::device_path::TYPE_MEDIA,
+                                sub_type: efi::protocols::device_path::Media::SUBTYPE_PIWG_FIRMWARE_FILE,
                                 length: [FILENAME_NODE_SIZE as u8, 0x00],
                             };
                             let filename_end_node = efi::protocols::device_path::Protocol {
-                                r#type: r_efi::protocols::device_path::TYPE_END,
+                                r#type: efi::protocols::device_path::TYPE_END,
                                 sub_type: efi::protocols::device_path::End::SUBTYPE_ENTIRE,
                                 length: [END_NODE_SIZE as u8, 0x00],
                             };
@@ -1479,14 +1479,8 @@ mod tests {
             );
 
             // Check that a non-existent FV GUID is not detected
-            let non_existent_guid = r_efi::efi::Guid::from_fields(
-                0x11111111,
-                0x2222,
-                0x3333,
-                0x44,
-                0x55,
-                &[0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB],
-            );
+            let non_existent_guid =
+                efi::Guid::from_fields(0x11111111, 0x2222, 0x3333, 0x44, 0x55, &[0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB]);
             assert!(
                 !CORE.pi_dispatcher.is_fv_already_installed(non_existent_guid),
                 "Should return false for non-existent FV GUID"
@@ -1506,7 +1500,7 @@ mod tests {
             CORE.override_instance();
             // Test that no FVB handles installed returns false
             assert!(
-                !CORE.pi_dispatcher.is_fv_already_installed(r_efi::efi::Guid::from_fields(
+                !CORE.pi_dispatcher.is_fv_already_installed(efi::Guid::from_fields(
                     0xAAAAAAAA,
                     0xBBBB,
                     0xCCCC,
@@ -1530,7 +1524,7 @@ mod tests {
 
             // Test that a non-matching GUID returns false
             assert!(
-                !CORE.pi_dispatcher.is_fv_already_installed(r_efi::efi::Guid::from_fields(
+                !CORE.pi_dispatcher.is_fv_already_installed(efi::Guid::from_fields(
                     0x11111111,
                     0x2222,
                     0x3333,
@@ -1666,14 +1660,8 @@ mod tests {
                 .expect("Failed to install null protocol");
 
             // Should return false since the FVB protocol is null
-            let test_guid = r_efi::efi::Guid::from_fields(
-                0xAAAAAAAA,
-                0xBBBB,
-                0xCCCC,
-                0xDD,
-                0xEE,
-                &[0xFF, 0x00, 0x11, 0x22, 0x33, 0x44],
-            );
+            let test_guid =
+                efi::Guid::from_fields(0xAAAAAAAA, 0xBBBB, 0xCCCC, 0xDD, 0xEE, &[0xFF, 0x00, 0x11, 0x22, 0x33, 0x44]);
             assert!(
                 !CORE.pi_dispatcher.is_fv_already_installed(test_guid),
                 "Should return false when the FVB protocol is null"
@@ -1710,14 +1698,8 @@ mod tests {
             // SAFETY: protocol was retrieved from PROTOCOL_DB and remains valid for this test scope.
             unsafe { &mut *protocol }.get_physical_address = get_physical_address1;
 
-            let test_guid = r_efi::efi::Guid::from_fields(
-                0xAAAAAAAA,
-                0xBBBB,
-                0xCCCC,
-                0xDD,
-                0xEE,
-                &[0xFF, 0x00, 0x11, 0x22, 0x33, 0x44],
-            );
+            let test_guid =
+                efi::Guid::from_fields(0xAAAAAAAA, 0xBBBB, 0xCCCC, 0xDD, 0xEE, &[0xFF, 0x00, 0x11, 0x22, 0x33, 0x44]);
             assert!(
                 !CORE.pi_dispatcher.is_fv_already_installed(test_guid),
                 "Should return false when get_physical_address fails"
@@ -1754,14 +1736,8 @@ mod tests {
             // SAFETY: protocol was retrieved from PROTOCOL_DB and remains valid for this test scope.
             unsafe { &mut *protocol }.get_physical_address = get_physical_address2;
 
-            let test_guid = r_efi::efi::Guid::from_fields(
-                0xAAAAAAAA,
-                0xBBBB,
-                0xCCCC,
-                0xDD,
-                0xEE,
-                &[0xFF, 0x00, 0x11, 0x22, 0x33, 0x44],
-            );
+            let test_guid =
+                efi::Guid::from_fields(0xAAAAAAAA, 0xBBBB, 0xCCCC, 0xDD, 0xEE, &[0xFF, 0x00, 0x11, 0x22, 0x33, 0x44]);
             assert!(
                 !CORE.pi_dispatcher.is_fv_already_installed(test_guid),
                 "Should return false when the address is zero"
@@ -1807,14 +1783,8 @@ mod tests {
             // SAFETY: Test-only mutable static is used under the global lock.
             unsafe { GET_PHYSICAL_ADDRESS3_VALUE = invalid_fv_raw.expose_provenance() as u64 };
 
-            let test_guid = r_efi::efi::Guid::from_fields(
-                0xAAAAAAAA,
-                0xBBBB,
-                0xCCCC,
-                0xDD,
-                0xEE,
-                &[0xFF, 0x00, 0x11, 0x22, 0x33, 0x44],
-            );
+            let test_guid =
+                efi::Guid::from_fields(0xAAAAAAAA, 0xBBBB, 0xCCCC, 0xDD, 0xEE, &[0xFF, 0x00, 0x11, 0x22, 0x33, 0x44]);
             assert!(
                 !CORE.pi_dispatcher.is_fv_already_installed(test_guid),
                 "Should return false when volume parsing fails"
@@ -1940,7 +1910,7 @@ mod tests {
             // Create a pending FV image with the corrupted section
             let pending_fv = PendingFirmwareVolumeImage {
                 parent_fv_handle: std::ptr::null_mut(),
-                file_name: r_efi::efi::Guid::from_fields(
+                file_name: efi::Guid::from_fields(
                     0x11111111,
                     0x2222,
                     0x3333,

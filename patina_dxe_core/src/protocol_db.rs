@@ -16,8 +16,8 @@ use alloc::{
     vec::Vec,
 };
 use core::{cmp::Ordering, ffi::c_void, hash::Hasher};
+use patina::standard::efi;
 use patina::{error::EfiError, hash::Xorshift64starHasher};
-use r_efi::efi;
 
 use crate::tpl_mutex;
 
@@ -684,7 +684,7 @@ impl SpinLockedProtocolDb {
     ///
     /// ## Errors
     ///
-    /// Returns r_efi:efi::Status::INVALID_PARAMETER if incorrect parameters are given.
+    /// Returns efi::Status::INVALID_PARAMETER if incorrect parameters are given.
     pub fn install_protocol_interface(
         &self,
         handle: Option<efi::Handle>,
@@ -701,7 +701,7 @@ impl SpinLockedProtocolDb {
     ///
     /// ## Errors
     ///
-    /// Returns r_efi:efi::Status::INVALID_PARAMETER if incorrect parameters are given.
+    /// Returns efi::Status::INVALID_PARAMETER if incorrect parameters are given.
     pub fn uninstall_protocol_interface(
         &self,
         handle: efi::Handle,
@@ -719,8 +719,8 @@ impl SpinLockedProtocolDb {
     ///
     /// ## Errors
     ///
-    /// Returns [`INVALID_PARAMETER`](r_efi::efi::Status::INVALID_PARAMETER) if incorrect parameters are given.
-    /// Returns [`NOT_FOUND`](r_efi::efi::Status::NOT_FOUND) if no matching handles are found.
+    /// Returns [`INVALID_PARAMETER`](efi::Status::INVALID_PARAMETER) if incorrect parameters are given.
+    /// Returns [`NOT_FOUND`](efi::Status::NOT_FOUND) if no matching handles are found.
     pub fn locate_handles(&self, protocol: Option<efi::Guid>) -> Result<Vec<efi::Handle>, EfiError> {
         self.lock().locate_handles(protocol)
     }
@@ -733,8 +733,8 @@ impl SpinLockedProtocolDb {
     ///
     /// ## Errors
     ///
-    /// Returns [`INVALID_PARAMETER`](r_efi::efi::Status::INVALID_PARAMETER) if incorrect parameters are given.
-    /// Returns [`NOT_FOUND`](r_efi::efi::Status::NOT_FOUND) if no matching interfaces are found.
+    /// Returns [`INVALID_PARAMETER`](efi::Status::INVALID_PARAMETER) if incorrect parameters are given.
+    /// Returns [`NOT_FOUND`](efi::Status::NOT_FOUND) if no matching interfaces are found.
     pub fn locate_protocol(&self, protocol: efi::Guid) -> Result<*mut c_void, EfiError> {
         self.lock().locate_protocol(protocol)
     }
@@ -745,8 +745,8 @@ impl SpinLockedProtocolDb {
     ///
     /// ## Errors
     ///
-    /// Returns [`INVALID_PARAMETER`](r_efi::efi::Status::INVALID_PARAMETER) if incorrect parameters are given.
-    /// Returns [`NOT_FOUND`](r_efi::efi::Status::NOT_FOUND) if no matching interfaces are found on the given handle.
+    /// Returns [`INVALID_PARAMETER`](efi::Status::INVALID_PARAMETER) if incorrect parameters are given.
+    /// Returns [`NOT_FOUND`](efi::Status::NOT_FOUND) if no matching interfaces are found on the given handle.
     pub fn get_interface_for_handle(&self, handle: efi::Handle, protocol: efi::Guid) -> Result<*mut c_void, EfiError> {
         self.lock().get_interface_for_handle(handle, protocol)
     }
@@ -766,14 +766,14 @@ impl SpinLockedProtocolDb {
     ///
     /// # Errors
     ///
-    /// Returns [`INVALID_PARAMETER`](r_efi::efi::Status::INVALID_PARAMETER) if incorrect parameters are given.
-    /// Returns [`NOT_FOUND`](r_efi::efi::Status::NOT_FOUND) if no matching interfaces are found.
-    /// Returns [`ALREADY_STARTED`](r_efi::efi::Status::ALREADY_STARTED) if attributes is BY_DRIVER and there is an
+    /// Returns [`INVALID_PARAMETER`](efi::Status::INVALID_PARAMETER) if incorrect parameters are given.
+    /// Returns [`NOT_FOUND`](efi::Status::NOT_FOUND) if no matching interfaces are found.
+    /// Returns [`ALREADY_STARTED`](efi::Status::ALREADY_STARTED) if attributes is BY_DRIVER and there is an
     ///     existing usage by the agent handle.
-    /// Returns [`ACCESS_DENIED`](r_efi::efi::Status::ACCESS_DENIED) if attributes is efi::OPEN_PROTOCOL_BY_DRIVER |
+    /// Returns [`ACCESS_DENIED`](efi::Status::ACCESS_DENIED) if attributes is efi::OPEN_PROTOCOL_BY_DRIVER |
     ///     efi::OPEN_PROTOCOL_EXCLUSIVE | BY_DRIVER_EXCLUSIVE and there is an existing usage that conflicts with those
     ///     attributes.
-    /// Returns [`UNSUPPORTED`](r_efi::efi::Status::UNSUPPORTED) if the handle does not support the specified protocol.
+    /// Returns [`UNSUPPORTED`](efi::Status::UNSUPPORTED) if the handle does not support the specified protocol.
     pub fn add_protocol_usage(
         &self,
         handle: efi::Handle,
@@ -792,9 +792,9 @@ impl SpinLockedProtocolDb {
     ///
     /// # Errors
     ///
-    /// Returns [`INVALID_PARAMETER`](r_efi::efi::Status::INVALID_PARAMETER) if incorrect parameters are given.
-    /// Returns [`NOT_FOUND`](r_efi::efi::Status::NOT_FOUND) if the specified handle does not support the specified protocol.
-    /// Returns [`NOT_FOUND`](r_efi::efi::Status::NOT_FOUND) if the protocol interface specified by handle and protocol are not
+    /// Returns [`INVALID_PARAMETER`](efi::Status::INVALID_PARAMETER) if incorrect parameters are given.
+    /// Returns [`NOT_FOUND`](efi::Status::NOT_FOUND) if the specified handle does not support the specified protocol.
+    /// Returns [`NOT_FOUND`](efi::Status::NOT_FOUND) if the protocol interface specified by handle and protocol are not
     ///   opened by the specified agent and controller handle.
     pub fn remove_protocol_usage(
         &self,
@@ -814,8 +814,8 @@ impl SpinLockedProtocolDb {
     ///
     /// # Errors
     ///
-    /// Returns [`INVALID_PARAMETER`](r_efi::efi::Status::INVALID_PARAMETER) if incorrect parameters are given.
-    /// Returns [`NOT_FOUND`](r_efi::efi::Status::NOT_FOUND) if the specified handle does not support the specified protocol.
+    /// Returns [`INVALID_PARAMETER`](efi::Status::INVALID_PARAMETER) if incorrect parameters are given.
+    /// Returns [`NOT_FOUND`](efi::Status::NOT_FOUND) if the specified handle does not support the specified protocol.
     pub fn get_open_protocol_information_by_protocol(
         &self,
         handle: efi::Handle,
@@ -829,8 +829,8 @@ impl SpinLockedProtocolDb {
     ///
     /// # Errors
     ///
-    /// Returns [`INVALID_PARAMETER`](r_efi::efi::Status::INVALID_PARAMETER) if incorrect parameters are given.
-    /// Returns [`NOT_FOUND`](r_efi::efi::Status::NOT_FOUND) if the specified handle does not support the specified protocol.
+    /// Returns [`INVALID_PARAMETER`](efi::Status::INVALID_PARAMETER) if incorrect parameters are given.
+    /// Returns [`NOT_FOUND`](efi::Status::NOT_FOUND) if the specified handle does not support the specified protocol.
     pub fn get_open_protocol_information(
         &self,
         handle: efi::Handle,
@@ -889,7 +889,7 @@ mod tests {
     use core::str::FromStr;
     use std::println;
 
-    use r_efi::efi;
+    use patina::standard::efi;
     use uuid::Uuid;
 
     use crate::test_support;

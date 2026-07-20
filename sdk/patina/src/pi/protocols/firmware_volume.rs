@@ -21,8 +21,8 @@ use fw_fs::{
     fv::{EfiFvFileType, attributes::EfiFvAttributes, file::EfiFvFileAttributes},
 };
 
+use crate::standard::efi::{Guid, Handle, Status};
 use core::ffi::c_void;
-use r_efi::efi::{Guid, Handle, Status};
 
 /// GUID for the Firmware Volume (FV) Protocol.
 ///

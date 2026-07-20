@@ -29,8 +29,8 @@ macro_rules! impl_r_efi_protocol {
         // from r_efi matches the protocol interface layout by design - r_efi provides the canonical UEFI
         // protocol definitions and GUIDs from the UEFI specification. The Protocol struct layout matches
         // the UEFI protocol interface requirements.
-        unsafe impl ProtocolInterface for r_efi::efi::protocols::$protocol::Protocol {
-            const PROTOCOL_GUID: BinaryGuid = BinaryGuid(r_efi::efi::protocols::$protocol::PROTOCOL_GUID);
+        unsafe impl ProtocolInterface for crate::standard::efi::protocols::$protocol::Protocol {
+            const PROTOCOL_GUID: BinaryGuid = BinaryGuid(crate::standard::efi::protocols::$protocol::PROTOCOL_GUID);
         }
     };
 }

@@ -8,15 +8,15 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 //!
+use crate::standard::efi::protocols::device_path::{End, Hardware, Media, Protocol};
 use alloc::{boxed::Box, format, string::String, vec, vec::Vec};
 use core::{
     mem::size_of_val,
     ptr::{NonNull, slice_from_raw_parts},
     slice::from_raw_parts,
 };
-use r_efi::protocols::device_path::{End, Hardware, Media, Protocol};
 
-use r_efi::efi;
+use crate::standard::efi;
 
 /// Minimum length in bytes of a device path node.
 ///
@@ -38,7 +38,7 @@ const DEVICE_PATH_NODE_MIN_LENGTH: usize = core::mem::size_of::<Protocol>();
 /// ```
 /// #![feature(pointer_byte_offsets)]
 /// use patina::device_path::walker::device_path_node_count;
-/// use r_efi::efi;
+/// use patina::standard::efi;
 /// let device_path_bytes = [
 ///   efi::protocols::device_path::TYPE_HARDWARE,
 ///   efi::protocols::device_path::Hardware::SUBTYPE_PCI,
@@ -141,7 +141,7 @@ pub fn device_path_as_slice(
 /// #![feature(pointer_byte_offsets)]
 /// use patina::device_path::walker::{device_path_node_count, remaining_device_path};
 /// use core::mem::size_of;
-/// use r_efi::efi;
+/// use patina::standard::efi;
 /// let device_path_a_bytes = [
 ///   efi::protocols::device_path::TYPE_HARDWARE,
 ///   efi::protocols::device_path::Hardware::SUBTYPE_PCI,
@@ -428,7 +428,7 @@ impl Iterator for DevicePathWalker {
 
 fn protocol_to_subtype_str(protocol: efi::protocols::device_path::Protocol) -> &'static str {
     match protocol.r#type {
-        r_efi::protocols::device_path::TYPE_HARDWARE => match protocol.sub_type {
+        efi::protocols::device_path::TYPE_HARDWARE => match protocol.sub_type {
             Hardware::SUBTYPE_PCI => "Pci",
             Hardware::SUBTYPE_PCCARD => "PcCard",
             Hardware::SUBTYPE_MMAP => "MemMap",
@@ -437,10 +437,10 @@ fn protocol_to_subtype_str(protocol: efi::protocols::device_path::Protocol) -> &
             Hardware::SUBTYPE_BMC => "Bmc",
             _ => "UnknownHardware",
         },
-        r_efi::protocols::device_path::TYPE_ACPI => "Acpi",
-        r_efi::protocols::device_path::TYPE_MESSAGING => "Msg",
-        r_efi::protocols::device_path::TYPE_BIOS => "Bios",
-        r_efi::protocols::device_path::TYPE_MEDIA => match protocol.sub_type {
+        efi::protocols::device_path::TYPE_ACPI => "Acpi",
+        efi::protocols::device_path::TYPE_MESSAGING => "Msg",
+        efi::protocols::device_path::TYPE_BIOS => "Bios",
+        efi::protocols::device_path::TYPE_MEDIA => match protocol.sub_type {
             Media::SUBTYPE_HARDDRIVE => "HardDrive",
             Media::SUBTYPE_CDROM => "CdRom",
             Media::SUBTYPE_VENDOR => "Vendor",
@@ -452,7 +452,7 @@ fn protocol_to_subtype_str(protocol: efi::protocols::device_path::Protocol) -> &
             Media::SUBTYPE_RAM_DISK => "RamDisk",
             _ => "UnknownMedia",
         },
-        r_efi::protocols::device_path::TYPE_END => match protocol.sub_type {
+        efi::protocols::device_path::TYPE_END => match protocol.sub_type {
             End::SUBTYPE_INSTANCE => "EndInstance",
             End::SUBTYPE_ENTIRE => "EndEntire",
             _ => "UnknownEnd",
@@ -467,7 +467,7 @@ mod tests {
     use core::mem::size_of;
 
     use efi::protocols::device_path::{End, Hardware, TYPE_END, TYPE_HARDWARE};
-    use r_efi::protocols::device_path::{TYPE_ACPI, TYPE_MEDIA};
+    use efi::protocols::device_path::{TYPE_ACPI, TYPE_MEDIA};
 
     use super::*;
 

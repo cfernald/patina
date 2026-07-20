@@ -89,7 +89,7 @@ and `DerefMut`, which allows access to the underlying data:
 
 ```rust,ignore
 use crate::tpl_mutex::TplMutex;
-use r_efi::efi;
+use patina::standard::efi;
 let tpl_mutex = TplMutex::new(efi::TPL_HIGH_LEVEL, 1_usize, "test_lock");
 
 *tpl_mutex.lock() = 2_usize; //deref to set
@@ -101,7 +101,7 @@ scope or is dropped, the lock is automatically released:
 
 ```rust,ignore
 use crate::tpl_mutex::TplMutex;
-use r_efi::efi;
+use patina::standard::efi;
 let tpl_mutex1 = TplMutex::new(efi::TPL_HIGH_LEVEL, 1_usize, "test_lock");
 
 let mut guard1 = tpl_mutex1.lock(); //mutex1 locked.

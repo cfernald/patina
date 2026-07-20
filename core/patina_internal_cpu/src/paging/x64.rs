@@ -9,12 +9,11 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 use crate::paging::{CacheAttributeValue, PatinaPageTable};
-use patina::error::EfiError;
+use patina::{error::EfiError, standard::efi};
 use patina_mtrr::{Mtrr, create_mtrr_lib, error::MtrrError, structs::MtrrMemoryCacheType};
 use patina_paging::{
     MemoryAttributes, PageTable, PagingType, PtError, page_allocator::PageAllocator, x64::X64PageTable,
 };
-use r_efi::efi;
 
 /// The x86_64 paging implementation. It acts as a bridge between the EFI CPU
 /// Architecture Protocol and the x86_64 paging implementation.

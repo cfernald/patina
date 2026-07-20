@@ -11,10 +11,9 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-use crate::{error::EfiError, pi::protocols::cpu_arch::CpuFlushType};
+use crate::{error::EfiError, pi::protocols::cpu_arch::CpuFlushType, standard::efi};
 use core::num::NonZeroU64;
 use core::sync::atomic::{AtomicBool, Ordering};
-use r_efi::efi;
 
 /// Stub architecture used for host/unit-test builds.
 pub(crate) struct StubArch;

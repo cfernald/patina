@@ -15,7 +15,7 @@ use core::{
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 use patina::error::EfiError;
-use r_efi::efi;
+use patina::standard::efi;
 
 use crate::{
     allocator::EFI_RUNTIME_SERVICES_DATA_ALLOCATOR,

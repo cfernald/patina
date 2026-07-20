@@ -8,8 +8,8 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 
+use crate::standard::efi;
 use num_traits;
-use r_efi::efi;
 
 use crate::error::EfiError;
 

@@ -8,11 +8,11 @@
 //!
 use core::ffi::c_void;
 
+use crate::standard::efi;
 use crate::{
     uefi_decompress::{DecompressionAlgorithm, decompress_into_with_algo},
     uefi_protocol::ProtocolInterface,
 };
-use r_efi::efi;
 
 /// The ffi interface for the get_info function of the `EfiDecompressProtocol`.
 pub type GetInfoFn =

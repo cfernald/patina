@@ -8,8 +8,8 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 //!
+use patina::standard::efi;
 use patina::{error::EfiError, writelncrlf};
-use r_efi::efi;
 
 use super::{AllocationStatistics, AllocationStrategy, PageAllocator};
 use core::{
@@ -33,7 +33,7 @@ struct AllocationInfo {
 /// UEFI Allocator
 ///
 /// Wraps a `PageAllocator` to provide additional UEFI-specific functionality:
-/// - Association of a particular [`r_efi::efi::MemoryType`] with the allocator
+/// - Association of a particular [`efi::MemoryType`] with the allocator
 /// - A pool implementation that allows tracking the layout and memory_type of UEFI pool allocations.
 pub struct UefiAllocator<A>
 where

@@ -12,8 +12,8 @@ use patina_paging::{MemoryAttributes, PageTable, PagingType, PtError, aarch64::A
 
 use crate::paging::{CacheAttributeValue, PatinaPageTable};
 use patina::pi::protocols::cpu_arch::CpuFlushType;
+use patina::standard::efi;
 use patina_paging::page_allocator::PageAllocator;
-use r_efi::efi;
 
 /// Memory attributes that indicate cached mappings (writeback or write-through).
 const CACHED_ATTRS: MemoryAttributes = MemoryAttributes::Writeback.union(MemoryAttributes::WriteThrough);

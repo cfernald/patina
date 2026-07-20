@@ -9,11 +9,11 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 use core::{cell::UnsafeCell, mem::size_of, ptr, slice, sync::atomic::Ordering};
+use patina::standard::efi;
 use patina::{
     base::align_up,
     error::{EfiError, Result},
 };
-use r_efi::efi;
 use zerocopy::IntoBytes;
 
 use crate::memory_log::{AdvLoggerInfo, AdvLoggerInfoRef, AdvLoggerMessageEntry, LogEntry};

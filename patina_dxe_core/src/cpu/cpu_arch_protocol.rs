@@ -11,6 +11,7 @@
 use crate::{dxe_services, protocols::PROTOCOL_DB};
 use alloc::boxed::Box;
 use core::ffi::c_void;
+use patina::standard::efi;
 use patina::{
     arch,
     boot_services::{BootServices, StandardBootServices},
@@ -22,7 +23,6 @@ use patina::{
     uefi_protocol::ProtocolInterface,
 };
 use patina_internal_cpu::interrupts::{self, ExceptionType, HandlerType, InterruptManager, Interrupts};
-use r_efi::efi;
 
 use core::sync::atomic::{AtomicU64, Ordering};
 

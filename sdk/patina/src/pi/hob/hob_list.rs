@@ -689,7 +689,10 @@ mod tests {
                     assert_eq!(capsule.base_address, 0);
                 }
                 Hob::GuidHob(guid_hob, data) => {
-                    assert_eq!(guid_hob.name, r_efi::efi::Guid::from_fields(1, 2, 3, 4, 5, &[6, 7, 8, 9, 10, 11]));
+                    assert_eq!(
+                        guid_hob.name,
+                        crate::standard::efi::Guid::from_fields(1, 2, 3, 4, 5, &[6, 7, 8, 9, 10, 11])
+                    );
                     assert_eq!(*data, &[1_u8, 2, 3, 4, 5, 6, 7, 8]);
                 }
                 Hob::FirmwareVolume(firmware_volume) => {
@@ -805,7 +808,10 @@ mod tests {
                     assert_eq!(capsule.base_address, 0);
                 }
                 Hob::GuidHob(guid_hob, data) => {
-                    assert_eq!(guid_hob.name, r_efi::efi::Guid::from_fields(1, 2, 3, 4, 5, &[6, 7, 8, 9, 10, 11]));
+                    assert_eq!(
+                        guid_hob.name,
+                        crate::standard::efi::Guid::from_fields(1, 2, 3, 4, 5, &[6, 7, 8, 9, 10, 11])
+                    );
                     assert_eq!(&data[..], guid_hob_data);
                 }
                 Hob::FirmwareVolume(firmware_volume) => {
@@ -862,7 +868,10 @@ mod tests {
                     assert_eq!(capsule.base_address, 0);
                 }
                 Hob::GuidHob(guid_hob, data) => {
-                    assert_eq!(guid_hob.name, r_efi::efi::Guid::from_fields(1, 2, 3, 4, 5, &[6, 7, 8, 9, 10, 11]));
+                    assert_eq!(
+                        guid_hob.name,
+                        crate::standard::efi::Guid::from_fields(1, 2, 3, 4, 5, &[6, 7, 8, 9, 10, 11])
+                    );
                     assert_eq!(data, &[1_u8, 2, 3, 4, 5, 6, 7, 8]);
                 }
                 Hob::FirmwareVolume(firmware_volume) => {

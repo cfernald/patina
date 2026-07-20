@@ -16,6 +16,7 @@ use crate::{
 };
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::ffi::c_void;
+use patina::standard::efi::EVENT_GROUP_READY_TO_BOOT;
 use patina::{
     base::UEFI_PAGE_SIZE,
     boot_services::{BootServices, StandardBootServices, allocation::AllocType, event::EventType, tpl::Tpl},
@@ -35,7 +36,6 @@ use patina::{
     uefi_protocol::{performance_measurement::EdkiiPerformanceMeasurement, status_code::StatusCodeRuntimeProtocol},
 };
 use patina_mm::component::communicator::MmCommunication;
-use r_efi::system::EVENT_GROUP_READY_TO_BOOT;
 
 use patina::function;
 
@@ -166,7 +166,7 @@ enum MmPerformanceError {
     /// Failed to parse response data from MM
     ParseError,
     /// An MM operation returned a non-success EFI status code
-    StatusError(r_efi::efi::Status),
+    StatusError(patina::standard::efi::Status),
     /// An error occurred while processing performance record data
     RecordError(String),
 }
@@ -197,7 +197,7 @@ fn fetch_mm_record_size(comm_service: &Service<dyn MmCommunication>) -> Result<u
 
     let (size_resp, _) = mm::GetRecordSize::read_from(&size_resp_bytes).map_err(|_| MmPerformanceError::ParseError)?;
 
-    if size_resp.return_status != r_efi::efi::Status::SUCCESS {
+    if size_resp.return_status != patina::standard::efi::Status::SUCCESS {
         return Err(MmPerformanceError::StatusError(size_resp.return_status));
     }
 
@@ -227,7 +227,7 @@ fn fetch_mm_record_chunk(
     let (data_resp, _) =
         mm::GetRecordDataByOffset::read_from_default(&data_resp_bytes).map_err(|_| MmPerformanceError::ParseError)?;
 
-    if data_resp.return_status != r_efi::efi::Status::SUCCESS {
+    if data_resp.return_status != patina::standard::efi::Status::SUCCESS {
         return Err(MmPerformanceError::StatusError(data_resp.return_status));
     }
 
@@ -392,7 +392,7 @@ fn process_mm_performance_records(
 
 /// Adds MM performance records to the FBPT.
 pub extern "efiapi" fn fetch_and_add_mm_performance_records<B>(
-    event: r_efi::efi::Event,
+    event: patina::standard::efi::Event,
     ctx: MmPerformanceEventContext<B>,
 ) where
     B: BootServices + Clone + 'static,
@@ -408,7 +408,7 @@ pub extern "efiapi" fn fetch_and_add_mm_performance_records<B>(
 /// Reports the FBPT at End of DXE: queries the required size from the [`PerformanceMeasurement`] service, allocates the
 /// publishing buffer, has the service serialize the table into it, reports it through a status code, and installs it as
 /// a configuration table.
-pub extern "efiapi" fn report_fbpt_event<B, R>(event: r_efi::efi::Event, ctx: ReportFbptEventContext<B, R>)
+pub extern "efiapi" fn report_fbpt_event<B, R>(event: patina::standard::efi::Event, ctx: ReportFbptEventContext<B, R>)
 where
     B: BootServices + Clone + 'static,
     R: RuntimeServices + Clone + 'static,
@@ -517,7 +517,7 @@ mod tests {
         assert_eq,
         sync::atomic::{AtomicBool, AtomicUsize, Ordering},
     };
-    use r_efi::efi;
+    use patina::standard::efi;
 
     use alloc::sync::Arc;
     use patina::{

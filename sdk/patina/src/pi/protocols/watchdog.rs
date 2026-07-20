@@ -14,7 +14,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-use r_efi::efi;
+use crate::standard::efi;
 
 /// Watchdog Architectrural Protocol GUID
 ///

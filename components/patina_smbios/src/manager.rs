@@ -26,11 +26,11 @@ pub(crate) use record::SmbiosRecord;
 
 use alloc::boxed::Box;
 
+use patina::standard::efi;
 use patina::{
     boot_services::{BootServices, StandardBootServices},
     tpl_mutex::TplMutex,
 };
-use r_efi::efi;
 
 use crate::error::SmbiosError;
 

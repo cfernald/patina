@@ -306,30 +306,30 @@ pub(crate) mod tests {
 
         let mut storage = Storage::new();
         storage.add_service(Recorder::default());
-        let bs: MaybeUninit<r_efi::efi::BootServices> = MaybeUninit::uninit();
+        let bs: MaybeUninit<patina::standard::efi::BootServices> = MaybeUninit::uninit();
 
         // SAFETY: This is very unsafe, because it is not initialized, however this code path only calls create_event
         // and create_event_ex, which we will fill in with no-op functions.
         let mut bs = unsafe { bs.assume_init() };
         extern "efiapi" fn noop_create_event(
             _type: u32,
-            _tpl: r_efi::efi::Tpl,
-            _notify_function: Option<unsafe extern "efiapi" fn(r_efi::efi::Event, *mut core::ffi::c_void)>,
+            _tpl: patina::standard::efi::Tpl,
+            _notify_function: Option<unsafe extern "efiapi" fn(patina::standard::efi::Event, *mut core::ffi::c_void)>,
             _notify_context: *mut core::ffi::c_void,
-            _event: *mut r_efi::efi::Event,
-        ) -> r_efi::efi::Status {
-            r_efi::efi::Status::SUCCESS
+            _event: *mut patina::standard::efi::Event,
+        ) -> patina::standard::efi::Status {
+            patina::standard::efi::Status::SUCCESS
         }
 
         extern "efiapi" fn noop_create_event_ex(
             _type: u32,
-            _tpl: r_efi::efi::Tpl,
-            _notify_function: Option<unsafe extern "efiapi" fn(r_efi::efi::Event, *mut core::ffi::c_void)>,
+            _tpl: patina::standard::efi::Tpl,
+            _notify_function: Option<unsafe extern "efiapi" fn(patina::standard::efi::Event, *mut core::ffi::c_void)>,
             _notify_context: *const core::ffi::c_void,
-            _guid: *const r_efi::efi::Guid,
-            _event: *mut r_efi::efi::Event,
-        ) -> r_efi::efi::Status {
-            r_efi::efi::Status::SUCCESS
+            _guid: *const patina::standard::efi::Guid,
+            _event: *mut patina::standard::efi::Event,
+        ) -> patina::standard::efi::Status {
+            patina::standard::efi::Status::SUCCESS
         }
 
         bs.create_event = noop_create_event;
@@ -347,38 +347,38 @@ pub(crate) mod tests {
         let test_runner = TestRunner::default().with_filter(Filter::include("triggered_test"));
 
         let mut storage = Storage::new();
-        let bs: MaybeUninit<r_efi::efi::BootServices> = MaybeUninit::uninit();
+        let bs: MaybeUninit<patina::standard::efi::BootServices> = MaybeUninit::uninit();
 
         // SAFETY: This is very unsafe, because it is not initialized, however this code path only calls create_event
         // create_event_ex, and set_timer which we will fill in with no-op functions.
         let mut bs = unsafe { bs.assume_init() };
         extern "efiapi" fn noop_create_event(
             _type: u32,
-            _tpl: r_efi::efi::Tpl,
-            _notify_function: Option<unsafe extern "efiapi" fn(r_efi::efi::Event, *mut core::ffi::c_void)>,
+            _tpl: patina::standard::efi::Tpl,
+            _notify_function: Option<unsafe extern "efiapi" fn(patina::standard::efi::Event, *mut core::ffi::c_void)>,
             _notify_context: *mut core::ffi::c_void,
-            _event: *mut r_efi::efi::Event,
-        ) -> r_efi::efi::Status {
-            r_efi::efi::Status::SUCCESS
+            _event: *mut patina::standard::efi::Event,
+        ) -> patina::standard::efi::Status {
+            patina::standard::efi::Status::SUCCESS
         }
 
         extern "efiapi" fn noop_create_event_ex(
             _type: u32,
-            _tpl: r_efi::efi::Tpl,
-            _notify_function: Option<unsafe extern "efiapi" fn(r_efi::efi::Event, *mut core::ffi::c_void)>,
+            _tpl: patina::standard::efi::Tpl,
+            _notify_function: Option<unsafe extern "efiapi" fn(patina::standard::efi::Event, *mut core::ffi::c_void)>,
             _notify_context: *const core::ffi::c_void,
-            _guid: *const r_efi::efi::Guid,
-            _event: *mut r_efi::efi::Event,
-        ) -> r_efi::efi::Status {
-            r_efi::efi::Status::SUCCESS
+            _guid: *const patina::standard::efi::Guid,
+            _event: *mut patina::standard::efi::Event,
+        ) -> patina::standard::efi::Status {
+            patina::standard::efi::Status::SUCCESS
         }
 
         extern "efiapi" fn noop_set_timer(
-            _event: r_efi::efi::Event,
-            _type: r_efi::efi::TimerDelay,
+            _event: patina::standard::efi::Event,
+            _type: patina::standard::efi::TimerDelay,
             _trigger_time: u64,
-        ) -> r_efi::efi::Status {
-            r_efi::efi::Status::SUCCESS
+        ) -> patina::standard::efi::Status {
+            patina::standard::efi::Status::SUCCESS
         }
 
         bs.create_event = noop_create_event;

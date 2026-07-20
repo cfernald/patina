@@ -20,12 +20,12 @@ pub mod serializable_fv;
 /// Serializable HOB definitions.
 pub mod serializable_hob;
 
-use r_efi::efi::Guid;
+use crate::standard::efi::Guid;
 
 use alloc::{format, string::String, vec, vec::Vec};
 
 /// Format a GUID as a string in the standard 8-4-4-4-12 format.
-/// This custom implementation is necessary because `r_efi::Guid` has private fields and cannot derive `Serialize` directly.
+/// This custom implementation is necessary because `patina::standard::Guid` has private fields and cannot derive `Serialize` directly.
 ///
 pub fn format_guid(guid: &Guid) -> String {
     let (time_low, time_mid, time_hi_and_version, clk_seq_hi_res, clk_seq_low, node) = guid.as_fields();

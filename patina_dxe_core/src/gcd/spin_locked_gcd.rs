@@ -11,6 +11,7 @@ use alloc::{boxed::Box, slice, vec, vec::Vec};
 use core::{fmt::Display, ptr};
 use patina::{base::DEFAULT_CACHE_ATTR, error::EfiError, log_debug_assert};
 
+use patina::standard::efi;
 use patina::{
     base::{SIZE_4GB, UEFI_PAGE_MASK, UEFI_PAGE_SHIFT, UEFI_PAGE_SIZE, align_up},
     function,
@@ -22,7 +23,6 @@ use patina::{
     uefi_pages_to_size, uefi_size_to_pages, writelncrlf,
 };
 use patina_internal_core::collections::{Error as SliceError, Rbt, SliceKey, node_size};
-use r_efi::efi;
 
 use crate::{
     GCD,
@@ -3084,7 +3084,8 @@ mod tests {
 
     use super::*;
     use alloc::vec::Vec;
-    use r_efi::efi;
+    use patina::pi::dxe_services::GcdMemoryType;
+    use patina::standard::efi;
     use std::{alloc::GlobalAlloc, cell::RefCell, rc::Rc};
 
     const DXE_CORE_PE_HEADER_DATA: [u8; 1057] = [

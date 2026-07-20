@@ -18,7 +18,7 @@ mod interrupt_manager;
 #[allow(unused)]
 pub use interrupt_manager::InterruptsAarch64;
 
-pub type ExceptionContextAArch64 = r_efi::protocols::debug_support::SystemContextAArch64;
+pub type ExceptionContextAArch64 = patina::standard::efi::protocols::debug_support::SystemContextAArch64;
 
 impl super::EfiSystemContextFactory for ExceptionContextAArch64 {
     fn create_efi_system_context(&mut self) -> EfiSystemContext {

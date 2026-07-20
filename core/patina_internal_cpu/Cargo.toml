@@ -15,7 +15,6 @@ features = ["std"]
 
 [dependencies]
 log = { workspace = true }
-r-efi = { workspace = true }
 patina = { workspace = true, features = ["core"] }
 spin = { workspace = true, features = ["rwlock"] }
 patina_paging = { workspace = true }

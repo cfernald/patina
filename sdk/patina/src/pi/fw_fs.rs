@@ -42,10 +42,10 @@ use zerocopy::FromBytes;
 
 #[cfg(test)]
 use crate::Char16String;
+use crate::standard::efi;
 use crate::{BinaryGuid, base::align_up};
 use alloc::{boxed::Box, collections::VecDeque, vec::Vec};
 use num_traits::WrappingSub;
-use r_efi::efi;
 
 /// Well-known GUIDs for firmware file system encapsulation and compression section types.
 ///
@@ -76,7 +76,7 @@ pub mod guid {
 ///```
 /// # use std::{env, fs, path::Path, error::Error};
 /// use patina::pi::fw_fs::{FirmwareVolume, Section, SectionExtractor};
-/// use r_efi::efi;
+/// use patina::standard::efi;
 ///
 /// struct ExampleSectionExtractor {}
 /// impl SectionExtractor for ExampleSectionExtractor {
@@ -1002,8 +1002,8 @@ mod unit_tests {
         path::Path,
     };
 
+    use crate::standard::efi;
     use core::{mem, sync::atomic::AtomicBool};
-    use r_efi::efi;
     use serde::Deserialize;
     use uuid::Uuid;
 

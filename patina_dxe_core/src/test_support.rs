@@ -10,6 +10,7 @@
 //!
 use crate::{GCD, allocator::DEFAULT_PAGE_ALLOCATION_GRANULARITY, protocols::PROTOCOL_DB};
 use core::ffi::c_void;
+use patina::standard::efi;
 use patina::{
     guids::ZERO,
     pi::{
@@ -20,7 +21,6 @@ use patina::{
 };
 use patina_internal_cpu::paging::{CacheAttributeValue, PatinaPageTable};
 use patina_paging::{MemoryAttributes, PtError};
-use r_efi::efi;
 use spin::{Once, RwLock};
 use std::{any::Any, cell::RefCell, fs::File, io::Read, slice};
 

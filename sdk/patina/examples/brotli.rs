@@ -1,7 +1,7 @@
 use alloc_no_stdlib::{self, SliceWrapper, SliceWrapperMut, define_index_ops_mut};
 use brotli_decompressor::{BrotliDecompressStream, BrotliResult, BrotliState, HuffmanCode};
 use patina::pi::fw_fs::{FirmwareVolume, SectionExtractor, SectionMetaData, guid};
-use r_efi::efi;
+use patina::standard::efi;
 use std::{env, error::Error, fmt::Debug, fs, path::Path};
 
 //Rebox and HeapAllocator satisfy BrotliDecompress custom allocation requirement.

@@ -25,7 +25,7 @@ use patina_mm::{
 
 use core::pin::Pin;
 
-use r_efi::efi;
+use patina::standard::efi;
 
 use crate::patina_mm_integration::common::*;
 

@@ -120,6 +120,7 @@ use core::{
 use cpu::DxeInterruptManager;
 use gcd::SpinLockedGcd;
 use memory_manager::CoreMemoryManager;
+use patina::standard::efi;
 use patina::{
     boot_services::StandardBootServices,
     component::{IntoComponent, service::performance::PerformanceManager},
@@ -134,7 +135,6 @@ use patina::{
 };
 use patina_ffs::section::SectionExtractor;
 use protocols::PROTOCOL_DB;
-use r_efi::efi;
 
 use crate::{
     component_dispatcher::ComponentDispatcher, config_tables::memory_attributes_table, performance::CorePerformance,

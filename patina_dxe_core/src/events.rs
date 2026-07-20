@@ -11,7 +11,7 @@ use core::{
     sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
 };
 
-use r_efi::efi;
+use patina::standard::efi;
 
 use patina::{arch, pi::protocols::timer};
 

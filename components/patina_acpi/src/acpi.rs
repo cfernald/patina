@@ -818,11 +818,11 @@ mod tests {
 
     use super::*;
     use mockall::predicate::always;
+    use patina::standard::efi;
     use patina::{
         boot_services::MockBootServices,
         component::service::memory::{MockMemoryManager, StdMemoryManager},
     };
-    use r_efi::efi;
     use std::{
         boxed::Box,
         sync::atomic::{AtomicBool, Ordering as AtomicOrdering},

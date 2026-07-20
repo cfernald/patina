@@ -22,8 +22,8 @@ use core::{
     fmt,
     ops::{Deref, DerefMut},
 };
+use patina::standard::efi;
 use patina::{error::EfiError, log_debug_assert};
-use r_efi::efi;
 
 use crate::{runtime, tpl_mutex};
 
@@ -316,7 +316,7 @@ impl EventDb {
     fn create_event(
         &mut self,
         event_type: u32,
-        notify_tpl: r_efi::base::Tpl,
+        notify_tpl: efi::Tpl,
         notify_function: Option<efi::EventNotify>,
         notify_context: Option<*mut c_void>,
         event_group: Option<efi::Guid>,
@@ -662,11 +662,11 @@ impl SpinLockedEventDb {
     ///
     /// ## Errors
     ///
-    /// Returns r_efi:efi::Status::INVALID_PARAMETER if incorrect parameters are given.
+    /// Returns efi::Status::INVALID_PARAMETER if incorrect parameters are given.
     pub fn create_event(
         &self,
         event_type: u32,
-        notify_tpl: r_efi::base::Tpl,
+        notify_tpl: efi::Tpl,
         notify_function: Option<efi::EventNotify>,
         notify_context: Option<*mut c_void>,
         event_group: Option<efi::Guid>,
@@ -681,7 +681,7 @@ impl SpinLockedEventDb {
     ///
     /// ## Errors
     ///
-    /// Returns r_efi:efi::Status::INVALID_PARAMETER if incorrect parameters are given.
+    /// Returns efi::Status::INVALID_PARAMETER if incorrect parameters are given.
     pub fn close_event(&self, event: efi::Event) -> Result<(), EfiError> {
         self.lock().close_event(event)
     }
@@ -693,7 +693,7 @@ impl SpinLockedEventDb {
     ///
     /// ## Errors
     ///
-    /// Returns r_efi:efi::Status::INVALID_PARAMETER if incorrect parameters are given.
+    /// Returns efi::Status::INVALID_PARAMETER if incorrect parameters are given.
     pub fn signal_event(&self, event: efi::Event) -> Result<(), EfiError> {
         if let Some(mut guard) = self.try_lock() {
             guard.signal_event(event)
@@ -731,7 +731,7 @@ impl SpinLockedEventDb {
     ///
     /// ## Errors
     ///
-    /// Returns r_efi:efi::Status::INVALID_PARAMETER if incorrect event is given.
+    /// Returns efi::Status::INVALID_PARAMETER if incorrect event is given.
     pub fn get_event_type(&self, event: efi::Event) -> Result<EventType, EfiError> {
         self.lock().get_event_type(event)
     }
@@ -746,7 +746,7 @@ impl SpinLockedEventDb {
     ///
     /// ## Errors
     ///
-    /// Returns r_efi:efi::Status::INVALID_PARAMETER if incorrect parameters are given.
+    /// Returns efi::Status::INVALID_PARAMETER if incorrect parameters are given.
     #[allow(dead_code)]
     pub fn clear_signal(&self, event: efi::Event) -> Result<(), EfiError> {
         self.lock().clear_signal(event)
@@ -756,7 +756,7 @@ impl SpinLockedEventDb {
     ///
     /// ## Errors
     ///
-    /// Returns r_efi:efi::Status::INVALID_PARAMETER if incorrect parameters are given.
+    /// Returns efi::Status::INVALID_PARAMETER if incorrect parameters are given.
     pub fn read_and_clear_signaled(&self, event: efi::Event) -> Result<bool, EfiError> {
         let mut event_db = self.lock();
         let signaled = event_db.is_signaled(event);
@@ -772,7 +772,7 @@ impl SpinLockedEventDb {
     ///
     /// ## Errors
     ///
-    /// Returns r_efi:efi::Status::INVALID_PARAMETER if incorrect parameters are given.
+    /// Returns efi::Status::INVALID_PARAMETER if incorrect parameters are given.
     pub fn queue_event_notify(&self, event: efi::Event) -> Result<(), EfiError> {
         self.lock().queue_event_notify(event)
     }
@@ -781,7 +781,7 @@ impl SpinLockedEventDb {
     ///
     /// ## Errors
     ///
-    /// Returns r_efi:efi::Status::INVALID_PARAMETER if incorrect parameters are given.
+    /// Returns efi::Status::INVALID_PARAMETER if incorrect parameters are given.
     #[allow(dead_code)]
     pub fn get_notification_data(&self, event: efi::Event) -> Result<EventNotification, EfiError> {
         self.lock().get_notification_data(event)
@@ -794,7 +794,7 @@ impl SpinLockedEventDb {
     ///
     /// ## Errors
     ///
-    /// Returns r_efi:efi::Status::INVALID_PARAMETER if incorrect parameters are given.
+    /// Returns efi::Status::INVALID_PARAMETER if incorrect parameters are given.
     pub fn set_timer(
         &self,
         event: efi::Event,
@@ -850,7 +850,7 @@ mod tests {
 
     use alloc::{vec, vec::Vec};
     use patina::Guid;
-    use r_efi::efi;
+    use patina::standard::efi;
     use uuid::Uuid;
 
     use crate::test_support;

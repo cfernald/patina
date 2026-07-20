@@ -13,7 +13,7 @@
 use patina::boot_services::{BootServices, StandardBootServices};
 use patina_test::{patina_test, u_assert, u_assert_eq};
 
-use r_efi::efi;
+use patina::standard::efi;
 
 use crate::{memory_log, protocol::AdvancedLoggerProtocol, reader::AdvancedLogReader};
 
