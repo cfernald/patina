@@ -25,7 +25,7 @@
 
 use core::ffi::c_void;
 
-use r_efi::efi;
+use crate::standard::efi;
 
 /// Security2 Arch Protocol GUID.
 pub const PROTOCOL_GUID: crate::BinaryGuid = crate::BinaryGuid::from_string("94AB2F58-1438-4EF1-9152-18941A3A0E68");

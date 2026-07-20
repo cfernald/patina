@@ -5,7 +5,7 @@
 //! ```rust, no_run
 //! use core::{mem::MaybeUninit, ptr::NonNull};
 //!
-//! use r_efi::efi::{self, protocols::device_path::Protocol as EfiDevicePathProtocol};
+//! use patina::standard::efi::{self, protocols::device_path::Protocol as EfiDevicePathProtocol};
 //!
 //! use patina::boot_services::{BootServices, StandardBootServices};
 //! use patina::driver_binding::{DriverBinding, UefiDriverBinding};
@@ -63,8 +63,8 @@ use core::{
     ptr::NonNull,
 };
 
-use r_efi::{
-    efi,
+use crate::standard::efi::{
+    self,
     protocols::{device_path::Protocol as EfiDevicePathProtocol, driver_binding::Protocol as EfiDriverBindingProtocol},
 };
 

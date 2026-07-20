@@ -752,19 +752,19 @@ unsafe impl Param for StandardRuntimeServices {
 /// ```
 #[derive(Debug, Clone, Copy)]
 pub struct Handle {
-    handle: r_efi::efi::Handle,
+    handle: crate::standard::efi::Handle,
 }
 
 impl Handle {
     /// Creates a mock Handle for testing purposes.
     #[cfg(any(test, feature = "mockall"))]
-    pub fn mock(handle: r_efi::efi::Handle) -> Self {
+    pub fn mock(handle: crate::standard::efi::Handle) -> Self {
         Self { handle }
     }
 }
 
 impl core::ops::Deref for Handle {
-    type Target = r_efi::efi::Handle;
+    type Target = crate::standard::efi::Handle;
 
     fn deref(&self) -> &Self::Target {
         &self.handle
@@ -1020,7 +1020,7 @@ mod tests {
         let mut storage = Storage::default();
         let mut mock_metadata = MetaData::new::<i32>();
 
-        let mut mock_bs = core::mem::MaybeUninit::<r_efi::efi::BootServices>::zeroed();
+        let mut mock_bs = core::mem::MaybeUninit::<crate::standard::efi::BootServices>::zeroed();
         storage.set_boot_services(StandardBootServices::new(mock_bs.as_mut_ptr()));
 
         <StandardBootServices as Param>::init_state(&mut storage, &mut mock_metadata).unwrap();
@@ -1049,7 +1049,7 @@ mod tests {
         let mut storage = Storage::default();
         let mut mock_metadata = MetaData::new::<i32>();
 
-        let mut mock_rt = core::mem::MaybeUninit::<r_efi::efi::RuntimeServices>::zeroed();
+        let mut mock_rt = core::mem::MaybeUninit::<crate::standard::efi::RuntimeServices>::zeroed();
         storage.set_runtime_services(StandardRuntimeServices::new(mock_rt.as_mut_ptr()));
 
         <StandardRuntimeServices as Param>::init_state(&mut storage, &mut mock_metadata).unwrap();
@@ -1078,7 +1078,7 @@ mod tests {
         let mut storage = Storage::default();
         let mut mock_metadata = MetaData::new::<i32>();
 
-        let mock_handle = 0x1234usize as r_efi::efi::Handle;
+        let mock_handle = 0x1234usize as crate::standard::efi::Handle;
         storage.set_image_handle(mock_handle);
 
         <Handle as Param>::init_state(&mut storage, &mut mock_metadata).unwrap();

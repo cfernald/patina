@@ -11,7 +11,7 @@
 use alloc::collections::BTreeMap;
 
 use super::{SIZE_1MB, UEFI_PAGE_SIZE};
-use r_efi::efi;
+use crate::standard::efi;
 
 /// Prints detailed information about a UEFI memory map from a collection of memory descriptors.
 ///
@@ -28,7 +28,7 @@ use r_efi::efi;
 ///
 /// ```rust,no_run
 /// use patina::base::memory_map;
-/// use r_efi::efi;
+/// use patina::standard::efi;
 ///
 /// let descriptors: Vec<efi::MemoryDescriptor> = vec![]; // Get from get_memory_map()
 /// memory_map::print_details(&descriptors);

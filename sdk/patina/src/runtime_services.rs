@@ -20,7 +20,7 @@ use alloc::vec::Vec;
 use core::{ffi::c_void, fmt::Debug, ptr};
 use spin::Once;
 
-use r_efi::efi;
+use crate::standard::efi;
 use variable_services::{GetVariableStatus, VariableInfo};
 
 /// The UEFI spec runtime services.

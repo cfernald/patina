@@ -15,7 +15,7 @@ use core::{
     option::Option,
 };
 
-use r_efi::efi;
+use crate::standard::efi;
 
 use crate::uefi_protocol::ProtocolInterface;
 

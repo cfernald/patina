@@ -137,7 +137,7 @@ pub const END_OF_HOB_LIST: u16 = 0xFFFF;
 /// HOB header structures and definitions.
 pub mod header {
     use crate::pi::hob::EfiPhysicalAddress;
-    use r_efi::system::MemoryType;
+    use crate::standard::efi::MemoryType;
 
     /// Describes the format and size of the data inside the HOB. All HOBs must contain
     /// this generic HOB header.
@@ -704,7 +704,7 @@ pub struct FirmwareVolume3 {
     /// TRUE if the FV was extracted as a file within another firmware volume.
     /// FALSE otherwise.
     ///
-    pub extracted_fv: r_efi::efi::Boolean,
+    pub extracted_fv: crate::standard::efi::Boolean,
 
     /// The name GUID of the firmware volume.
     /// Valid only if IsExtractedFv is TRUE.
@@ -1001,7 +1001,7 @@ pub const MEMORY_TYPE_INFO_HOB_GUID: crate::BinaryGuid =
 #[repr(C)]
 pub struct EFiMemoryTypeInformation {
     /// Type of memory being described.
-    pub memory_type: r_efi::efi::MemoryType,
+    pub memory_type: crate::standard::efi::MemoryType,
     /// Number of pages in this allocation.
     pub number_of_pages: u32,
 }

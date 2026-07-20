@@ -32,7 +32,7 @@ use core::{
 };
 use spin::Once;
 
-use r_efi::{efi, protocols::device_path::Protocol};
+use crate::standard::efi::{self, protocols::device_path::Protocol};
 
 use crate::{efi_types::EfiMemoryType, uefi_protocol::ProtocolInterface};
 use allocation::{AllocType, MemoryMap};

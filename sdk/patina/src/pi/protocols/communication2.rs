@@ -12,8 +12,8 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
+use crate::standard::efi;
 use core::ffi::c_void;
-use r_efi::efi;
 
 /// MM Communication Protocol GUID.
 pub const PROTOCOL_GUID: crate::BinaryGuid = crate::BinaryGuid::from_string("378DAEDC-F06B-4446-8314-40AB933C87A3");

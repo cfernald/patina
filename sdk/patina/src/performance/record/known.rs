@@ -11,7 +11,7 @@
 use alloc::string::String;
 use core::convert::TryFrom;
 
-use r_efi::efi;
+use crate::standard::efi;
 
 use crate::uefi_protocol::performance_measurement::PerfAttribute;
 

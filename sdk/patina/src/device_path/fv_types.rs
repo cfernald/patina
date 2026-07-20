@@ -7,8 +7,8 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
+use crate::standard::efi;
 use core::mem;
-use r_efi::efi;
 
 /// Describes a memory-mapped device path node.
 #[repr(C)]

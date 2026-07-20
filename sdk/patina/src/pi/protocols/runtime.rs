@@ -14,7 +14,7 @@
 use core::{ffi::c_void, sync::atomic::AtomicBool};
 
 use crate::pi::list_entry;
-use r_efi::efi;
+use crate::standard::efi;
 
 /// Runtime Arch Protocol GUID.
 pub const PROTOCOL_GUID: crate::BinaryGuid = crate::BinaryGuid::from_string("B7DFB4E1-052F-449F-87BE-9818FC91B733");

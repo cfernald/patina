@@ -11,7 +11,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-use r_efi::efi;
+use crate::standard::efi;
 
 /// CPU Architectrural Protocol GUID
 ///

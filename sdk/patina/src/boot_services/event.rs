@@ -9,7 +9,7 @@
 
 use core::ops;
 
-use r_efi::efi;
+use crate::standard::efi;
 
 /// Function signature for event notify function.
 pub type EventNotifyCallback<T> = unsafe extern "efiapi" fn(efi::Event, T);

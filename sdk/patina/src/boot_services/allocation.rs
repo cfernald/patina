@@ -8,7 +8,7 @@
 //!
 use core::ops::{BitOr, BitOrAssign};
 
-use r_efi::efi;
+use crate::standard::efi;
 
 use super::{BootServices, boxed::BootServicesBox};
 

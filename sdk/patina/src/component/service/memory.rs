@@ -36,7 +36,7 @@ use core::{
     ptr::{NonNull, with_exposed_provenance_mut},
 };
 
-use r_efi::efi;
+use crate::standard::efi;
 
 use crate::{base::UEFI_PAGE_SIZE, efi_types::EfiMemoryType, error::EfiError};
 

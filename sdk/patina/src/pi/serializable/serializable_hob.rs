@@ -111,7 +111,7 @@ pub struct MemAllocDescriptorSerDe {
     pub memory_base_address: u64,
     /// Length of the memory region in bytes.
     pub memory_length: u64,
-    /// Type of memory (as defined in `r_efi::System::MemoryType`).
+    /// Type of memory (as defined in `patina::standard::efi::MemoryType`).
     pub memory_type: u32,
 }
 

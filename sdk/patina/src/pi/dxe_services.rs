@@ -21,10 +21,7 @@ use core::{
     ops::Range,
 };
 
-use r_efi::{
-    efi::{Guid, Handle, PhysicalAddress, Status},
-    system::TableHeader,
-};
+use crate::standard::efi::{Guid, Handle, PhysicalAddress, Status, TableHeader};
 
 /// DXE Services Table GUID identifier
 ///

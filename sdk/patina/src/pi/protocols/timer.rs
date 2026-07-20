@@ -12,7 +12,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-use r_efi::efi;
+use crate::standard::efi;
 
 /// Timer Arch Protocol GUID.
 pub const PROTOCOL_GUID: crate::BinaryGuid = crate::BinaryGuid::from_string("26BACCB3-6F42-11D4-BCE7-0080C73C8881");

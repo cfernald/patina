@@ -11,7 +11,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-use r_efi::efi;
+use crate::standard::efi;
 
 /// Status Code Runtime Protocol GUID.
 pub const PROTOCOL_GUID: crate::BinaryGuid = crate::BinaryGuid::from_string("D2B2B828-0826-48A7-B3DF-983C006024F0");

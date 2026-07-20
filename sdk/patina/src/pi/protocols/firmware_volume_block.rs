@@ -13,8 +13,8 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
+use crate::standard::efi::{Handle, Lba, Status};
 use core::ffi::c_void;
-use r_efi::efi::{Handle, Lba, Status};
 
 use crate::pi::{fw_fs::EfiFvbAttributes2, hob::EfiPhysicalAddress};
 

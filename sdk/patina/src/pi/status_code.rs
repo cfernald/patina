@@ -16,7 +16,7 @@
 
 use crate::pi::protocols::status_code::{EfiStatusCodeType, EfiStatusCodeValue};
 // Required for IA32, X64, IPF, ARM and EBC defines for CPU exception types
-use r_efi::efi::protocols::debug_support;
+use crate::standard::efi::protocols::debug_support;
 
 // A Status Code Type is made up of the code type and severity.
 // All values masked by EFI_STATUS_CODE_RESERVED_MASK are
