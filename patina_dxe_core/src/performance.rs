@@ -337,14 +337,14 @@ impl PerformanceManager for CorePerformance {
     fn published_table_size(&self) -> Result<usize, Error> {
         match self.performance_table.try_lock() {
             Some(table) => Ok(table.published_table_size()),
-            None => Err(EfiError::InvalidParameter.into()),
+            None => Err(EfiError::AccessDenied.into()),
         }
     }
 
     fn publish_table(&self, buffer: &'static mut [u8]) -> Result<(), Error> {
         match self.performance_table.try_lock() {
             Some(mut table) => table.publish_table(buffer).map(|_| ()),
-            None => Err(EfiError::InvalidParameter.into()),
+            None => Err(EfiError::AccessDenied.into()),
         }
     }
 }
@@ -356,13 +356,13 @@ impl CorePerformance {
     /// may occur when dropping a measurement's lock guard restores the TPL and dispatches a pending
     /// event notification whose callback creates another measurement before the guard finishes releasing
     /// the lock. To avoid panicking, this attempts lock acquisition and, on contention, drops the record and returns
-    /// [`EfiError::InvalidParameter`] so the caller can observe that the record was not added. This is similar
+    /// [`EfiError::AccessDenied`] so the caller can observe that the record was not added. This is similar
     /// in behavior and return status to the edk2 implementation of [`create_performance_measurement`].
     fn add_fbpt_record<T: PerformanceRecord>(&self, record: T) -> Result<(), Error> {
         match self.performance_table.try_lock() {
             Some(mut table) => table.add_record(record),
             // Re-entrant measurement: See function docs.
-            None => Err(EfiError::InvalidParameter.into()),
+            None => Err(EfiError::AccessDenied.into()),
         }
     }
 
@@ -934,10 +934,10 @@ mod tests {
             let perf = test_core_performance();
             let _guard = perf.performance_table.lock();
 
-            assert_eq!(perf.published_table_size().unwrap_err(), Error::Efi(EfiError::InvalidParameter));
+            assert_eq!(perf.published_table_size().unwrap_err(), Error::Efi(EfiError::AccessDenied));
 
             let buffer: &'static mut [u8] = alloc::boxed::Box::leak(alloc::vec![0u8; 64].into_boxed_slice());
-            assert_eq!(perf.publish_table(buffer).unwrap_err(), Error::Efi(EfiError::InvalidParameter));
+            assert_eq!(perf.publish_table(buffer).unwrap_err(), Error::Efi(EfiError::AccessDenied));
 
             // A re-entrant record add cannot acquire the held table lock and drops the record.
             let data = [0u8; 4];
@@ -948,7 +948,7 @@ mod tests {
             bytes.push(0);
             bytes.extend_from_slice(&data);
             let record = GenericPerformanceRecord::ref_from_bytes(&bytes).unwrap();
-            assert_eq!(perf.add_generic_record(record).unwrap_err(), Error::Efi(EfiError::InvalidParameter));
+            assert_eq!(perf.add_generic_record(record).unwrap_err(), Error::Efi(EfiError::AccessDenied));
         })
         .unwrap();
     }

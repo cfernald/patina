@@ -38,7 +38,7 @@ pub(crate) struct Fbpt {
 
 impl Fbpt {
     /// FBPT - Firmware Basic Boot Performance Table signature
-    pub const SIGNATURE: u32 = u32::from_le_bytes([b'F', b'B', b'P', b'T']);
+    pub const SIGNATURE: u32 = patina::signature!('F', 'B', 'P', 'T');
 
     /// Create an new empty FBPT.
     pub const fn new() -> Self {

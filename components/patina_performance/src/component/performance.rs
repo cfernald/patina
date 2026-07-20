@@ -303,11 +303,12 @@ impl<'a> Iterator for PerformanceRecordIterator<'a> {
         }
 
         if rec_len > self.bytes.len() {
+            let available = self.bytes.len();
             self.bytes = &[];
             return Some(Err(MmPerformanceError::RecordError(alloc::format!(
                 "Truncated record (needed {}, had {})",
                 rec_len,
-                self.bytes.len()
+                available
             ))));
         }
 
@@ -434,6 +435,7 @@ where
     // Provide the allocated memory for the service to serialize the table into.
     if let Err(e) = performance.publish_table(buffer) {
         log::error!("Performance: Fail to serialize FBPT: {e:?}");
+        free_fbpt_buffer(&boot_services, fbpt_address, size);
         return;
     }
 
@@ -494,6 +496,18 @@ fn allocate_fbpt_buffer<B: BootServices>(
 
     // SAFETY: `pages` pages (`alloc_size` bytes) were just allocated at `address` as reserved memory.
     Some(unsafe { core::slice::from_raw_parts_mut(address as *mut u8, alloc_size) })
+}
+
+/// Frees the FBPT buffer allocated by `allocate_fbpt_buffer`.
+fn free_fbpt_buffer<B: BootServices>(boot_services: &B, buffer: usize, size: usize) {
+    let pages = size.div_ceil(UEFI_PAGE_SIZE);
+    let address = buffer;
+
+    // SAFETY: `buffer` was allocated by `allocate_fbpt_buffer`, which used `boot_services.allocate_pages` to allocate
+    //         this buffer, so it is safe to free using `boot_services.free_pages`.
+    if let Err(e) = unsafe { boot_services.free_pages(address, pages) } {
+        log::error!("Performance: Failed to free FBPT buffer at {address:#x}: {e:?}");
+    }
 }
 
 #[cfg(test)]

@@ -123,13 +123,7 @@ pub(crate) unsafe extern "efiapi" fn create_performance_measurement_efiapi(
 
     match service.create_measurement(caller_identifier, guid, string.as_deref(), ticker, address, perf_id, attribute) {
         Ok(_) => efi::Status::SUCCESS,
-        Err(Error::OutOfResources) => {
-            static HAS_BEEN_LOGGED: AtomicBool = AtomicBool::new(false);
-            if HAS_BEEN_LOGGED.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_ok() {
-                log::info!("Performance: FBPT is full, can't add more performance records !");
-            };
-            efi::Status::OUT_OF_RESOURCES
-        }
+        Err(Error::OutOfResources) => efi::Status::OUT_OF_RESOURCES,
         Err(Error::Efi(status_code)) => {
             log::error!(
                 "Performance: Something went wrong in create_performance_measurement. status_code: {status_code:?}"
