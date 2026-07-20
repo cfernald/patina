@@ -375,7 +375,7 @@ fn process_mm_performance_records(
             }
             Err(e) => {
                 log::warn!("Performance: {}", e);
-                break;
+                continue;
             }
         }
     }
