@@ -23,6 +23,7 @@ use alloc::{
 use core::{cmp::Ordering, ffi::c_void};
 use patina::{
     BinaryGuid, OwnedGuid,
+    component::service::Service,
     device_path::walker::concat_device_path_to_boxed_slice,
     error::EfiError,
     pi::{
@@ -37,15 +38,21 @@ use patina_ffs::{
 };
 use patina_internal_core::depex::{AssociatedDependency, Depex, Opcode};
 use r_efi::efi;
-use spin::{Once, RwLock};
+use spin::RwLock;
 
 use image::ImageStatus;
 use section_decompress::CoreExtractor;
 
 use crate::{
-    PlatformInfo, config_tables::core_install_configuration_table, events::EVENT_DB, performance,
-    pi_dispatcher::fv::device_path_bytes_for_fv_file, protocol_db::DXE_CORE_HANDLE, protocols::PROTOCOL_DB,
-    systemtables::EfiSystemTable, tpl_mutex::TplMutex,
+    PlatformInfo,
+    config_tables::core_install_configuration_table,
+    events::EVENT_DB,
+    performance::{self, CorePerformance},
+    pi_dispatcher::fv::device_path_bytes_for_fv_file,
+    protocol_db::DXE_CORE_HANDLE,
+    protocols::PROTOCOL_DB,
+    systemtables::EfiSystemTable,
+    tpl_mutex::TplMutex,
 };
 
 // Default Dependency expression per PI spec v1.2 Vol 2 section 10.9.
@@ -89,7 +96,7 @@ pub(crate) struct PiDispatcher<P: PlatformInfo> {
     /// Section extractor used when working with firmware volumes.
     section_extractor: CoreExtractor<P::Extractor>,
     /// Optional performance service reference.
-    performance: Once<&'static performance::CorePerformance>,
+    performance: Service<CorePerformance>,
 }
 
 impl<P: PlatformInfo> PiDispatcher<P> {
@@ -101,12 +108,12 @@ impl<P: PlatformInfo> PiDispatcher<P> {
             debug_image_data: debug_image_info_table::DebugImageInfoData::new_locked(),
             fv_data: fv::FvProtocolData::new_locked(),
             section_extractor: CoreExtractor::new(section_extractor),
-            performance: Once::new(),
+            performance: Service::new_uninit(),
         }
     }
 
-    pub(crate) fn set_performance(&self, performance: &'static performance::CorePerformance) {
-        let _ = self.performance.call_once(|| performance);
+    pub(crate) fn set_performance(&self, performance: &Service<performance::CorePerformance>) {
+        self.performance.replace(performance);
     }
 
     fn instance<'a>() -> &'a Self {

@@ -16,7 +16,7 @@ use patina::{
     BinaryGuid,
     component::{
         hob::FromHob,
-        service::{IntoService, perf_timer::ArchTimerFunctionality, performance::PerformanceManager},
+        service::{IntoService, Service, perf_timer::ArchTimerFunctionality, performance::PerformanceManager},
     },
     error::EfiError,
     performance::{
@@ -36,7 +36,6 @@ use patina::{
     pi::hob::{Hob as PiHob, HobList},
     uefi_protocol::performance_measurement::PerfAttribute,
 };
-use spin::Once;
 
 use crate::{cpu::PerfTimer, protocols::PROTOCOL_DB, tpl_mutex::TplMutex};
 
@@ -53,7 +52,7 @@ use table::Fbpt;
 
 /// This is a temporary global reference for code that has not yet been converted to use the instanced
 /// core mechanisms. This should be removed once driver_services.rs is converted.
-pub(crate) static CORE_PERFORMANCE: Once<&'static CorePerformance> = Once::new();
+pub(crate) static CORE_PERFORMANCE: Service<CorePerformance> = Service::new_uninit();
 
 /// Performance measurement service owned by the DXE Core.
 ///

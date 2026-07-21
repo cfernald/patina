@@ -22,9 +22,7 @@ use crate::{performance::CORE_PERFORMANCE, protocols::PROTOCOL_DB, systemtables:
 
 macro_rules! perf {
     ($method:ident, $driver_handle:expr, $controller_handle:expr) => {
-        if let Some(perf) = CORE_PERFORMANCE.get() {
-            perf.$method($driver_handle, $controller_handle);
-        }
+        CORE_PERFORMANCE.map_or_default(|perf| perf.$method($driver_handle, $controller_handle));
     };
 }
 

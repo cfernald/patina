@@ -321,8 +321,6 @@ pub struct Core<P: PlatformInfo> {
     component_dispatcher: TplMutex<ComponentDispatcher>,
     /// The subsystem responsible for fv management and dispatch of PI specification compliant UEFI drivers.
     pi_dispatcher: PiDispatcher<P>,
-    /// Performance subsystem for tracking measurements.
-    performance: CorePerformance,
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -333,7 +331,6 @@ impl<P: PlatformInfo> Core<P> {
             hob_list: Once::new(),
             component_dispatcher: ComponentDispatcher::new_locked(),
             pi_dispatcher: PiDispatcher::new(section_extractor),
-            performance: CorePerformance::new(),
         }
     }
 
@@ -481,41 +478,46 @@ impl<P: PlatformInfo> Core<P> {
 
         log::info!("GCD - After memory init:\n{GCD}");
 
-        self.initialize_performance(perf_frequency);
-
         let mut component_dispatcher = self.component_dispatcher.lock();
         component_dispatcher.add_service(DxeCpu(cpu));
         component_dispatcher.add_service(DxeInterruptManager(interrupt_manager));
         component_dispatcher.add_service(CoreMemoryManager);
         component_dispatcher.add_service(dxe_dispatch_service::CoreDxeDispatch::new(self));
         component_dispatcher.add_service(cpu::PerfTimer::with_frequency(perf_frequency));
-        if self.performance.enabled() {
-            component_dispatcher.add_service(&self.performance);
-        }
+        self.initialize_performance(perf_frequency, &mut component_dispatcher);
 
         relocated_hob_list
     }
 
-    fn initialize_performance(&'static self, perf_frequency: u64) {
+    fn initialize_performance(&'static self, perf_frequency: u64, component_dispatcher: &mut ComponentDispatcher) {
+        let performance = CorePerformance::new();
+
         // Initialize the core performance service from the HOB configuration (or the platform default) before
         // registering it below, so the service is published only when performance measurement is enabled. The engine
         // relies only on the arch timer and its own `TplMutex`, both of which are available at this point.
         let perf_config =
             performance::read_performance_config(self.hob_list()).unwrap_or(P::DEFAULT_PERFORMANCE_CONFIG);
         let perf_hob_records = performance::read_hob_performance_records(self.hob_list());
-        self.performance.init(perf_frequency, perf_config, perf_hob_records);
-        if self.performance.enabled() {
+        performance.init(perf_frequency, perf_config, perf_hob_records);
+        if performance.enabled() {
             // Record the PEI-end / DXE-begin cross-module markers. This runs during core memory initialization, as early
             // as the performance engine can record into its table, so the DXE span is captured close to the phase boundary.
             let dxe_core_guid = patina::guids::DXE_CORE.into_inner();
-            self.performance.perf_cross_module_end("PEI", &dxe_core_guid);
-            self.performance.perf_cross_module_begin("DXE", &dxe_core_guid);
-
-            // This should be removed once more code is converted to use platform generic.
-            performance::CORE_PERFORMANCE.call_once(|| &self.performance);
+            performance.perf_cross_module_end("PEI", &dxe_core_guid);
+            performance.perf_cross_module_begin("DXE", &dxe_core_guid);
 
             // Register the performance service with the dispatcher.
-            self.pi_dispatcher.set_performance(&self.performance);
+            component_dispatcher.add_service(performance);
+
+            let service = component_dispatcher
+                .get_service::<CorePerformance>()
+                .expect("CorePerformance was added, but not found");
+
+            // Register the performance service with the dispatcher.
+            self.pi_dispatcher.set_performance(&service);
+
+            // This should be removed once more code is converted to use platform generic.
+            performance::CORE_PERFORMANCE.replace(&service);
         }
     }
 
