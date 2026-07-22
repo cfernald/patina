@@ -23,6 +23,7 @@ use alloc::{
 use core::{cmp::Ordering, ffi::c_void};
 use patina::{
     BinaryGuid, Char16Str, OwnedGuid,
+    component::service::Service,
     device_path::walker::concat_device_path_to_boxed_slice,
     error::EfiError,
     pi::{
@@ -43,9 +44,15 @@ use image::ImageStatus;
 use section_decompress::CoreExtractor;
 
 use crate::{
-    PlatformInfo, config_tables::core_install_configuration_table, events::EVENT_DB,
-    pi_dispatcher::fv::device_path_bytes_for_fv_file, protocol_db::DXE_CORE_HANDLE, protocols::PROTOCOL_DB,
-    systemtables::EfiSystemTable, tpl_mutex::TplMutex,
+    PlatformInfo,
+    config_tables::core_install_configuration_table,
+    events::EVENT_DB,
+    performance::{self, CorePerformance},
+    pi_dispatcher::fv::device_path_bytes_for_fv_file,
+    protocol_db::DXE_CORE_HANDLE,
+    protocols::PROTOCOL_DB,
+    systemtables::EfiSystemTable,
+    tpl_mutex::TplMutex,
 };
 
 // Default Dependency expression per PI spec v1.2 Vol 2 section 10.9.
@@ -88,6 +95,8 @@ pub(crate) struct PiDispatcher<P: PlatformInfo> {
     fv_data: TplMutex<fv::FvProtocolData<P>>,
     /// Section extractor used when working with firmware volumes.
     section_extractor: CoreExtractor<P::Extractor>,
+    /// Optional performance service reference.
+    performance: Service<CorePerformance>,
 }
 
 impl<P: PlatformInfo> PiDispatcher<P> {
@@ -99,7 +108,12 @@ impl<P: PlatformInfo> PiDispatcher<P> {
             debug_image_data: debug_image_info_table::DebugImageInfoData::new_locked(),
             fv_data: fv::FvProtocolData::new_locked(),
             section_extractor: CoreExtractor::new(section_extractor),
+            performance: Service::new_uninit(),
         }
+    }
+
+    pub(crate) fn set_performance(&self, performance: &Service<performance::CorePerformance>) {
+        self.performance.replace(performance);
     }
 
     fn instance<'a>() -> &'a Self {

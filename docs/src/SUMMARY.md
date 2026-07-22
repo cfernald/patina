@@ -74,11 +74,13 @@
   - [Image Loading and Execution](dxe_core/images.md)
   - [Memory Management](dxe_core/memory_management.md)
   - [Memory Bins](dxe_core/memory_bins.md)
+  - [Performance Measurement](dxe_core/performance_measurement.md)
   - [Protocol Database](dxe_core/protocol_database.md)
   - [Synchronization](dxe_core/synchronization.md)
   - [Testing](dxe_core/testing.md)
   - [UEFI Driver Model](dxe_core/driver_model.md)
 
 -----------
+
 - [Contributors](misc/contributors.md)
 - [License](misc/license_history.md)

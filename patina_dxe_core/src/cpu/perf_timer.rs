@@ -39,13 +39,18 @@ impl ArchTimerFunctionality for PerfTimer {
 
 impl PerfTimer {
     /// Creates a new `PerfTimer` instance.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { frequency: AtomicU64::new(0) }
     }
 
     /// Creates a new `PerfTimer` instance with a specified frequency.
-    pub fn with_frequency(frequency: u64) -> Self {
+    pub const fn with_frequency(frequency: u64) -> Self {
         Self { frequency: AtomicU64::new(frequency) }
+    }
+
+    /// Initializes the frequency of the performance timer to the specified value.
+    pub(crate) fn set_frequency(&self, frequency: u64) {
+        self.frequency.store(frequency, Ordering::Relaxed);
     }
 }
 

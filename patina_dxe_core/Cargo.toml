@@ -36,6 +36,7 @@ patina_test = { workspace = true }
 # local to the workspace should be added via `path` instead of `workspace = true` so that that it does not fail to
 # compile due to the dev-dependency not being published yet.
 patina_samples = { path = "../components/patina_samples" }
+patina = { path = "../sdk/patina", features = ["core", "mockall"] }
 patina_ffs_extractors = { path = "../sdk/patina_ffs_extractors" }
 patina_internal_core = { path = "../core/patina_internal_core" }
 env_logger = { workspace = true }

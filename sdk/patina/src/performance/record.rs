@@ -8,13 +8,11 @@
 //!
 
 pub mod extended;
-pub mod hob;
 pub mod known;
 
 use crate::{BinaryGuid, performance::error::Error, performance_debug_assert};
 use alloc::vec::Vec;
 use core::{fmt, fmt::Debug, mem};
-use scroll::Pread;
 use zerocopy::{FromBytes, IntoBytes};
 use zerocopy_derive::*;
 
@@ -124,52 +122,72 @@ pub trait PerformanceRecord {
     }
 }
 
-/// Performance record used to store any specific type of record.
-#[derive(Debug)]
-pub struct GenericPerformanceRecord<T: AsRef<[u8]>> {
-    /// This value depicts the format and contents of the performance record.
-    pub record_type: u16,
-    /// This value depicts the length of the performance record, in bytes.
-    pub length: u8,
-    /// This value is updated if the format of the record type is extended.
-    /// Any changes to a performance record layout must be backwards-compatible
-    /// in that all previously defined fields must be maintained if still applicable,
-    /// but newly defined fields allow the length of the performance record to be increased.
-    /// Previously defined record fields must not be redefined, but are permitted to be deprecated.
-    pub revision: u8,
-    /// The underlying data of the specific performance record.
-    pub data: T,
-}
-
-impl<T: AsRef<[u8]>> GenericPerformanceRecord<T> {
-    /// Create a new generic performance record.
-    pub fn new(record_type: u16, length: u8, revision: u8, data: T) -> Self {
-        Self { record_type, length, revision, data }
-    }
-
-    /// Get the header as a structured type.
-    pub fn header(&self) -> PerformanceRecordHeader {
-        PerformanceRecordHeader::new(self.record_type, self.length, self.revision)
-    }
-}
-
-impl<T: AsRef<[u8]>> PerformanceRecord for GenericPerformanceRecord<T> {
+/// Blanket implementation so that a shared reference to any performance record
+/// (including the unsized [`GenericPerformanceRecord`]) can be used wherever an owned
+/// [`PerformanceRecord`] value is expected.
+impl<T: PerformanceRecord + ?Sized> PerformanceRecord for &T {
     fn record_type(&self) -> u16 {
-        self.record_type
+        (**self).record_type()
     }
 
     fn revision(&self) -> u8 {
-        self.revision
+        (**self).revision()
+    }
+
+    fn write_data_into(&self, buff: &mut [u8], offset: &mut usize) -> Result<(), Error> {
+        (**self).write_data_into(buff, offset)
+    }
+}
+
+/// A generic performance record type with an opaque payload. Structured as a
+/// [`PerformanceRecordHeader`] immediately followed by the variable-length payload.
+///
+/// Implemented using [`zerocopy`] to allow safe zero-copy parsing of the header and payload from a byte slice.
+#[repr(C, packed)]
+#[derive(FromBytes, IntoBytes, KnownLayout, Immutable)]
+pub struct GenericPerformanceRecord {
+    /// The fixed record header: type, length (header + payload), and revision.
+    pub header: PerformanceRecordHeader,
+    /// The payload of the specific performance record (everything after the header).
+    pub data: [u8],
+}
+
+impl Debug for GenericPerformanceRecord {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GenericPerformanceRecord").field("header", &self.header).field("data", &&self.data).finish()
+    }
+}
+
+impl GenericPerformanceRecord {
+    /// Borrows `bytes` in place as a single performance record.
+    ///
+    /// `bytes` must contain exactly one record: the [`PerformanceRecordHeader`] followed by
+    /// its payload. The trailing bytes after the header become [`GenericPerformanceRecord::data`].
+    ///
+    /// ## Errors
+    ///
+    /// Returns [`Error::Serialization`] if `bytes` is smaller than the record header.
+    pub fn ref_from_bytes(bytes: &[u8]) -> Result<&Self, Error> {
+        <Self as FromBytes>::ref_from_bytes(bytes).map_err(|_| Error::Serialization)
+    }
+}
+
+impl PerformanceRecord for GenericPerformanceRecord {
+    fn record_type(&self) -> u16 {
+        self.header.record_type
+    }
+
+    fn revision(&self) -> u8 {
+        self.header.revision
     }
 
     fn write_data_into(&self, buff: &mut [u8], offset: &mut usize) -> Result<(), Error> {
         let remaining = buff.len().saturating_sub(*offset);
-        let data = self.data.as_ref();
-        if data.len() > remaining {
+        if self.data.len() > remaining {
             return Err(Error::Serialization);
         }
-        buff.get_mut(*offset..*offset + data.len()).ok_or(Error::Serialization)?.copy_from_slice(data);
-        *offset += data.len();
+        buff.get_mut(*offset..*offset + self.data.len()).ok_or(Error::Serialization)?.copy_from_slice(&self.data);
+        *offset += self.data.len();
         Ok(())
     }
 }
@@ -285,20 +303,17 @@ impl<'a> Iter<'a> {
 }
 
 impl<'a> Iterator for Iter<'a> {
-    type Item = GenericPerformanceRecord<&'a [u8]>;
+    type Item = &'a GenericPerformanceRecord;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.buffer.is_empty() {
             return None;
         }
-        let mut offset = 0;
-        let record_type = self.buffer.gread::<u16>(&mut offset).unwrap();
-        let length = self.buffer.gread::<u8>(&mut offset).unwrap();
-        let revision = self.buffer.gread::<u8>(&mut offset).unwrap();
-
-        let data = self.buffer.get(offset..length as usize)?;
-        self.buffer = self.buffer.get(length as usize..)?;
-        Some(GenericPerformanceRecord::new(record_type, length, revision, data))
+        // The `length` field (total record size) is the third byte of the header.
+        let length = self.buffer.get(2).copied()? as usize;
+        let record = GenericPerformanceRecord::ref_from_bytes(self.buffer.get(..length)?).ok()?;
+        self.buffer = self.buffer.get(length..)?;
+        Some(record)
     }
 }
 
@@ -677,27 +692,19 @@ mod tests {
         performance_record_buffer.push_record(GuidQwordStringEventRecord::new(1, 0, 10, guid, 64, "test")).unwrap();
 
         for (i, record) in performance_record_buffer.iter().enumerate() {
+            let actual = (record.header.record_type, record.header.revision);
             match i {
-                _ if i == 0 => assert_eq!(
-                    (GuidEventRecord::TYPE, GuidEventRecord::REVISION),
-                    (record.record_type, record.revision)
-                ),
-                _ if i == 1 => assert_eq!(
-                    (DynamicStringEventRecord::TYPE, DynamicStringEventRecord::REVISION),
-                    (record.record_type, record.revision)
-                ),
-                _ if i == 2 => assert_eq!(
-                    (DualGuidStringEventRecord::TYPE, DualGuidStringEventRecord::REVISION),
-                    (record.record_type, record.revision)
-                ),
-                _ if i == 3 => assert_eq!(
-                    (GuidQwordEventRecord::TYPE, GuidQwordEventRecord::REVISION),
-                    (record.record_type, record.revision)
-                ),
-                _ if i == 4 => assert_eq!(
-                    (GuidQwordStringEventRecord::TYPE, GuidQwordStringEventRecord::REVISION),
-                    (record.record_type, record.revision)
-                ),
+                _ if i == 0 => assert_eq!((GuidEventRecord::TYPE, GuidEventRecord::REVISION), actual),
+                _ if i == 1 => {
+                    assert_eq!((DynamicStringEventRecord::TYPE, DynamicStringEventRecord::REVISION), actual)
+                }
+                _ if i == 2 => {
+                    assert_eq!((DualGuidStringEventRecord::TYPE, DualGuidStringEventRecord::REVISION), actual)
+                }
+                _ if i == 3 => assert_eq!((GuidQwordEventRecord::TYPE, GuidQwordEventRecord::REVISION), actual),
+                _ if i == 4 => {
+                    assert_eq!((GuidQwordStringEventRecord::TYPE, GuidQwordStringEventRecord::REVISION), actual)
+                }
                 _ => unreachable!(),
             }
         }
@@ -722,27 +729,19 @@ mod tests {
         performance_record_buffer.push_record(GuidQwordStringEventRecord::new(1, 0, 10, guid, 64, "test")).unwrap();
 
         for (i, record) in performance_record_buffer.iter().enumerate() {
+            let actual = (record.header.record_type, record.header.revision);
             match i {
-                _ if i == 0 => assert_eq!(
-                    (GuidEventRecord::TYPE, GuidEventRecord::REVISION),
-                    (record.record_type, record.revision)
-                ),
-                _ if i == 1 => assert_eq!(
-                    (DynamicStringEventRecord::TYPE, DynamicStringEventRecord::REVISION),
-                    (record.record_type, record.revision)
-                ),
-                _ if i == 2 => assert_eq!(
-                    (DualGuidStringEventRecord::TYPE, DualGuidStringEventRecord::REVISION),
-                    (record.record_type, record.revision)
-                ),
-                _ if i == 3 => assert_eq!(
-                    (GuidQwordEventRecord::TYPE, GuidQwordEventRecord::REVISION),
-                    (record.record_type, record.revision)
-                ),
-                _ if i == 4 => assert_eq!(
-                    (GuidQwordStringEventRecord::TYPE, GuidQwordStringEventRecord::REVISION),
-                    (record.record_type, record.revision)
-                ),
+                _ if i == 0 => assert_eq!((GuidEventRecord::TYPE, GuidEventRecord::REVISION), actual),
+                _ if i == 1 => {
+                    assert_eq!((DynamicStringEventRecord::TYPE, DynamicStringEventRecord::REVISION), actual)
+                }
+                _ if i == 2 => {
+                    assert_eq!((DualGuidStringEventRecord::TYPE, DualGuidStringEventRecord::REVISION), actual)
+                }
+                _ if i == 3 => assert_eq!((GuidQwordEventRecord::TYPE, GuidQwordEventRecord::REVISION), actual),
+                _ if i == 4 => {
+                    assert_eq!((GuidQwordStringEventRecord::TYPE, GuidQwordStringEventRecord::REVISION), actual)
+                }
                 _ => unreachable!(),
             }
         }

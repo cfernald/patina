@@ -1,4 +1,4 @@
-//! This module implements the functionality necessary to extract performance records from HOBs.
+//! Extraction of performance records carried over from earlier boot phases via HOBs.
 //!
 //! ## License
 //!
@@ -7,14 +7,11 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-#[cfg(any(test, feature = "mockall"))]
-use mockall::automock;
-
 use alloc::vec::Vec;
 use core::iter::Iterator;
 
-use crate::{
-    component::hob::{FromHob, Hob},
+use patina::{
+    component::hob::FromHob,
     performance::{
         error::Error,
         record::{Iter, PerformanceRecordBuffer},
@@ -23,16 +20,9 @@ use crate::{
 
 use scroll::Pread;
 
-/// API to extract the performance data from HOB.
-#[cfg_attr(any(test, feature = "mockall"), automock)]
-pub trait HobPerformanceDataExtractor {
-    /// Extract the number of image loaded and the performance records from performance HOB.
-    fn extract_hob_perf_data(&self) -> Result<(u32, PerformanceRecordBuffer), Error>;
-}
-
-/// Data inside an [`crate::guids::EDKII_FPDT_EXTENDED_FIRMWARE_PERFORMANCE`] guid hob.
+/// Data inside an [`patina::guids::EDKII_FPDT_EXTENDED_FIRMWARE_PERFORMANCE`] guid hob.
 #[derive(Debug, Default)]
-pub struct HobPerformanceData {
+pub(crate) struct HobPerformanceData {
     /// Number of images loaded.
     pub load_image_count: u32,
     /// Buffer containing performance records.
@@ -40,7 +30,7 @@ pub struct HobPerformanceData {
 }
 
 impl FromHob for HobPerformanceData {
-    const HOB_GUID: crate::BinaryGuid = crate::BinaryGuid::from_string("3B387BFD-7ABC-4CF2-A0CA-B6A16C1B1B25");
+    const HOB_GUID: patina::BinaryGuid = patina::BinaryGuid::from_string("3B387BFD-7ABC-4CF2-A0CA-B6A16C1B1B25");
 
     fn parse(bytes: &[u8]) -> HobPerformanceData {
         let mut offset = 0;
@@ -61,14 +51,9 @@ impl FromHob for HobPerformanceData {
     }
 }
 
-impl HobPerformanceDataExtractor for Hob<'_, HobPerformanceData> {
-    #[cfg_attr(coverage, coverage(off))]
-    fn extract_hob_perf_data(&self) -> Result<(u32, PerformanceRecordBuffer), Error> {
-        merge_hob_performance_buffer(self.iter())
-    }
-}
-
-fn merge_hob_performance_buffer<'a, T>(iter: T) -> Result<(u32, PerformanceRecordBuffer), Error>
+/// Merges the performance records from an iterator of [`HobPerformanceData`] into a single
+/// [`PerformanceRecordBuffer`], returning the total load-image count and the merged records.
+pub(crate) fn merge_hob_performance_buffer<'a, T>(iter: T) -> Result<(u32, PerformanceRecordBuffer), Error>
 where
     T: Iterator<Item = &'a HobPerformanceData>,
 {
@@ -86,16 +71,14 @@ where
 
 #[cfg(test)]
 #[cfg_attr(coverage, coverage(off))]
-pub mod tests {
+mod tests {
     use core::assert_eq;
 
     use scroll::Pwrite;
 
     use super::{HobPerformanceData, merge_hob_performance_buffer};
-    use crate::{
-        component::hob::FromHob,
-        performance::record::{GenericPerformanceRecord, PerformanceRecordBuffer},
-    };
+    use crate::performance::push_generic_record;
+    use patina::{component::hob::FromHob, performance::record::PerformanceRecordBuffer};
 
     #[test]
     fn test_merge_hob_performance_buffer_with_none() {
@@ -118,9 +101,7 @@ pub mod tests {
         let mut offset = 0;
 
         let mut perf_record_buffer = PerformanceRecordBuffer::new();
-        perf_record_buffer
-            .push_record(GenericPerformanceRecord { record_type: 1, length: 5, revision: 1, data: [1_u8, 2, 3, 4, 5] })
-            .unwrap();
+        push_generic_record(&mut perf_record_buffer, 1, 1, &[1_u8, 2, 3, 4, 5]);
 
         let size_of_all_entries = perf_record_buffer.size() as u32;
         let load_image_count = 12_u32;
@@ -150,19 +131,10 @@ pub mod tests {
     #[test]
     fn test_merge_hob_performance_buffer() {
         let mut perf_record_buffer_1 = PerformanceRecordBuffer::new();
-        perf_record_buffer_1
-            .push_record(GenericPerformanceRecord { record_type: 1, length: 5, revision: 1, data: [1_u8, 2, 3, 4, 5] })
-            .unwrap();
+        push_generic_record(&mut perf_record_buffer_1, 1, 1, &[1_u8, 2, 3, 4, 5]);
 
         let mut perf_record_buffer_2 = PerformanceRecordBuffer::new();
-        perf_record_buffer_2
-            .push_record(GenericPerformanceRecord {
-                record_type: 1,
-                length: 9,
-                revision: 1,
-                data: [10_u8, 20, 30, 40, 50],
-            })
-            .unwrap();
+        push_generic_record(&mut perf_record_buffer_2, 1, 1, &[10_u8, 20, 30, 40, 50]);
 
         let buffer = [
             HobPerformanceData { load_image_count: 1, records_data_buffer: perf_record_buffer_1.buffer().to_vec() },
@@ -172,17 +144,8 @@ pub mod tests {
         let (loaded_image_count, perf_record_buffer) = merge_hob_performance_buffer(buffer.iter()).unwrap();
 
         let mut expected_perf_record_buffer = PerformanceRecordBuffer::new();
-        expected_perf_record_buffer
-            .push_record(GenericPerformanceRecord { record_type: 1, length: 9, revision: 1, data: [1_u8, 2, 3, 4, 5] })
-            .unwrap();
-        expected_perf_record_buffer
-            .push_record(GenericPerformanceRecord {
-                record_type: 1,
-                length: 9,
-                revision: 1,
-                data: [10_u8, 20, 30, 40, 50],
-            })
-            .unwrap();
+        push_generic_record(&mut expected_perf_record_buffer, 1, 1, &[1_u8, 2, 3, 4, 5]);
+        push_generic_record(&mut expected_perf_record_buffer, 1, 1, &[10_u8, 20, 30, 40, 50]);
 
         assert_eq!(2, loaded_image_count);
         assert_eq!(expected_perf_record_buffer.buffer(), perf_record_buffer.buffer());

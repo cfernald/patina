@@ -157,6 +157,13 @@ impl ComponentDispatcher {
         self.storage.add_service(service);
     }
 
+    /// Gets a service from storage.
+    #[cfg_attr(coverage, coverage(off))]
+    #[inline(always)]
+    pub(crate) fn get_service<S: IntoService + 'static>(&mut self) -> Option<patina::component::service::Service<S>> {
+        self.storage.get_service::<S>()
+    }
+
     /// Locks the configurations in storage, preventing further modifications.
     #[cfg_attr(coverage, coverage(off))]
     #[inline(always)]

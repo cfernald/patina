@@ -87,6 +87,7 @@ mod memory_bin;
 mod memory_manager;
 mod misc_boot_services;
 mod pecoff;
+mod performance;
 mod pi_dispatcher;
 mod protocol_db;
 mod protocols;
@@ -121,8 +122,9 @@ use gcd::SpinLockedGcd;
 use memory_manager::CoreMemoryManager;
 use patina::{
     boot_services::StandardBootServices,
-    component::IntoComponent,
+    component::{IntoComponent, service::performance::PerformanceManager},
     error::{self, Result},
+    performance::config::PerformanceConfig,
     pi::{
         hob::{HobList, get_pi_hob_list_size},
         protocols::{bds, status_code},
@@ -135,8 +137,8 @@ use protocols::PROTOCOL_DB;
 use r_efi::efi;
 
 use crate::{
-    component_dispatcher::ComponentDispatcher, config_tables::memory_attributes_table, pi_dispatcher::PiDispatcher,
-    tpl_mutex::TplMutex,
+    component_dispatcher::ComponentDispatcher, config_tables::memory_attributes_table, performance::CorePerformance,
+    pi_dispatcher::PiDispatcher, tpl_mutex::TplMutex,
 };
 
 #[doc(hidden)]
@@ -237,6 +239,12 @@ pub trait PlatformInfo: 'static {
 
     /// The platform's section extractor type, used when extracting sections from firmware volumes.
     type Extractor: SectionExtractor;
+
+    /// The performance measurement configuration used when no performance configuration HOB is present.
+    ///
+    /// Defaults to disabled. Platforms may override this option to control the default behavior of the performance
+    /// measurement service when no configuration HOB is present.
+    const DEFAULT_PERFORMANCE_CONFIG: PerformanceConfig = PerformanceConfig::new();
 }
 
 /// Static reference to the DXE Core instance in the compiled binary.
@@ -458,9 +466,10 @@ impl<P: PlatformInfo> Core<P> {
         debugger_reload::initialize_debugger_reload(physical_hob_list);
 
         // Initialize the debugger if it is enabled.
+        let perf_frequency = P::CpuInfo::perf_timer_frequency().unwrap_or(0);
         patina_debugger::initialize(
             &mut interrupt_manager,
-            Some(Box::leak(Box::new(cpu::PerfTimer::with_frequency(P::CpuInfo::perf_timer_frequency().unwrap_or(0))))),
+            Some(Box::leak(Box::new(cpu::PerfTimer::with_frequency(perf_frequency)))),
         );
 
         #[cfg(feature = "debugger_reload")]
@@ -472,10 +481,42 @@ impl<P: PlatformInfo> Core<P> {
         component_dispatcher.add_service(DxeInterruptManager(interrupt_manager));
         component_dispatcher.add_service(CoreMemoryManager);
         component_dispatcher.add_service(dxe_dispatch_service::CoreDxeDispatch::new(self));
-        component_dispatcher
-            .add_service(cpu::PerfTimer::with_frequency(P::CpuInfo::perf_timer_frequency().unwrap_or(0)));
+        component_dispatcher.add_service(cpu::PerfTimer::with_frequency(perf_frequency));
+        self.initialize_performance(perf_frequency, &mut component_dispatcher);
 
         relocated_hob_list
+    }
+
+    fn initialize_performance(&'static self, perf_frequency: u64, component_dispatcher: &mut ComponentDispatcher) {
+        let performance = CorePerformance::new();
+
+        // Initialize the core performance service from the HOB configuration (or the platform default) before
+        // registering it below, so the service is published only when performance measurement is enabled. The engine
+        // relies only on the arch timer and its own `TplMutex`, both of which are available at this point.
+        let perf_config =
+            performance::read_performance_config(self.hob_list()).unwrap_or(P::DEFAULT_PERFORMANCE_CONFIG);
+        let perf_hob_records = performance::read_hob_performance_records(self.hob_list());
+        performance.init(perf_frequency, perf_config, perf_hob_records);
+        if performance.enabled() {
+            // Record the PEI-end / DXE-begin cross-module markers. This runs during core memory initialization, as early
+            // as the performance engine can record into its table, so the DXE span is captured close to the phase boundary.
+            let dxe_core_guid = patina::guids::DXE_CORE.into_inner();
+            performance.perf_cross_module_end("PEI", &dxe_core_guid);
+            performance.perf_cross_module_begin("DXE", &dxe_core_guid);
+
+            // Register the performance service with the dispatcher.
+            component_dispatcher.add_service(performance);
+
+            let service = component_dispatcher
+                .get_service::<CorePerformance>()
+                .expect("CorePerformance was added, but not found");
+
+            // Register the performance service with the dispatcher.
+            self.pi_dispatcher.set_performance(&service);
+
+            // This should be removed once more code is converted to use platform generic.
+            performance::CORE_PERFORMANCE.replace(&service);
+        }
     }
 
     /// Performs a combined dispatch of Patina components and UEFI drivers.
