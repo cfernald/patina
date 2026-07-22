@@ -10,7 +10,7 @@
 //!
 //! ```rust
 //! use patina::{
-//!    base::error::Result,
+//!    error::Result,
 //!    component::hob::{Hob, FromHob},
 //!    BinaryGuid
 //! };
@@ -34,7 +34,7 @@
 //! }
 //!
 //! impl FromHob for MyComplexHobStruct {
-//!     const HOB_GUID: BinaryGuid = patina::base::guid::constants::ZERO;
+//!     const HOB_GUID: BinaryGuid = patina::BinaryGuid::ZERO;
 //!
 //!    fn parse(bytes: &[u8]) -> Self {
 //!        Self::default() // Simple for example
@@ -90,7 +90,7 @@ use super::{
 /// }
 ///
 /// impl FromHob for MyConfig {
-///     const HOB_GUID: BinaryGuid = patina::base::guid::constants::ZERO;
+///     const HOB_GUID: BinaryGuid = patina::BinaryGuid::ZERO;
 ///
 ///     fn parse(bytes: &[u8]) -> Self {
 ///         // SAFETY: Specification defined requirement that the byte array is this underlying C type.
@@ -134,7 +134,7 @@ pub use patina_macro::FromHob;
 /// # #[derive(Debug)]
 /// # struct MyStruct{ value: u32 };
 /// # impl FromHob for MyStruct {
-/// #     const HOB_GUID: patina::BinaryGuid = patina::base::guid::constants::ZERO;
+/// #     const HOB_GUID: patina::BinaryGuid = patina::BinaryGuid::ZERO;
 /// #     fn parse(bytes: &[u8]) -> Self {
 /// #         MyStruct { value: 5 }
 /// #     }
@@ -167,7 +167,7 @@ impl<'h, T: FromHob + 'static> Hob<'h, T> {
     /// struct MyStruct;
     ///
     /// impl FromHob for MyStruct {
-    ///     const HOB_GUID: BinaryGuid = patina::base::guid::constants::ZERO;
+    ///     const HOB_GUID: BinaryGuid = patina::BinaryGuid::ZERO;
     ///
     ///    fn parse(bytes: &[u8]) -> Self {
     ///        MyStruct
@@ -251,7 +251,7 @@ unsafe impl<T: FromHob + 'static> Param for Hob<'_, T> {
 /// # use patina::component::hob::{FromHob, Hob};
 /// # struct MyStruct(u32);
 /// # impl FromHob for MyStruct {
-/// #     const HOB_GUID: patina::BinaryGuid = patina::base::guid::constants::ZERO;
+/// #     const HOB_GUID: patina::BinaryGuid = patina::BinaryGuid::ZERO;
 /// #     fn parse(bytes: &[u8]) -> Self {
 /// #         MyStruct(5)
 /// #     }
@@ -309,7 +309,7 @@ mod tests {
     }
 
     impl FromHob for MyStruct {
-        const HOB_GUID: BinaryGuid = patina::base::guid::constants::ZERO;
+        const HOB_GUID: BinaryGuid = patina::BinaryGuid::ZERO;
 
         fn parse(_bytes: &[u8]) -> Self {
             MyStruct::default()

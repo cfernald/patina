@@ -10,7 +10,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 use core::{mem::size_of, slice, sync::atomic::Ordering};
-use patina::base::error::{EfiError, Result};
+use patina::error::{EfiError, Result};
 use patina::standard::efi;
 use zerocopy::FromBytes;
 

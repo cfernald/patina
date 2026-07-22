@@ -37,7 +37,7 @@ const SURROGATE_RANGE: core::ops::RangeInclusive<u16> = 0xD800..=0xDFFF;
 /// # Examples
 ///
 /// ```rust
-/// use patina::base::string::Char16Str;
+/// use patina::string::Char16Str;
 ///
 /// let units = [0x0045u16, 0x0046, 0x0049, 0x0000]; // "EFI\0"
 /// let s = Char16Str::from_units_with_nul(&units).unwrap();
@@ -306,7 +306,7 @@ fn decode_le_units(bytes: &[u8]) -> Result<Vec<u16>, StringError> {
 /// # Examples
 ///
 /// ```rust
-/// use patina::base::string::Char16String;
+/// use patina::string::Char16String;
 ///
 /// let s = Char16String::try_from_str("Boot0001").unwrap();
 /// assert_eq!(s.len(), 8);
@@ -582,7 +582,7 @@ pub const fn ucs2_capacity(s: &str) -> usize {
 /// # Examples
 ///
 /// ```rust
-/// use patina::base::string::Char16Array;
+/// use patina::string::Char16Array;
 ///
 /// const NAME: Char16Array<4> = Char16Array::from_str("EFI");
 /// assert_eq!(NAME.as_char16_str().len(), 3);

@@ -9,8 +9,8 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 use patina::{
-    base::error::Result,
     component::{component, params::Config},
+    error::Result,
 };
 
 /// A simple struct component example.

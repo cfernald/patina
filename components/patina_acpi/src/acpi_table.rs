@@ -16,7 +16,7 @@ use crate::{
 };
 use alloc::{boxed::Box, vec::Vec};
 use patina::{
-    base::SIZE_4GB,
+    SIZE_4GB,
     component::service::{
         Service,
         memory::{AllocationOptions, MemoryManager, PageAllocationStrategy},

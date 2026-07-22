@@ -14,8 +14,8 @@ use crate::{GCD, gcd::AllocateType};
 use alloc::vec::Vec;
 use patina::standard::efi;
 use patina::{
-    base::{SIZE_1GB, SIZE_2MB, SIZE_4KB},
     pi::dxe_services::GcdMemoryType,
+    {SIZE_1GB, SIZE_2MB, SIZE_4KB},
 };
 use patina_paging::MemoryAttributes;
 use patina_test::{patina_test, u_assert, u_assert_eq};

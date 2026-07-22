@@ -60,7 +60,7 @@
 //! ### Example Option Usage
 //!
 //! ``` rust
-//! # use patina::{base::error::Result, component::params::{ConfigMut, Config}};
+//! # use patina::{error::Result, component::params::{ConfigMut, Config}};
 //! // This component will execute even if the config is already locked. If the interface was just
 //! // `config: ConfigMut<u32>`, and the config was locked, this component would never execute.
 //! fn my_driver(mut config: Option<ConfigMut<u32>>) -> Result<()> {
@@ -191,7 +191,7 @@ impl ComponentInput for () {}
     note = "1. The first parameter must be Self, &Self, or &mut Self.",
     note = "2. The remaining parameters must implement patina::component::params::Param",
     note = "3. Only a function with up to 5 parameters, excluding self, is supported.",
-    note = "4. The return type must be patina::base::error::Result<()>"
+    note = "4. The return type must be patina::error::Result<()>"
 )]
 pub trait ParamFunction<Marker>: Send + Sync + 'static {
     /// All parameters of the function that are retrievable from [Storage].
@@ -731,7 +731,7 @@ unsafe impl Param for StandardRuntimeServices {
 /// ```rust,ignore
 /// use patina::component::{component, params::Handle};
 /// use patina::uefi::boot_services::BootServices;
-/// use patina::base::error::Result;
+/// use patina::error::Result;
 ///
 /// struct BootLoader;
 ///

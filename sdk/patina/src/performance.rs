@@ -10,6 +10,7 @@
 //!
 pub mod config;
 pub mod error;
+pub mod guid;
 pub mod measurement;
 pub mod record;
 

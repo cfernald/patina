@@ -23,14 +23,21 @@
 //!
 //! The implementation avoids heap allocations, using stack-allocated buffers for formatting.
 
-use patina::base::guid::{Guid, GuidError, OwnedGuid, constants::*};
+use patina::{
+    BinaryGuid, Guid, GuidError, OwnedGuid, guid::DXE_CORE_ID, management_mode::guid::SMM_COMMUNICATION_PROTOCOL_GUID,
+    performance::guid::PERFORMANCE_PROTOCOL_GUID, pi::event::END_OF_DXE_EVENT_GROUP_GUID,
+    pi::hob::MEMORY_TYPE_INFO_HOB_GUID, uefi::event::EXIT_BOOT_SERVICES_FAILED_EVENT_GROUP_GUID,
+};
+
+/// The zero GUID (00000000-0000-0000-0000-000000000000).
+const ZERO: BinaryGuid = BinaryGuid::ZERO;
 
 /// Demonstrates formatting GUIDs from `efi::Guid` references.
 fn demonstrate_reference_formatting() {
     println!("=== GUID Formatting from efi::Guid References ===\n");
 
     // (1) Using the constructor method
-    let dxe_core_guid = Guid::from_ref(&DXE_CORE);
+    let dxe_core_guid = Guid::from_ref(&DXE_CORE_ID);
     println!("  DXE Core Module GUID: {}", dxe_core_guid);
     println!("    Debug format: {:?}", dxe_core_guid);
 
@@ -39,14 +46,13 @@ fn demonstrate_reference_formatting() {
     println!("  Zero GUID: {}", zero_guid);
 
     // (3 Automatic conversion with the Into trait
-    let perf_guid: Guid = (&PERFORMANCE_PROTOCOL).into();
+    let perf_guid: Guid = (&PERFORMANCE_PROTOCOL_GUID).into();
     println!("  Performance Protocol GUID: {}", perf_guid);
 
     // (4) Printing various protocol GUIDs
     println!("\n  Common Protocol GUIDs:");
-    println!("    SMM Communication: {}", Guid::from(&SMM_COMMUNICATION_PROTOCOL));
-    println!("    Hardware Interrupt: {}", Guid::from(&HARDWARE_INTERRUPT_PROTOCOL));
-    println!("    Memory Type Info: {}", Guid::from(&MEMORY_TYPE_INFORMATION));
+    println!("    SMM Communication: {}", Guid::from(&SMM_COMMUNICATION_PROTOCOL_GUID));
+    println!("    Memory Type Info: {}", Guid::from(&MEMORY_TYPE_INFO_HOB_GUID));
 
     println!();
 }
@@ -187,8 +193,10 @@ fn demonstrate_practical_usage() {
 
     // (1) Protocol identification in logging
     println!("  Protocol Logging Example:");
-    let protocols =
-        vec![("Performance Protocol", &PERFORMANCE_PROTOCOL), ("SMM Communication", &SMM_COMMUNICATION_PROTOCOL)];
+    let protocols = vec![
+        ("Performance Protocol", &PERFORMANCE_PROTOCOL_GUID),
+        ("SMM Communication", &SMM_COMMUNICATION_PROTOCOL_GUID),
+    ];
 
     for (name, guid) in protocols {
         println!("    [INFO] Loading protocol '{}' with GUID: {}", name, guid);
@@ -196,8 +204,8 @@ fn demonstrate_practical_usage() {
 
     // (2) Event group identification
     println!("\n  Event Group Example:");
-    println!("    [EVENT] End of DXE event signaled: {}", EVENT_GROUP_END_OF_DXE);
-    println!("    [EVENT] Exit Boot Services failed: {}", EBS_FAILED);
+    println!("    [EVENT] End of DXE event signaled: {}", END_OF_DXE_EVENT_GROUP_GUID);
+    println!("    [EVENT] Exit Boot Services failed: {}", EXIT_BOOT_SERVICES_FAILED_EVENT_GROUP_GUID);
 
     // (3) Configuration file or user input parsing
     println!("\n  Configuration Parsing Example:");
@@ -265,9 +273,9 @@ fn demonstrate_practical_usage() {
 
     // (7) Comparing different protocol GUIDs
     println!("\n  Different Protocol Comparison Example:");
-    println!("    Performance Protocol: {}", PERFORMANCE_PROTOCOL);
-    println!("    SMM Communication:    {}", SMM_COMMUNICATION_PROTOCOL);
-    println!("    Are they equal? {}", PERFORMANCE_PROTOCOL == SMM_COMMUNICATION_PROTOCOL);
+    println!("    Performance Protocol: {}", PERFORMANCE_PROTOCOL_GUID);
+    println!("    SMM Communication:    {}", SMM_COMMUNICATION_PROTOCOL_GUID);
+    println!("    Are they equal? {}", PERFORMANCE_PROTOCOL_GUID == SMM_COMMUNICATION_PROTOCOL_GUID);
 
     println!();
 }

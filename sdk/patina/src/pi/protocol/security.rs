@@ -62,7 +62,7 @@ pub const PROTOCOL_GUID: crate::BinaryGuid = crate::BinaryGuid::from_string("A46
 ///                                    the platform policy dictates that File should not be
 ///                                    used for any purpose.
 pub type EfiSecurityFileAuthenticationState = extern "efiapi" fn(
-    this: *mut Protocol,
+    this: *mut SecurityProtocol,
     authentication_status: u32,
     file: *mut efi::protocols::device_path::Protocol,
 ) -> efi::Status;
@@ -71,7 +71,7 @@ pub type EfiSecurityFileAuthenticationState = extern "efiapi" fn(
 /// from the DXE core.  This includes locking flash upon failure to authenticate,
 /// attestation logging, and other exception operations.
 #[repr(C)]
-pub struct Protocol {
+pub struct SecurityProtocol {
     /// Function to check file authentication state. See [`EfiSecurityFileAuthenticationState`] for more details.
     pub file_authentication_state: EfiSecurityFileAuthenticationState,
 }

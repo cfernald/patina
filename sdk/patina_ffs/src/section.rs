@@ -11,8 +11,8 @@
 //!
 use alloc::{boxed::Box, vec, vec::Vec};
 use patina::{
-    base::align_up,
-    base::c_ptr::CPtr,
+    align_up,
+    c_ptr::CPtr,
     pi::fw_fs::ffs::{self, section},
 };
 

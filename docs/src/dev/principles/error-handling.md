@@ -49,8 +49,8 @@ This code which `unwrap`s on logger initialization panics unnecessarily:
 use patina_adv_logger::{component::AdvancedLoggerComponent, logger::AdvancedLogger};
 use log::LevelFilter;
 use patina::{
-    log::Format,
-    serial::uart::UartNull,
+    debug::log::Format,
+    peripheral::serial::uart::UartNull,
 };
 
 static LOGGER: AdvancedLogger<UartNull> = AdvancedLogger::new(
@@ -74,8 +74,8 @@ Consider replacing it with `match` and returning a `Result`:
 # use patina_adv_logger::{component::AdvancedLoggerComponent, logger::AdvancedLogger};
 # use log::LevelFilter;
 # use patina::{
-#     log::Format,
-#     serial::uart::UartNull,
+#     debug::log::Format,
+#     peripheral::serial::uart::UartNull,
 # };
 # static LOGGER: AdvancedLogger<UartNull> = AdvancedLogger::new(
 #     Format::Standard,

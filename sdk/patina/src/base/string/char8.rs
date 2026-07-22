@@ -35,7 +35,7 @@ use super::char16::{Char16Str, Char16String};
 /// # Examples
 ///
 /// ```rust
-/// use patina::base::string::Char8Str;
+/// use patina::string::Char8Str;
 ///
 /// let bytes = *b"EFI\0";
 /// let s = Char8Str::from_bytes_with_nul(&bytes).unwrap();
@@ -278,7 +278,7 @@ impl core::fmt::Debug for Char8Str {
 /// # Examples
 ///
 /// ```rust
-/// use patina::base::string::Char8String;
+/// use patina::string::Char8String;
 ///
 /// let s = Char8String::try_from_str("Firmware").unwrap();
 /// assert_eq!(s.len(), 8);
@@ -527,7 +527,7 @@ pub const fn latin1_capacity(s: &str) -> usize {
 /// # Examples
 ///
 /// ```rust
-/// use patina::base::string::Char8Array;
+/// use patina::string::Char8Array;
 ///
 /// const NAME: Char8Array<4> = Char8Array::from_str("EFI");
 /// assert_eq!(NAME.as_char8_str().len(), 3);

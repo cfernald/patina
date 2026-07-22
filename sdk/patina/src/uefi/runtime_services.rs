@@ -9,6 +9,11 @@
 //! let variable_services::VariableInfo = RUNTIME_SERVICES.query_variable_info(attributes);
 //! ```
 //!
+//! ## License
+//!
+//! Copyright (c) Microsoft Corporation.
+//!
+//! SPDX-License-Identifier: Apache-2.0
 
 /// Variable-services-specific structs and utilities
 pub mod variable_services;

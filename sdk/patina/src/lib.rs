@@ -2,7 +2,6 @@
 //!
 //! This crate implements the core SDK for Patina and is only part of the Patina
 //! solution. For general knowledge on Patina, refer to the [Patina book](https://opendevicepartnership.github.io/patina/).
-
 //!
 //! ## License
 //!
@@ -18,15 +17,14 @@
 #[cfg(any(test, feature = "alloc"))]
 extern crate alloc;
 
-pub use base::error;
-pub use base::guid::{BinaryGuid, Guid, GuidError, OwnedGuid};
-pub use base::string::{Char8Array, Char8Str, Char16Array, Char16Str, StringError};
-
-#[cfg(any(test, feature = "alloc"))]
-pub use base::string::{Char8String, Char16String};
+// The base module gets republished from the root to flatten dependencies for common structures.
+// Additionally, certain types will also be directly exposed from the root for convenience.
+mod base;
+pub use base::*;
+pub use guid::{BinaryGuid, Guid, GuidError, OwnedGuid};
+pub use string::{Char8Array, Char8Str, Char8String, Char16Array, Char16Str, Char16String, StringError};
 
 pub mod arch;
-pub mod base;
 #[cfg(any(test, feature = "alloc"))]
 pub mod component;
 pub mod debug;

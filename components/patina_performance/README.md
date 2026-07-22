@@ -79,7 +79,7 @@ Core and consumed both internally by the core and by components via dependency i
 ```rust,no_run
 # extern crate patina;
 use patina::component::service::{Service, performance::PerformanceManager};
-use patina::base::guid::constants::CALLER_ID;
+use patina::guid::CALLER_ID;
 
 fn record(perf: Service<dyn PerformanceManager>) {
     perf.perf_cross_module_begin("DXE", CALLER_ID.as_efi_guid());

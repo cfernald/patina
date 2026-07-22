@@ -1,4 +1,4 @@
-//! Definition of [`EdkiiPerformanceMeasurement`].
+//! Definition of [`EdkiiPerformanceMeasurementProtocol`].
 //!
 //! This Protocol is use to log performance measurement records.
 //!
@@ -15,8 +15,8 @@ use core::{
     option::Option,
 };
 
+use crate::base::protocol::ProtocolInterface;
 use crate::standard::efi;
-use crate::uefi::protocol::ProtocolInterface;
 
 /// GUID for the EDKII Performance Measurement Protocol.
 pub const EDKII_PERFORMANCE_MEASUREMENT_PROTOCOL_GUID: crate::BinaryGuid =
@@ -50,14 +50,14 @@ pub type CreateMeasurementUefi = unsafe extern "efiapi" fn(
 ) -> efi::Status;
 
 /// EDKII defined Performance Measurement Protocol structure.
-pub struct EdkiiPerformanceMeasurement {
+pub struct EdkiiPerformanceMeasurementProtocol {
     /// Function to create performance record with event description and a timestamp.
     pub create_performance_measurement: CreateMeasurementUefi,
 }
 
-// SAFETY: EdkiiPerformanceMeasurement implements the EDK II Performance Measurement protocol interface.
+// SAFETY: EdkiiPerformanceMeasurementProtocol implements the EDK II Performance Measurement protocol interface.
 // The PROTOCOL_GUID matches the EDK II defined value. The protocol structure layout matches the protocol
 // interface requirements.
-unsafe impl ProtocolInterface for EdkiiPerformanceMeasurement {
+unsafe impl ProtocolInterface for EdkiiPerformanceMeasurementProtocol {
     const PROTOCOL_GUID: crate::BinaryGuid = EDKII_PERFORMANCE_MEASUREMENT_PROTOCOL_GUID;
 }

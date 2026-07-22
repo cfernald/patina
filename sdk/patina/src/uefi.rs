@@ -17,6 +17,7 @@ pub mod decompress;
 pub mod device_path;
 #[cfg(any(test, feature = "alloc"))]
 pub mod driver_binding;
+pub mod event;
 pub mod memory;
 #[cfg(any(test, feature = "alloc"))]
 pub mod memory_map;

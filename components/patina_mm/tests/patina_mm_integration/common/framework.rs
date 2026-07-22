@@ -56,9 +56,9 @@ impl core::fmt::Display for TestFrameworkError {
 
 impl std::error::Error for TestFrameworkError {}
 
-impl From<TestFrameworkError> for patina::base::error::EfiError {
+impl From<TestFrameworkError> for patina::error::EfiError {
     fn from(_err: TestFrameworkError) -> Self {
-        patina::base::error::EfiError::Aborted // Convert to appropriate EFI error
+        patina::error::EfiError::Aborted // Convert to appropriate EFI error
     }
 }
 

@@ -29,7 +29,7 @@
 //!
 //! ```rust,ignore
 //! use patina::component::component;
-//! use patina::base::error::Result;
+//! use patina::error::Result;
 //!
 //! pub struct MyComponent {
 //!     data: u32,
@@ -92,7 +92,7 @@
 //!
 //! ```rust
 //! use patina::{
-//!     base::error::Result,
+//!     error::Result,
 //!     component::{
 //!         component,
 //!         params::Config,

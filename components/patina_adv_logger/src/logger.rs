@@ -17,9 +17,9 @@ use core::{ffi::c_void, marker::Send, ptr};
 use log::Level;
 use patina::standard::efi;
 use patina::{
-    base::error::EfiError,
     component::service::{Service, perf_timer::ArchTimerFunctionality},
     debug::log::Format,
+    error::EfiError,
     peripheral::serial::{SerialIO, shared::SharedSerial},
     pi::hob::{Hob, PhaseHandoffInformationTable},
 };
@@ -359,7 +359,7 @@ mod tests {
         component::service::{IntoService, perf_timer::ArchTimerFunctionality},
         debug::log::Format,
         peripheral::serial::uart::UartNull,
-        pi::hob::{GUID_EXTENSION, GuidHob, header},
+        pi::hob::{GUID_EXTENSION, GuidHob, HobHeader},
     };
 
     use crate::{
@@ -429,7 +429,7 @@ mod tests {
             ptr::write(
                 hob,
                 GuidHob {
-                    header: header::Hob { r#type: GUID_EXTENSION, length: HOB_LEN as u16, reserved: 0 },
+                    header: HobHeader { r#type: GUID_EXTENSION, length: HOB_LEN as u16, reserved: 0 },
                     name: memory_log::ADV_LOGGER_HOB_GUID,
                 },
             )

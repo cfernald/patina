@@ -28,7 +28,7 @@ impl<E: SectionExtractor> CoreExtractor<E> {
     ) -> Result<vec::Vec<u8>, FirmwareFileSystemError> {
         let (src, algo) = match section.header() {
             SectionHeader::GuidDefined(guid_header, _, _)
-                if guid_header.section_definition_guid == fw_fs::guid::TIANO_DECOMPRESS_SECTION =>
+                if guid_header.section_definition_guid == fw_fs::guid::TIANO_DECOMPRESS_SECTION_GUID =>
             {
                 (section.try_content_as_slice()?, DecompressionAlgorithm::TianoDecompress)
             }

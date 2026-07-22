@@ -82,10 +82,11 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
+mod constants;
+pub use constants::*;
+
 use crate::base::error::EfiError;
 use crate::standard::efi;
-
-pub mod constants;
 
 /// The expected number of hexadecimal characters in a valid GUID string representation
 const EXPECTED_HEX_CHARS: usize = 32;
@@ -205,6 +206,9 @@ pub type OwnedGuid = Guid<'static>;
 pub struct BinaryGuid(pub efi::Guid);
 
 impl BinaryGuid {
+    /// A constant representing a GUID with all zero bytes.
+    pub const ZERO: BinaryGuid = BinaryGuid::from_string("00000000-0000-0000-0000-000000000000");
+
     /// Create a BinaryGuid from individual GUID fields.
     ///
     /// This is a const function that can be used to create compile-time constants.

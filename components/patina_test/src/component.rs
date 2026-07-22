@@ -99,7 +99,7 @@ impl TestRunner {
 
     /// The entry point for the test runner component.
     #[cfg_attr(coverage, coverage(off))]
-    fn entry_point(self, storage: &mut Storage) -> patina::base::error::Result<()> {
+    fn entry_point(self, storage: &mut Storage) -> patina::error::Result<()> {
         let test_list: &'static [__private_api::TestCase] = __private_api::test_cases();
         self.register_tests(test_list, storage)
     }
@@ -109,7 +109,7 @@ impl TestRunner {
         &self,
         test_list: &'static [__private_api::TestCase],
         storage: &mut Storage,
-    ) -> patina::base::error::Result<()> {
+    ) -> patina::error::Result<()> {
         let recorder = match storage.get_service::<Recorder>() {
             Some(recorder) => recorder,
             None => {

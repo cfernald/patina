@@ -272,8 +272,8 @@ In this example, we will talk about how to configure the loggers provided by Pat
 ```rust
 # extern crate patina;
 # extern crate log;
-use patina::serial::uart::UartNull; // UartPl011 (AARCH64) and Uart16550 (X64) exist
-use patina::log::{Format, SerialLogger};
+use patina::peripheral::serial::uart::UartNull; // UartPl011 (AARCH64) and Uart16550 (X64) exist
+use patina::debug::log::{Format, SerialLogger};
 use log::LevelFilter;
 
 const LOGGER: SerialLogger<UartNull> = SerialLogger::new(
@@ -291,7 +291,7 @@ Modify the `DEBUGGER` static to match your platform's debug serial infrastructur
 ```rust
 # extern crate patina;
 # extern crate patina_debugger;
-use patina::serial::uart::UartNull; // UartPl011 (AARCH64) and Uart16550 (X64) exist
+use patina::peripheral::serial::uart::UartNull; // UartPl011 (AARCH64) and Uart16550 (X64) exist
 
 #[cfg(feature = "enable_debugger")]
 const _ENABLE_DEBUGGER: bool = true;
@@ -325,8 +325,8 @@ use core::ffi::c_void;
 
 use patina_dxe_core::*;
 use patina_ffs_extractors::BrotliSectionExtractor;
-use patina::log::{Format, SerialLogger};
-use patina::serial::uart::UartNull; // Uart16550 or UartPl011 available for X64 / AARCH64 platforms
+use patina::debug::log::{Format, SerialLogger};
+use patina::peripheral::serial::uart::UartNull; // Uart16550 or UartPl011 available for X64 / AARCH64 platforms
 
 static LOGGER: SerialLogger<UartNull> = SerialLogger::new(
     Format::Standard, // Format to write logs in
@@ -497,8 +497,8 @@ crate when supported by the target architecture.
 use core::{ffi::c_void, panic::PanicInfo};
 use patina_dxe_core::*;
 use patina_ffs_extractors::BrotliSectionExtractor;
-use patina::log::{Format, SerialLogger};
-use patina::serial::uart::UartNull; // Uart16550 or UartPl011 exist
+use patina::debug::log::{Format, SerialLogger};
+use patina::peripheral::serial::uart::UartNull; // Uart16550 or UartPl011 exist
 use patina_stacktrace::StackTrace;
 extern crate alloc;
 

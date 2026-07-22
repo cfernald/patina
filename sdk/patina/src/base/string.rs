@@ -213,8 +213,8 @@ impl From<StringError> for EfiError {
 #[macro_export]
 macro_rules! char16 {
     ($s:literal) => {{
-        static CHAR16_LITERAL: $crate::base::string::Char16Array<{ $crate::base::string::ucs2_capacity($s) }> =
-            $crate::base::string::Char16Array::from_str($s);
+        static CHAR16_LITERAL: $crate::string::Char16Array<{ $crate::string::ucs2_capacity($s) }> =
+            $crate::string::Char16Array::from_str($s);
         CHAR16_LITERAL.as_char16_str()
     }};
 }
@@ -236,8 +236,8 @@ macro_rules! char16 {
 #[macro_export]
 macro_rules! char8 {
     ($s:literal) => {{
-        static CHAR8_LITERAL: $crate::base::string::Char8Array<{ $crate::base::string::latin1_capacity($s) }> =
-            $crate::base::string::Char8Array::from_str($s);
+        static CHAR8_LITERAL: $crate::string::Char8Array<{ $crate::string::latin1_capacity($s) }> =
+            $crate::string::Char8Array::from_str($s);
         CHAR8_LITERAL.as_char8_str()
     }};
 }

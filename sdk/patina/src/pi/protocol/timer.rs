@@ -53,7 +53,7 @@ pub type EfiTimerNotify = extern "efiapi" fn(time: u64);
 ///   previously registered.
 /// * @retval - EFI_DEVICE_ERROR: The timer handler could not be registered.
 pub type EfiTimerRegisterHandler =
-    extern "efiapi" fn(this: *mut Protocol, notify_function: EfiTimerNotify) -> efi::Status;
+    extern "efiapi" fn(this: *mut TimerProtocol, notify_function: EfiTimerNotify) -> efi::Status;
 
 /// This function adjusts the period of timer interrupts to the value specified
 /// by TimerPeriod.  If the timer period is updated, then the selected timer
@@ -75,7 +75,7 @@ pub type EfiTimerRegisterHandler =
 /// * @retval - EFI_SUCCESS: The timer period was changed.
 /// * @retval - EFI_UNSUPPORTED: The platform cannot change the period of the timer interrupt.
 /// * @retval - EFI_DEVICE_ERROR: The timer period could not be changed due to a device error.
-pub type EfiTimerSetTimerPeriod = extern "efiapi" fn(this: *mut Protocol, timer_period: u64) -> efi::Status;
+pub type EfiTimerSetTimerPeriod = extern "efiapi" fn(this: *mut TimerProtocol, timer_period: u64) -> efi::Status;
 
 /// This function retrieves the period of timer interrupts in 100 ns units,
 /// returns that value in TimerPeriod, and returns EFI_SUCCESS.  If TimerPeriod
@@ -86,7 +86,7 @@ pub type EfiTimerSetTimerPeriod = extern "efiapi" fn(this: *mut Protocol, timer_
 ///   0 is returned, then the timer is currently disabled.
 /// * @retval - EFI_SUCCESS: The timer period was returned in TimerPeriod.
 /// * @retval - EFI_INVALID_PARAMETER: TimerPeriod is NULL.
-pub type EfiTimerGetTimerPeriod = extern "efiapi" fn(*mut Protocol, *mut u64) -> efi::Status;
+pub type EfiTimerGetTimerPeriod = extern "efiapi" fn(*mut TimerProtocol, *mut u64) -> efi::Status;
 
 /// This function generates a soft timer interrupt. If the platform does not support soft
 /// timer interrupts, then EFI_UNSUPPORTED is returned. Otherwise, EFI_SUCCESS is returned.
@@ -98,7 +98,7 @@ pub type EfiTimerGetTimerPeriod = extern "efiapi" fn(*mut Protocol, *mut u64) ->
 /// * this - The EFI_TIMER_ARCH_PROTOCOL instance.
 /// * @retval - EFI_SUCCESS: The soft timer interrupt was generated.
 /// * @retval - EFI_UNSUPPORTED: The platform does not support the generation of soft timer interrupts.
-pub type EfiTimerGenerateSoftInterrupt = extern "efiapi" fn(this: *mut Protocol) -> efi::Status;
+pub type EfiTimerGenerateSoftInterrupt = extern "efiapi" fn(this: *mut TimerProtocol) -> efi::Status;
 
 /// This protocol provides the services to initialize a periodic timer interrupt, and to register a handler
 /// that is called each time the time interrupt fires.  It may also provide a service to adjust the rate of the
@@ -108,7 +108,7 @@ pub type EfiTimerGenerateSoftInterrupt = extern "efiapi" fn(this: *mut Protocol)
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.10.1
 #[repr(C)]
-pub struct Protocol {
+pub struct TimerProtocol {
     /// Registers a handler function for timer interrupts.
     pub register_handler: EfiTimerRegisterHandler,
     /// Sets the period of the timer interrupt.

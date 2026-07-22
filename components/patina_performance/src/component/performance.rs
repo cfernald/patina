@@ -18,28 +18,31 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 use core::ffi::c_void;
 use patina::standard::efi::EVENT_GROUP_READY_TO_BOOT;
 use patina::{
-    base::UEFI_PAGE_SIZE,
-    base::error::EfiError,
-    base::guid::constants::{EDKII_FPDT_EXTENDED_FIRMWARE_PERFORMANCE, PERFORMANCE_PROTOCOL},
+    UEFI_PAGE_SIZE,
     component::{
         component,
         service::{Service, perf_timer::ArchTimerFunctionality, performance::PerformanceManager},
     },
+    error::EfiError,
     performance::{
+        guid::{EDKII_FPDT_EXTENDED_FIRMWARE_PERFORMANCE_GUID, PERFORMANCE_PROTOCOL_GUID},
         measurement::PerformanceProperty,
         record::{GenericPerformanceRecord, PerformanceRecordHeader, print_record_details, record_type_name},
     },
     pi::status_code::{EFI_PROGRESS_CODE, EFI_SOFTWARE_DXE_BS_DRIVER},
-    uefi::boot_services::{BootServices, StandardBootServices, allocation::AllocType, event::EventType, tpl::Tpl},
+    uefi::boot_services::{BootServices, StandardBootServices, allocation::AllocType, tpl::Tpl},
+    uefi::event::EventType,
     uefi::memory::EfiMemoryType,
-    uefi::protocol::{performance_measurement::EdkiiPerformanceMeasurement, status_code::StatusCodeRuntimeProtocol},
+    uefi::protocol::{
+        performance_measurement::EdkiiPerformanceMeasurementProtocol, status_code::StatusCodeRuntimeProtocol,
+    },
     uefi::runtime_services::{RuntimeServices, StandardRuntimeServices},
 };
 use patina_mm::component::communicator::MmCommunication;
 
 use patina::function;
 
-use patina::base::guid::constants::EVENT_GROUP_END_OF_DXE;
+use patina::pi::event::END_OF_DXE_EVENT_GROUP_GUID;
 
 /// Context parameter for the Ready-to-Boot event callback that fetches MM performance records.
 type MmPerformanceEventContext<B> = Box<(B, Service<dyn PerformanceManager>, Service<dyn MmCommunication>)>;
@@ -110,13 +113,13 @@ impl Performance {
             Tpl::CALLBACK,
             Some(report_fbpt_event::<B, R>),
             Box::new((boot_services.clone(), runtime_services.clone(), performance.clone())),
-            &EVENT_GROUP_END_OF_DXE,
+            &END_OF_DXE_EVENT_GROUP_GUID,
         )?;
 
         // Install the protocol interfaces for DXE performance.
         boot_services.install_protocol_interface(
             None,
-            Box::new(EdkiiPerformanceMeasurement {
+            Box::new(EdkiiPerformanceMeasurementProtocol {
                 create_performance_measurement: create_performance_measurement_efiapi,
             }),
         )?;
@@ -142,10 +145,10 @@ impl Performance {
         log::info!("Performance: Performance component initialized.");
 
         // Install configuration table for performance property.
-        // SAFETY: `install_configuration_table` requires that the data match the GUID; PERFORMANCE_PROTOCOL matches `PerformanceProperty`.
+        // SAFETY: `install_configuration_table` requires that the data match the GUID; PERFORMANCE_PROTOCOL_GUID matches `PerformanceProperty`.
         unsafe {
             boot_services.install_configuration_table(
-                &PERFORMANCE_PROTOCOL,
+                &PERFORMANCE_PROTOCOL_GUID,
                 Box::new(PerformanceProperty::new(
                     timer.perf_frequency(),
                     timer.cpu_count_start(),
@@ -449,8 +452,8 @@ where
         EFI_PROGRESS_CODE,
         EFI_SOFTWARE_DXE_BS_DRIVER,
         0,
-        patina::base::guid::constants::CALLER_ID.as_efi_guid(),
-        *EDKII_FPDT_EXTENDED_FIRMWARE_PERFORMANCE.as_efi_guid(),
+        patina::guid::CALLER_ID.as_efi_guid(),
+        *EDKII_FPDT_EXTENDED_FIRMWARE_PERFORMANCE_GUID.as_efi_guid(),
         fbpt_address,
     );
     if status.is_err() {
@@ -458,10 +461,10 @@ where
     }
 
     // SAFETY: This operation is valid because the expected configuration type of an entry with guid
-    // `EDKII_FPDT_EXTENDED_FIRMWARE_PERFORMANCE` is a usize and the memory address is valid and points to an FBPT.
+    // `EDKII_FPDT_EXTENDED_FIRMWARE_PERFORMANCE_GUID` is a usize and the memory address is valid and points to an FBPT.
     let status = unsafe {
         boot_services.install_configuration_table_unchecked(
-            &EDKII_FPDT_EXTENDED_FIRMWARE_PERFORMANCE,
+            &EDKII_FPDT_EXTENDED_FIRMWARE_PERFORMANCE_GUID,
             fbpt_address as *mut c_void,
         )
     };
@@ -521,12 +524,12 @@ mod tests {
 
     use alloc::sync::Arc;
     use patina::{
-        base::c_ptr::{CMutPtr, CPtr},
+        c_ptr::{CMutPtr, CPtr},
         component::service::{IntoService, Service},
         performance::{error::Error, measurement::CallerIdentifier},
+        protocol::ProtocolInterface,
         uefi::boot_services::MockBootServices,
         uefi::protocol::{
-            ProtocolInterface,
             performance_measurement::{EDKII_PERFORMANCE_MEASUREMENT_PROTOCOL_GUID, PerfAttribute},
             status_code::StatusCodeRuntimeProtocol,
         },
@@ -647,13 +650,13 @@ mod tests {
 
         // Test that the protocol in installed.
         boot_services
-            .expect_install_protocol_interface::<EdkiiPerformanceMeasurement, Box<_>>()
+            .expect_install_protocol_interface::<EdkiiPerformanceMeasurementProtocol, Box<_>>()
             .once()
             .withf_st(|handle, _protocol_interface| {
                 assert_eq!(&None, handle);
                 assert_eq!(
                     EDKII_PERFORMANCE_MEASUREMENT_PROTOCOL_GUID.into_inner(),
-                    EdkiiPerformanceMeasurement::PROTOCOL_GUID
+                    EdkiiPerformanceMeasurementProtocol::PROTOCOL_GUID
                 );
                 true
             })
@@ -670,7 +673,7 @@ mod tests {
                     report_fbpt_event::<MockBootServices, MockRuntimeServices> as *const () as usize,
                     notify_function.unwrap() as usize
                 );
-                assert_eq!(&EVENT_GROUP_END_OF_DXE, event_group);
+                assert_eq!(&END_OF_DXE_EVENT_GROUP_GUID, event_group);
                 true
             })
             .return_const_st(Ok(TEST_EVENT_HANDLE));
@@ -720,7 +723,7 @@ mod tests {
             })
             .return_const_st(Ok(TEST_EVENT_HANDLE_2));
         entry_point_mock
-            .expect_install_protocol_interface::<EdkiiPerformanceMeasurement, Box<_>>()
+            .expect_install_protocol_interface::<EdkiiPerformanceMeasurementProtocol, Box<_>>()
             .once()
             .returning(|_, protocol_interface| Ok((TEST_EFI_HANDLE, protocol_interface.metadata())));
         entry_point_mock.expect_install_configuration_table::<Box<PerformanceProperty>>().once().return_const(Ok(()));
@@ -743,7 +746,7 @@ mod tests {
             _b: u32,
             _c: u32,
             _d: *const efi::Guid,
-            _e: *const patina::pi::protocols::status_code::EfiStatusCodeData,
+            _e: *const patina::pi::protocol::status_code::EfiStatusCodeData,
         ) -> efi::Status {
             REPORT_STATUS_CODE_CALLED.store(true, Ordering::Relaxed);
             efi::Status::SUCCESS

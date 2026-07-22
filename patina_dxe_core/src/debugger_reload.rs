@@ -15,9 +15,12 @@ use core::ffi::c_void;
 
 use alloc::vec::Vec;
 use patina::{
-    base::guid::constants as guids,
     component::service::memory::{AllocationOptions, MemoryManager, PageAllocationStrategy},
-    pi::hob::{self},
+    guid as base_guids,
+    pi::{
+        guid as pi_guids,
+        hob::{self},
+    },
     uefi::decompress::{DecompressionAlgorithm, decompress_into_with_algo},
     uefi_size_to_pages, writelncrlf,
 };
@@ -247,7 +250,7 @@ fn fixup_hob_list(
         return Err("Original HOB list address is zero");
     }
 
-    let mut next_hob = physical_hob_list as *mut hob::header::Hob;
+    let mut next_hob = physical_hob_list as *mut hob::HobHeader;
     let mut stack_ptr = 0usize;
     let mut fixed_up_core = false;
     loop {
@@ -264,12 +267,12 @@ fn fixup_hob_list(
             let alloc_hob = unsafe { (next_hob as *mut hob::MemoryAllocationModule).as_mut() }
                 .ok_or("Failed to read memory allocation HOB")?;
 
-            if alloc_hob.module_name == guids::DXE_CORE {
+            if alloc_hob.module_name == base_guids::DXE_CORE_ID {
                 alloc_hob.alloc_descriptor.memory_base_address = core_address as u64;
                 alloc_hob.alloc_descriptor.memory_length = core_buffer_size as u64;
                 alloc_hob.entry_point = entry_point as u64;
                 fixed_up_core = true;
-            } else if alloc_hob.alloc_descriptor.name == guids::HOB_MEMORY_ALLOC_STACK {
+            } else if alloc_hob.alloc_descriptor.name == pi_guids::MEMORY_ALLOC_STACK_HOB_GUID {
                 // Get the top of the stack. The pointer used needs to be offset down 0x18 bytes for
                 // alignment to ensure we match calling convention requirements. Failure to do this will cause
                 // crashes due to mis-aligned stack accesses.

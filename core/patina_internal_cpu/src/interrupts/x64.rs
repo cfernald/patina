@@ -8,7 +8,7 @@
 //!
 
 use crate::{interrupts::ExceptionContextX64, log_registers};
-use patina::pi::protocols::cpu_arch::EfiSystemContext;
+use patina::pi::protocol::cpu_arch::EfiSystemContext;
 use patina_stacktrace::{StackFrame, StackTrace};
 
 #[cfg(target_os = "uefi")]

@@ -386,7 +386,7 @@ mod tests {
 
     #[test]
     fn test_hoblist_serialization() {
-        let header = hob::header::Hob {
+        let header = hob::HobHeader {
             r#type: hob::HANDOFF,
             length: size_of::<hob::PhaseHandoffInformationTable>() as u16,
             reserved: 0,
@@ -402,12 +402,12 @@ mod tests {
             end_of_hob_list: 0xdeaddeadc0dec0de,
         };
 
-        let header = hob::header::Hob {
+        let header = hob::HobHeader {
             r#type: hob::MEMORY_ALLOCATION,
             length: size_of::<hob::MemoryAllocation>() as u16,
             reserved: 0,
         };
-        let alloc_descriptor = hob::header::MemoryAllocation {
+        let alloc_descriptor = hob::MemoryAllocationHeader {
             name: crate::BinaryGuid::from_fields(1, 2, 3, 4, 5, &[6, 7, 8, 9, 10, 11]),
             memory_base_address: 0,
             memory_length: 0x0123456789abcdef,
@@ -416,7 +416,7 @@ mod tests {
         };
         let memory_alloc_hob = hob::MemoryAllocation { header, alloc_descriptor };
 
-        let header = hob::header::Hob {
+        let header = hob::HobHeader {
             r#type: hob::RESOURCE_DESCRIPTOR,
             length: size_of::<hob::ResourceDescriptor>() as u16,
             reserved: 0,
@@ -445,7 +445,7 @@ mod tests {
         let data = [1_u8, 2, 3, 4, 5, 6, 7, 8];
         let guid_hob = (
             hob::GuidHob {
-                header: hob::header::Hob {
+                header: hob::HobHeader {
                     r#type: hob::GUID_EXTENSION,
                     length: (size_of::<hob::GuidHob>() + data.len()) as u16,
                     reserved: 0,
@@ -455,10 +455,10 @@ mod tests {
             data,
         );
 
-        let header = hob::header::Hob { r#type: hob::FV, length: size_of::<hob::FirmwareVolume>() as u16, reserved: 0 };
+        let header = hob::HobHeader { r#type: hob::FV, length: size_of::<hob::FirmwareVolume>() as u16, reserved: 0 };
         let fv_hob = hob::FirmwareVolume { header, base_address: 0, length: 0x0123456789abcdef };
 
-        let header = hob::header::Hob { r#type: hob::CPU, length: size_of::<hob::Cpu>() as u16, reserved: 0 };
+        let header = hob::HobHeader { r#type: hob::CPU, length: size_of::<hob::Cpu>() as u16, reserved: 0 };
         let cpu_hob = hob::Cpu { header, size_of_memory_space: 0, size_of_io_space: 0, reserved: [0; 6] };
 
         let hob_list = [
@@ -511,7 +511,7 @@ mod tests {
         data.extend_from_slice(&999_u32.to_le_bytes()); // ignored sentinel pages
 
         let guid_hob = hob::GuidHob {
-            header: hob::header::Hob {
+            header: hob::HobHeader {
                 r#type: hob::GUID_EXTENSION,
                 length: (size_of::<hob::GuidHob>() + data.len()) as u16,
                 reserved: 0,

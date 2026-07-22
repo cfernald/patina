@@ -6,7 +6,7 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 
-use patina::base::SIZE_4KB;
+use patina::SIZE_4KB;
 
 /// Standard test buffer size
 pub const TEST_BUFFER_SIZE: usize = SIZE_4KB;

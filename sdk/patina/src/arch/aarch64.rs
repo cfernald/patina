@@ -9,7 +9,7 @@
 //! Portions Copyright 2023 The arm-gic Authors.
 //! arm-gic is dual-licensed under Apache 2.0 and MIT terms.
 
-use crate::{error::EfiError, pi::protocols::cpu_arch::CpuFlushType, standard::efi};
+use crate::{error::EfiError, pi::protocol::cpu_arch::CpuFlushType, standard::efi};
 use core::num::NonZeroU64;
 
 pub(super) struct AArch64;

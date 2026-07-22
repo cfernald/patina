@@ -21,7 +21,7 @@ use patina::{
     },
 };
 
-use patina::base::error::EfiError;
+use patina::error::EfiError;
 use patina::standard::efi::{self, MEMORY_MAPPED_IO};
 use patina_ffs::{file::FileRef, section::SectionExtractor, volume::VolumeRef};
 
@@ -39,9 +39,9 @@ use crate::{
 #[allow(dead_code)]
 enum Protocol {
     /// A heap-allocated FV protocol instance.
-    Fv(&'static pi::protocols::firmware_volume::Protocol),
+    Fv(&'static pi::protocol::firmware_volume::FirmwareVolumeProtocol),
     /// A heap-allocated FVB protocol instance.
-    Fvb(&'static pi::protocols::firmware_volume_block::Protocol),
+    Fvb(&'static pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol),
 }
 
 /// The metadata associated with a given FV / FVB protocol installation.
@@ -54,12 +54,15 @@ struct Metadata {
 
 impl Metadata {
     /// Creates a new Metadata instance for a FVB protocol.
-    fn new_fvb(protocol: Box<pi::protocols::firmware_volume_block::Protocol>, physical_address: u64) -> Self {
+    fn new_fvb(
+        protocol: Box<pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol>,
+        physical_address: u64,
+    ) -> Self {
         Self { protocol: Protocol::Fvb(Box::leak(protocol)), physical_address }
     }
 
     /// Creates a new Metadata instance for a FV protocol.
-    fn new_fv(protocol: Box<pi::protocols::firmware_volume::Protocol>, physical_address: u64) -> Self {
+    fn new_fv(protocol: Box<pi::protocol::firmware_volume::FirmwareVolumeProtocol>, physical_address: u64) -> Self {
         Self { protocol: Protocol::Fv(Box::leak(protocol)), physical_address }
     }
 }
@@ -75,7 +78,7 @@ pub(super) struct FvProtocolData<P: PlatformInfo> {
 impl<P: PlatformInfo> FvProtocolData<P> {
     /// Returns the FV's physical address for the given protocol pointer, if it is in-fact a FV protocol.
     #[inline(always)]
-    fn get_fv_address(&self, protocol: NonNull<pi::protocols::firmware_volume::Protocol>) -> Option<u64> {
+    fn get_fv_address(&self, protocol: NonNull<pi::protocol::firmware_volume::FirmwareVolumeProtocol>) -> Option<u64> {
         if let Some(Metadata { protocol: Protocol::Fv(_), physical_address }) = self.fv_metadata.get(&protocol.addr()) {
             Some(*physical_address)
         } else {
@@ -85,7 +88,10 @@ impl<P: PlatformInfo> FvProtocolData<P> {
 
     /// Returns the FVB's physical address for the given protocol pointer, if it is in-fact a FVB protocol.
     #[inline(always)]
-    fn get_fvb_address(&self, protocol: NonNull<pi::protocols::firmware_volume_block::Protocol>) -> Option<u64> {
+    fn get_fvb_address(
+        &self,
+        protocol: NonNull<pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol>,
+    ) -> Option<u64> {
         if let Some(Metadata { protocol: Protocol::Fvb(_), physical_address }) = self.fv_metadata.get(&protocol.addr())
         {
             Some(*physical_address)
@@ -114,7 +120,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
     /// Rust implementation of the FVB protocol's get_attributes method.
     fn fvb_get_attributes(
         &self,
-        protocol: NonNull<pi::protocols::firmware_volume_block::Protocol>,
+        protocol: NonNull<pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol>,
     ) -> Result<fvb::attributes::EfiFvbAttributes2, EfiError> {
         let physical_address = self.get_fvb_address(protocol).ok_or(EfiError::NotFound)?;
 
@@ -127,7 +133,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
     /// Rust implementation of the FVB protocol's get_physical_address method.
     fn fvb_get_physical_address(
         &self,
-        protocol: NonNull<pi::protocols::firmware_volume_block::Protocol>,
+        protocol: NonNull<pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol>,
     ) -> Result<efi::PhysicalAddress, EfiError> {
         let physical_address = self.get_fvb_address(protocol).ok_or(EfiError::NotFound)?;
 
@@ -137,7 +143,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
     /// Rust implementation of the FVB protocol's get_block_size method.
     fn fvb_get_block_size(
         &self,
-        protocol: NonNull<pi::protocols::firmware_volume_block::Protocol>,
+        protocol: NonNull<pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol>,
         lba: efi::Lba,
     ) -> Result<(usize, usize), EfiError> {
         let physical_address = self.get_fvb_address(protocol).ok_or(EfiError::NotFound)?;
@@ -156,7 +162,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
     /// Rust implementation of the FVB protocol's read method.
     fn fvb_read(
         &self,
-        protocol: NonNull<pi::protocols::firmware_volume_block::Protocol>,
+        protocol: NonNull<pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol>,
         lba: efi::Lba,
         offset: usize,
         num_bytes: usize,
@@ -191,7 +197,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
     /// Rust implementation of the FV protocol's get_volume_attributes method.
     fn fv_get_volume_attributes(
         &self,
-        protocol: NonNull<pi::protocols::firmware_volume::Protocol>,
+        protocol: NonNull<pi::protocol::firmware_volume::FirmwareVolumeProtocol>,
     ) -> Result<fv::attributes::EfiFvAttributes, EfiError> {
         let physical_address = self.get_fv_address(protocol).ok_or(EfiError::NotFound)?;
 
@@ -205,7 +211,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
     /// Rust implementation of the FV protocol's read_file method.
     fn fv_read_file(
         &self,
-        protocol: NonNull<pi::protocols::firmware_volume::Protocol>,
+        protocol: NonNull<pi::protocol::firmware_volume::FirmwareVolumeProtocol>,
         name: efi::Guid,
     ) -> Result<FileRef<'_>, EfiError> {
         let physical_address = self.get_fv_address(protocol).ok_or(EfiError::NotFound)?;
@@ -230,7 +236,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
     /// Helper function to extract a section from a FV.
     fn fv_read_section<E: SectionExtractor>(
         &self,
-        protocol: NonNull<pi::protocols::firmware_volume::Protocol>,
+        protocol: NonNull<pi::protocol::firmware_volume::FirmwareVolumeProtocol>,
         name: efi::Guid,
         section_type: ffs::section::EfiSectionType,
         section_instance: usize,
@@ -250,7 +256,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
     /// Rust implementation of the FV protocol's GetNextFile method.
     fn fv_get_next_file(
         &self,
-        protocol: NonNull<pi::protocols::firmware_volume::Protocol>,
+        protocol: NonNull<pi::protocol::firmware_volume::FirmwareVolumeProtocol>,
         file_type: fv::EfiFvFileType,
         key: usize,
     ) -> Result<(efi::Guid, fv::file::EfiFvFileAttributes, usize, fv::EfiFvFileType), EfiError> {
@@ -292,8 +298,10 @@ impl<P: PlatformInfo> FvProtocolData<P> {
         Ok((file.name().into_inner(), attributes, file.data().len(), file.file_type_raw()))
     }
 
-    fn new_fvb_protocol(parent_handle: Option<efi::Handle>) -> Box<pi::protocols::firmware_volume_block::Protocol> {
-        Box::new(pi::protocols::firmware_volume_block::Protocol {
+    fn new_fvb_protocol(
+        parent_handle: Option<efi::Handle>,
+    ) -> Box<pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol> {
+        Box::new(pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol {
             get_attributes: Self::fvb_get_attributes_efiapi,
             set_attributes: Self::fvb_set_attributes_efiapi,
             get_physical_address: Self::fvb_get_physical_address_efiapi,
@@ -305,8 +313,10 @@ impl<P: PlatformInfo> FvProtocolData<P> {
         })
     }
 
-    fn new_fv_protocol(parent_handle: Option<efi::Handle>) -> Box<pi::protocols::firmware_volume::Protocol> {
-        Box::from(pi::protocols::firmware_volume::Protocol {
+    fn new_fv_protocol(
+        parent_handle: Option<efi::Handle>,
+    ) -> Box<pi::protocol::firmware_volume::FirmwareVolumeProtocol> {
+        Box::from(pi::protocol::firmware_volume::FirmwareVolumeProtocol {
             get_volume_attributes: Self::fv_get_volume_attributes_efiapi,
             set_volume_attributes: Self::fv_set_volume_attributes_efiapi,
             read_file: Self::fv_read_file_efiapi,
@@ -339,7 +349,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
         // install the protocol and return status
         core_install_protocol_interface(
             handle,
-            pi::protocols::firmware_volume_block::PROTOCOL_GUID.into_inner(),
+            pi::protocol::firmware_volume_block::PROTOCOL_GUID.into_inner(),
             protocol_ptr.as_ptr(),
         )
     }
@@ -363,7 +373,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
         // install the protocol and return status
         core_install_protocol_interface(
             handle,
-            pi::protocols::firmware_volume::PROTOCOL_GUID.into_inner(),
+            pi::protocol::firmware_volume::PROTOCOL_GUID.into_inner(),
             protocol_ptr.as_ptr(),
         )
     }
@@ -439,7 +449,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
 impl<P: PlatformInfo> FvProtocolData<P> {
     /// EFIAPI compliant FVB protocol GetAttributes method.
     extern "efiapi" fn fvb_get_attributes_efiapi(
-        this: *mut pi::protocols::firmware_volume_block::Protocol,
+        this: *mut pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol,
         attributes: *mut fvb::attributes::EfiFvbAttributes2,
     ) -> efi::Status {
         if attributes.is_null() {
@@ -461,7 +471,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
 
     /// EFIAPI compliant FVB protocol SetAttributes method.
     extern "efiapi" fn fvb_set_attributes_efiapi(
-        _this: *mut pi::protocols::firmware_volume_block::Protocol,
+        _this: *mut pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol,
         _attributes: *mut fvb::attributes::EfiFvbAttributes2,
     ) -> efi::Status {
         efi::Status::UNSUPPORTED
@@ -469,7 +479,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
 
     /// EFIAPI compliant FVB protocol GetPhysicalAddress method.
     extern "efiapi" fn fvb_get_physical_address_efiapi(
-        this: *mut pi::protocols::firmware_volume_block::Protocol,
+        this: *mut pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol,
         address: *mut efi::PhysicalAddress,
     ) -> efi::Status {
         if address.is_null() {
@@ -491,7 +501,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
 
     /// EFIAPI compliant FVB protocol GetBlockSize method.
     extern "efiapi" fn fvb_get_block_size_efiapi(
-        this: *mut pi::protocols::firmware_volume_block::Protocol,
+        this: *mut pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol,
         lba: efi::Lba,
         block_size: *mut usize,
         number_of_blocks: *mut usize,
@@ -520,7 +530,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
 
     /// EFIAPI compliant FVB protocol Read method.
     extern "efiapi" fn fvb_read_efiapi(
-        this: *mut pi::protocols::firmware_volume_block::Protocol,
+        this: *mut pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol,
         lba: efi::Lba,
         offset: usize,
         num_bytes: *mut usize,
@@ -562,7 +572,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
 
     /// EFIAPI compliant FVB protocol Write method.
     extern "efiapi" fn fvb_write_efiapi(
-        _this: *mut pi::protocols::firmware_volume_block::Protocol,
+        _this: *mut pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol,
         _lba: efi::Lba,
         _offset: usize,
         _num_bytes: *mut usize,
@@ -573,7 +583,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
 
     /// EFIAPI compliant FVB protocol EraseBlocks method.
     extern "efiapi" fn fvb_erase_blocks_efiapi(
-        _this: *mut pi::protocols::firmware_volume_block::Protocol,
+        _this: *mut pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol,
         //... TODO: this should be variadic; however, variadic and eficall don't mix well presently.
     ) -> efi::Status {
         efi::Status::UNSUPPORTED
@@ -581,14 +591,14 @@ impl<P: PlatformInfo> FvProtocolData<P> {
 
     /// EFIAPI compliant FV protocol GetVolumeAttributes method.
     extern "efiapi" fn fv_get_volume_attributes_efiapi(
-        this: *const pi::protocols::firmware_volume::Protocol,
+        this: *const pi::protocol::firmware_volume::FirmwareVolumeProtocol,
         fv_attributes: *mut fv::attributes::EfiFvAttributes,
     ) -> efi::Status {
         if fv_attributes.is_null() {
             return efi::Status::INVALID_PARAMETER;
         }
 
-        let Some(protocol) = NonNull::new(this as *mut pi::protocols::firmware_volume::Protocol) else {
+        let Some(protocol) = NonNull::new(this as *mut pi::protocol::firmware_volume::FirmwareVolumeProtocol) else {
             return efi::Status::INVALID_PARAMETER;
         };
 
@@ -605,7 +615,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
 
     /// EFIAPI compliant FV protocol SetVolumeAttributes method.
     extern "efiapi" fn fv_set_volume_attributes_efiapi(
-        _this: *const pi::protocols::firmware_volume::Protocol,
+        _this: *const pi::protocol::firmware_volume::FirmwareVolumeProtocol,
         _fv_attributes: *mut fv::attributes::EfiFvAttributes,
     ) -> efi::Status {
         efi::Status::UNSUPPORTED
@@ -613,7 +623,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
 
     /// EFIAPI compliant FV protocol ReadFile method.
     extern "efiapi" fn fv_read_file_efiapi(
-        this: *const pi::protocols::firmware_volume::Protocol,
+        this: *const pi::protocol::firmware_volume::FirmwareVolumeProtocol,
         name_guid: *const efi::Guid,
         buffer: *mut *mut c_void,
         buffer_size: *mut usize,
@@ -630,7 +640,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
             return efi::Status::INVALID_PARAMETER;
         }
 
-        let Some(protocol) = NonNull::new(this as *mut pi::protocols::firmware_volume::Protocol) else {
+        let Some(protocol) = NonNull::new(this as *mut pi::protocol::firmware_volume::FirmwareVolumeProtocol) else {
             return efi::Status::INVALID_PARAMETER;
         };
 
@@ -716,7 +726,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
 
     /// EFIAPI compliant FV protocol ReadSection method.
     extern "efiapi" fn fv_read_section_efiapi(
-        this: *const pi::protocols::firmware_volume::Protocol,
+        this: *const pi::protocol::firmware_volume::FirmwareVolumeProtocol,
         name_guid: *const efi::Guid,
         section_type: ffs::section::EfiSectionType,
         section_instance: usize,
@@ -728,7 +738,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
             return efi::Status::INVALID_PARAMETER;
         }
 
-        let Some(protocol) = NonNull::new(this as *mut pi::protocols::firmware_volume::Protocol) else {
+        let Some(protocol) = NonNull::new(this as *mut pi::protocol::firmware_volume::FirmwareVolumeProtocol) else {
             return efi::Status::INVALID_PARAMETER;
         };
 
@@ -801,17 +811,17 @@ impl<P: PlatformInfo> FvProtocolData<P> {
 
     /// EFIAPI compliant FV protocol WriteFile method.
     extern "efiapi" fn fv_write_file_efiapi(
-        _this: *const pi::protocols::firmware_volume::Protocol,
+        _this: *const pi::protocol::firmware_volume::FirmwareVolumeProtocol,
         _number_of_files: u32,
-        _write_policy: pi::protocols::firmware_volume::EfiFvWritePolicy,
-        _file_data: *mut pi::protocols::firmware_volume::EfiFvWriteFileData,
+        _write_policy: pi::protocol::firmware_volume::EfiFvWritePolicy,
+        _file_data: *mut pi::protocol::firmware_volume::EfiFvWriteFileData,
     ) -> efi::Status {
         efi::Status::UNSUPPORTED
     }
 
     /// EFIAPI compliant FV protocol GetNextFile method.
     extern "efiapi" fn fv_get_next_file_efiapi(
-        this: *const pi::protocols::firmware_volume::Protocol,
+        this: *const pi::protocol::firmware_volume::FirmwareVolumeProtocol,
         key: *mut c_void,
         file_type: *mut fv::EfiFvFileType,
         name_guid: *mut efi::Guid,
@@ -822,7 +832,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
             return efi::Status::INVALID_PARAMETER;
         }
 
-        let Some(protocol) = NonNull::new(this as *mut pi::protocols::firmware_volume::Protocol) else {
+        let Some(protocol) = NonNull::new(this as *mut pi::protocol::firmware_volume::FirmwareVolumeProtocol) else {
             return efi::Status::INVALID_PARAMETER;
         };
 
@@ -860,7 +870,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
 
     /// EFIAPI compliant FV protocol GetInfo method.
     extern "efiapi" fn fv_get_info_efiapi(
-        _this: *const pi::protocols::firmware_volume::Protocol,
+        _this: *const pi::protocol::firmware_volume::FirmwareVolumeProtocol,
         _information_type: *const efi::Guid,
         _buffer_size: *mut usize,
         _buffer: *mut c_void,
@@ -870,7 +880,7 @@ impl<P: PlatformInfo> FvProtocolData<P> {
 
     /// EFIAPI compliant FV protocol SetInfo method.
     extern "efiapi" fn fv_set_info_efiapi(
-        _this: *const pi::protocols::firmware_volume::Protocol,
+        _this: *const pi::protocol::firmware_volume::FirmwareVolumeProtocol,
         _information_type: *const efi::Guid,
         _buffer_size: usize,
         _buffer: *const c_void,
@@ -931,7 +941,7 @@ mod tests {
             // SAFETY: global lock ensures exclusive access to the private data.
             fn gen_firmware_volume2() -> hob::FirmwareVolume2 {
                 let header =
-                    hob::header::Hob { r#type: hob::FV, length: size_of::<hob::FirmwareVolume2>() as u16, reserved: 0 };
+                    hob::HobHeader { r#type: hob::FV, length: size_of::<hob::FirmwareVolume2>() as u16, reserved: 0 };
 
                 hob::FirmwareVolume2 {
                     header,
@@ -949,13 +959,13 @@ mod tests {
                 let base: u64 = fv.as_ptr() as u64;
 
                 let header =
-                    hob::header::Hob { r#type: hob::FV, length: size_of::<hob::FirmwareVolume>() as u16, reserved: 0 };
+                    hob::HobHeader { r#type: hob::FV, length: size_of::<hob::FirmwareVolume>() as u16, reserved: 0 };
 
                 hob::FirmwareVolume { header, base_address: base, length: len }
             }
 
             fn gen_end_of_hoblist() -> hob::PhaseHandoffInformationTable {
-                let header = hob::header::Hob {
+                let header = hob::HobHeader {
                     r#type: hob::END_OF_HOB_LIST,
                     length: size_of::<hob::PhaseHandoffInformationTable>() as u16,
                     reserved: 0,
@@ -1039,13 +1049,14 @@ mod tests {
             // save the protocol structure we're about to install in the private data.
             CORE.pi_dispatcher.fv_data.lock().fv_metadata.insert(fv_ptr.addr(), metadata);
 
-            let fv_ptr1 = fv_ptr.cast::<pi::protocols::firmware_volume::Protocol>().as_ptr();
+            let fv_ptr1 = fv_ptr.cast::<pi::protocol::firmware_volume::FirmwareVolumeProtocol>().as_ptr();
 
             /* Build Firmware Volume Block Interface*/
             let fvb_interface = MockProtocolData::new_fvb_protocol(parent_handle);
 
             let fvb_ptr = NonNull::from(&*fvb_interface).cast::<c_void>();
-            let fvb_ptr_mut_prot = fvb_ptr.cast::<pi::protocols::firmware_volume_block::Protocol>().as_ptr();
+            let fvb_ptr_mut_prot =
+                fvb_ptr.cast::<pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol>().as_ptr();
 
             /* Build Private Data */
             let metadata = Metadata::new_fvb(fvb_interface, base_address);
@@ -1058,7 +1069,7 @@ mod tests {
             let fv_interface3 = MockProtocolData::new_fv_protocol(parent_handle);
 
             let fv_ptr3 = NonNull::from(&*fv_interface3).cast::<c_void>();
-            let fv_ptr3_const = fv_ptr3.cast::<pi::protocols::firmware_volume::Protocol>().as_ptr();
+            let fv_ptr3_const = fv_ptr3.cast::<pi::protocol::firmware_volume::FirmwareVolumeProtocol>().as_ptr();
 
             /* Allocate a readable buffer with invalid content (no valid _FVH signature) */
             let bad_fv_buf = vec![0u8; size_of::<fv::Header>()].leak();
@@ -1070,13 +1081,15 @@ mod tests {
             /* Create an interface with No physical address and no private data - cover Error Conditions */
             let fv_interface_no_data = MockProtocolData::new_fv_protocol(None);
 
-            let fv_ptr_no_data = fv_interface_no_data.as_ref() as *const pi::protocols::firmware_volume::Protocol;
+            let fv_ptr_no_data =
+                fv_interface_no_data.as_ref() as *const pi::protocol::firmware_volume::FirmwareVolumeProtocol;
 
             /* Create a Firmware Volume Block Interface with Invalid Physical Address */
             let fvb_intf_invalid = MockProtocolData::new_fvb_protocol(parent_handle);
             let fvb_intf_invalid_void = NonNull::from(&*fvb_intf_invalid).cast::<c_void>();
-            let fvb_intf_invalid_mutpro =
-                fvb_intf_invalid_void.cast::<pi::protocols::firmware_volume_block::Protocol>().as_ptr();
+            let fvb_intf_invalid_mutpro = fvb_intf_invalid_void
+                .cast::<pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol>()
+                .as_ptr();
             let base_no: u64 = fv.as_ptr() as u64 + 0x1000;
 
             let private_data4 = Metadata::new_fvb(fvb_intf_invalid, base_no);
@@ -1084,7 +1097,7 @@ mod tests {
             CORE.pi_dispatcher.fv_data.lock().fv_metadata.insert(fvb_intf_invalid_void.addr(), private_data4);
 
             /* Create a Firmware Volume Block Interface without Physical address populated  */
-            let mut fvb_intf_data_n = Box::from(pi::protocols::firmware_volume_block::Protocol {
+            let mut fvb_intf_data_n = Box::from(pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol {
                 get_attributes: MockProtocolData::fvb_get_attributes_efiapi,
                 set_attributes: MockProtocolData::fvb_set_attributes_efiapi,
                 get_physical_address: MockProtocolData::fvb_get_physical_address_efiapi,
@@ -1097,7 +1110,8 @@ mod tests {
                     None => core::ptr::null_mut(),
                 },
             });
-            let fvb_intf_data_n_mut = fvb_intf_data_n.as_mut() as *mut pi::protocols::firmware_volume_block::Protocol;
+            let fvb_intf_data_n_mut =
+                fvb_intf_data_n.as_mut() as *mut pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol;
 
             // SAFETY: the following test code must uphold the safety expectations of the unsafe
             // functions it calls. It uses direct memory allocations to create buffers for testing FFI
@@ -1258,7 +1272,7 @@ mod tests {
                 };
                 let fvb_test_write_file = || {
                     let number_of_files: u32 = 0;
-                    let write_policy: pi::protocols::firmware_volume::EfiFvWritePolicy = 0;
+                    let write_policy: pi::protocol::firmware_volume::EfiFvWritePolicy = 0;
                     MockProtocolData::fv_write_file_efiapi(
                         fv_ptr1,
                         number_of_files,
@@ -1611,7 +1625,7 @@ mod tests {
             let private_data = Metadata::new_fv(fv_interface, base_address);
             // save the protocol structure we're about to install in the private data.
             CORE.pi_dispatcher.fv_data.lock().fv_metadata.insert(fv_ptr.addr(), private_data);
-            let fv_ptr1: *const pi::protocols::firmware_volume::Protocol = fv_ptr.as_ptr();
+            let fv_ptr1: *const pi::protocol::firmware_volume::FirmwareVolumeProtocol = fv_ptr.as_ptr();
 
             // SAFETY: the following test code must uphold the safety expectations of the unsafe
             // functions it calls. It uses direct memory management to test fv FFI primitives.
@@ -1687,7 +1701,7 @@ mod tests {
             let metadata = Metadata::new_fv(fv_interface, base_address);
             CORE.pi_dispatcher.fv_data.lock().fv_metadata.insert(fv_ptr.addr(), metadata);
 
-            let fv_ptr1: *const pi::protocols::firmware_volume::Protocol = fv_ptr.as_ptr();
+            let fv_ptr1: *const pi::protocol::firmware_volume::FirmwareVolumeProtocol = fv_ptr.as_ptr();
 
             // SAFETY: the following test code must uphold the safety expectations of the unsafe
             // functions it calls. This unsafe section encompasses all of the logic for the remaining

@@ -24,12 +24,12 @@ use core::{cmp::Ordering, ffi::c_void};
 use patina::standard::efi;
 use patina::{
     BinaryGuid, Char16Str, OwnedGuid,
-    base::error::EfiError,
     component::service::Service,
+    error::EfiError,
     pi::{
         fw_fs::ffs,
         hob::{Hob, HobList},
-        protocols::firmware_volume_block,
+        protocol::firmware_volume_block,
     },
     uefi::device_path::walker::concat_device_path_to_boxed_slice,
 };
@@ -220,7 +220,7 @@ impl<P: PlatformInfo> PiDispatcher<P> {
             crate::gcd::AllocateType::TopDown(None),
             patina::pi::dxe_services::GcdMemoryType::SystemMemory,
             ALIGNMENT_SHIFT_4MB,
-            patina::base::UEFI_PAGE_SIZE,
+            patina::UEFI_PAGE_SIZE,
             crate::protocol_db::EFI_BOOT_SERVICES_DATA_ALLOCATOR_HANDLE,
             None,
         ) else {
@@ -487,7 +487,7 @@ impl<P: PlatformInfo> PiDispatcher<P> {
             else {
                 continue;
             };
-            let fvb_ptr = ptr as *mut firmware_volume_block::Protocol;
+            let fvb_ptr = ptr as *mut firmware_volume_block::FirmwareVolumeBlockProtocol;
 
             // SAFETY: fvb_ptr is obtained from a valid handle that has a FVB protocol instance
             // and the as_ref() call checks for null
@@ -582,8 +582,8 @@ impl PendingFirmwareVolumeImage {
     fn evaluate_auth(&self) -> Result<(), EfiError> {
         // SAFETY: locate_protocol returns a valid pointer when present. as_ref is used for shared access.
         let security_protocol = unsafe {
-            match PROTOCOL_DB.locate_protocol(patina::pi::protocols::security::PROTOCOL_GUID.into_inner()) {
-                Ok(protocol) => (protocol as *mut patina::pi::protocols::security::Protocol)
+            match PROTOCOL_DB.locate_protocol(patina::pi::protocol::security::PROTOCOL_GUID.into_inner()) {
+                Ok(protocol) => (protocol as *mut patina::pi::protocol::security::SecurityProtocol)
                     .as_ref()
                     .expect("Security Protocol should not be null"),
                 //If security protocol is not located, then assume it has not yet been produced and implicitly trust the
@@ -598,7 +598,7 @@ impl PendingFirmwareVolumeImage {
         //authentication status, so it is hard-coded to zero here. The primary security handlers for the main usage
         //scenarios (TPM measurement and UEFI Secure Boot) do not use it.
         let status = (security_protocol.file_authentication_state)(
-            security_protocol as *const _ as *mut patina::pi::protocols::security::Protocol,
+            security_protocol as *const _ as *mut patina::pi::protocol::security::SecurityProtocol,
             0,
             file_path.as_ptr() as *const _ as *mut efi::protocols::device_path::Protocol,
         );
@@ -665,8 +665,7 @@ impl DispatcherContext {
     /// Check if a child FV has already been extracted. The FvNameGuid is optional per FDF spec; when it is
     /// not provided, the HOBs will have the zero GUID.
     fn has_pre_extracted_fv_hob(&self, file_name: efi::Guid, fv_name: Option<BinaryGuid>) -> bool {
-        self.pre_extracted_fv_hobs
-            .contains(&(file_name.into(), fv_name.unwrap_or(patina::base::guid::constants::ZERO_GUID.into())))
+        self.pre_extracted_fv_hobs.contains(&(file_name.into(), fv_name.unwrap_or(patina::BinaryGuid::ZERO)))
     }
 
     fn add_fv_handles(
@@ -685,7 +684,7 @@ impl DispatcherContext {
                             "get_interface_for_handle failed to return an interface on a handle where it should have existed"
                         )
                     }
-                    Ok(protocol) => protocol as *mut firmware_volume_block::Protocol,
+                    Ok(protocol) => protocol as *mut firmware_volume_block::FirmwareVolumeBlockProtocol,
                 };
 
                 // SAFETY: fvb_ptr was successfully returned from get_interface_for_handle and should point to a
@@ -949,7 +948,7 @@ mod tests {
 
     // Monkey patch for get_physical_address that always returns NOT_FOUND.
     extern "efiapi" fn get_physical_address1(
-        _: *mut pi::protocols::firmware_volume_block::Protocol,
+        _: *mut pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol,
         _: *mut u64,
     ) -> efi::Status {
         efi::Status::NOT_FOUND
@@ -957,7 +956,7 @@ mod tests {
 
     // Monkey patch for get_physical_address that always returns 0.
     extern "efiapi" fn get_physical_address2(
-        _: *mut pi::protocols::firmware_volume_block::Protocol,
+        _: *mut pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol,
         addr: *mut u64,
     ) -> efi::Status {
         // SAFETY: addr is provided by the caller and is expected to be valid for a single u64 write.
@@ -967,7 +966,7 @@ mod tests {
 
     // Monkey patch for get_physical_address that returns a physical address as determined by `GET_PHYSICAL_ADDRESS3_VALUE`
     extern "efiapi" fn get_physical_address3(
-        _: *mut pi::protocols::firmware_volume_block::Protocol,
+        _: *mut pi::protocol::firmware_volume_block::FirmwareVolumeBlockProtocol,
         addr: *mut u64,
     ) -> efi::Status {
         // SAFETY: addr is provided by the caller and is expected to be valid for a single u64 write.
@@ -1097,7 +1096,7 @@ mod tests {
             let protocol = PROTOCOL_DB
                 .get_interface_for_handle(handle, firmware_volume_block::PROTOCOL_GUID.into_inner())
                 .expect("Failed to get FVB protocol");
-            let protocol = protocol as *mut firmware_volume_block::Protocol;
+            let protocol = protocol as *mut firmware_volume_block::FirmwareVolumeBlockProtocol;
             // SAFETY: protocol was retrieved from PROTOCOL_DB and remains valid for this test scope.
             unsafe { &mut *protocol }.get_physical_address = get_physical_address1;
 
@@ -1135,7 +1134,7 @@ mod tests {
             let protocol = PROTOCOL_DB
                 .get_interface_for_handle(handle, firmware_volume_block::PROTOCOL_GUID.into_inner())
                 .expect("Failed to get FVB protocol");
-            let protocol = protocol as *mut firmware_volume_block::Protocol;
+            let protocol = protocol as *mut firmware_volume_block::FirmwareVolumeBlockProtocol;
             // SAFETY: protocol was retrieved from PROTOCOL_DB and remains valid for this test scope.
             unsafe { &mut *protocol }.get_physical_address = get_physical_address2;
 
@@ -1170,7 +1169,7 @@ mod tests {
             let protocol = PROTOCOL_DB
                 .get_interface_for_handle(handle, firmware_volume_block::PROTOCOL_GUID.into_inner())
                 .expect("Failed to get FVB protocol");
-            let protocol = protocol as *mut firmware_volume_block::Protocol;
+            let protocol = protocol as *mut firmware_volume_block::FirmwareVolumeBlockProtocol;
             // SAFETY: protocol was retrieved from PROTOCOL_DB and remains valid for this test scope.
             unsafe { &mut *protocol }.get_physical_address = get_physical_address3;
 
@@ -1389,7 +1388,7 @@ mod tests {
 
             static SECURITY_CALL_EXECUTED: AtomicBool = AtomicBool::new(false);
             extern "efiapi" fn mock_file_authentication_state(
-                this: *mut patina::pi::protocols::security::Protocol,
+                this: *mut patina::pi::protocol::security::SecurityProtocol,
                 authentication_status: u32,
                 file: *mut efi::protocols::device_path::Protocol,
             ) -> efi::Status {
@@ -1424,13 +1423,14 @@ mod tests {
                 efi::Status::SUCCESS
             }
 
-            let security_protocol =
-                patina::pi::protocols::security::Protocol { file_authentication_state: mock_file_authentication_state };
+            let security_protocol = patina::pi::protocol::security::SecurityProtocol {
+                file_authentication_state: mock_file_authentication_state,
+            };
 
             PROTOCOL_DB
                 .install_protocol_interface(
                     None,
-                    patina::pi::protocols::security::PROTOCOL_GUID.into_inner(),
+                    patina::pi::protocol::security::PROTOCOL_GUID.into_inner(),
                     &security_protocol as *const _ as *mut _,
                 )
                 .unwrap();
@@ -1693,7 +1693,7 @@ mod tests {
             let protocol = PROTOCOL_DB
                 .get_interface_for_handle(handle, firmware_volume_block::PROTOCOL_GUID.into_inner())
                 .expect("Failed to get FVB protocol");
-            let protocol = protocol as *mut firmware_volume_block::Protocol;
+            let protocol = protocol as *mut firmware_volume_block::FirmwareVolumeBlockProtocol;
             // Patch get_physical_address to return an error
             // SAFETY: protocol was retrieved from PROTOCOL_DB and remains valid for this test scope.
             unsafe { &mut *protocol }.get_physical_address = get_physical_address1;
@@ -1732,7 +1732,7 @@ mod tests {
             let protocol = PROTOCOL_DB
                 .get_interface_for_handle(handle, firmware_volume_block::PROTOCOL_GUID.into_inner())
                 .expect("Failed to get FVB protocol");
-            let protocol = protocol as *mut firmware_volume_block::Protocol;
+            let protocol = protocol as *mut firmware_volume_block::FirmwareVolumeBlockProtocol;
             // SAFETY: protocol was retrieved from PROTOCOL_DB and remains valid for this test scope.
             unsafe { &mut *protocol }.get_physical_address = get_physical_address2;
 
@@ -1775,7 +1775,7 @@ mod tests {
             let protocol = PROTOCOL_DB
                 .get_interface_for_handle(handle, firmware_volume_block::PROTOCOL_GUID.into_inner())
                 .expect("Failed to get FVB protocol");
-            let protocol = protocol as *mut firmware_volume_block::Protocol;
+            let protocol = protocol as *mut firmware_volume_block::FirmwareVolumeBlockProtocol;
             // SAFETY: protocol was retrieved from PROTOCOL_DB and remains valid for this test scope.
             unsafe { &mut *protocol }.get_physical_address = get_physical_address3;
 
@@ -1975,7 +1975,7 @@ mod tests {
             let child_file_name = BinaryGuid::from_string("2DFBCBC7-14D6-4C70-A9C5-AD0AD03F4D75");
             let zero_guid = BinaryGuid::from_string("00000000-0000-0000-0000-000000000000");
             let fv2_hob = hob::FirmwareVolume2 {
-                header: hob::header::Hob {
+                header: hob::HobHeader {
                     r#type: hob::FV2,
                     length: core::mem::size_of::<hob::FirmwareVolume2>() as u16,
                     reserved: 0,
@@ -2032,7 +2032,7 @@ mod tests {
             let child_file_name = BinaryGuid::from_string("2DFBCBC7-14D6-4C70-A9C5-AD0AD03F4D75");
             let zero_guid = BinaryGuid::from_string("00000000-0000-0000-0000-000000000000");
             let fv3_hob = hob::FirmwareVolume3 {
-                header: hob::header::Hob {
+                header: hob::HobHeader {
                     r#type: hob::FV3,
                     length: core::mem::size_of::<hob::FirmwareVolume3>() as u16,
                     reserved: 0,

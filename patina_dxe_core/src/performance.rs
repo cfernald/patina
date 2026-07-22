@@ -14,11 +14,11 @@ use alloc::vec::Vec;
 
 use patina::{
     BinaryGuid,
-    base::error::EfiError,
     component::{
         hob::FromHob,
         service::{IntoService, Service, perf_timer::ArchTimerFunctionality, performance::PerformanceManager},
     },
+    error::EfiError,
     performance::{
         Measurement,
         config::PerformanceConfig,
@@ -515,7 +515,7 @@ fn report_add_record_error(error: Error) -> Error {
 
 /// Resolves the firmware file GUID for the module backing the given handle.
 fn get_module_guid_from_handle(handle: efi::Handle) -> Result<BinaryGuid, efi::Status> {
-    let mut guid = patina::base::guid::constants::ZERO;
+    let mut guid = patina::BinaryGuid::ZERO;
 
     let loaded_image_ptr = 'find_loaded_image_protocol: {
         if let Ok(interface) = PROTOCOL_DB.get_interface_for_handle(handle, efi::protocols::loaded_image::PROTOCOL_GUID)
@@ -700,7 +700,7 @@ mod tests {
     /// default when absent.
     #[test]
     fn test_core_performance_read_performance_config() {
-        use patina::pi::hob::{GUID_EXTENSION, GuidHob, header};
+        use patina::pi::hob::{GUID_EXTENSION, GuidHob, HobHeader};
 
         // Absent: returns a disabled default.
         let empty = HobList::new();
@@ -710,7 +710,7 @@ mod tests {
         // Present: enabled with a measurement mask of 0x9 (packed u8 + u32, little-endian).
         let bytes: [u8; 5] = [PerformanceConfig::ENABLED, 0x09, 0x00, 0x00, 0x00];
         let guid_hob = GuidHob {
-            header: header::Hob { r#type: GUID_EXTENSION, length: 0, reserved: 0 },
+            header: HobHeader { r#type: GUID_EXTENSION, length: 0, reserved: 0 },
             name: PerformanceConfig::HOB_GUID,
         };
         let mut hob_list = HobList::new();
@@ -725,7 +725,7 @@ mod tests {
     /// none are present.
     #[test]
     fn test_core_performance_read_hob_performance_records() {
-        use patina::pi::hob::{GUID_EXTENSION, GuidHob, header};
+        use patina::pi::hob::{GUID_EXTENSION, GuidHob, HobHeader};
 
         // Absent: returns None.
         let empty = HobList::new();
@@ -738,7 +738,7 @@ mod tests {
         bytes.extend_from_slice(&LOAD_IMAGE_COUNT.to_le_bytes()); // load_image_count
         bytes.extend_from_slice(&0u32.to_le_bytes()); // hob_is_full
         let guid_hob = GuidHob {
-            header: header::Hob { r#type: GUID_EXTENSION, length: 0, reserved: 0 },
+            header: HobHeader { r#type: GUID_EXTENSION, length: 0, reserved: 0 },
             name: HobPerformanceData::HOB_GUID,
         };
         let mut hob_list = HobList::new();
@@ -991,7 +991,7 @@ mod tests {
     fn test_get_module_guid_from_handle_without_protocol_returns_zero() {
         with_global_lock(|| {
             let resolved = get_module_guid_from_handle(0x1234_usize as efi::Handle).unwrap();
-            assert_eq!(resolved, patina::base::guid::constants::ZERO);
+            assert_eq!(resolved, patina::BinaryGuid::ZERO);
         })
         .unwrap();
     }

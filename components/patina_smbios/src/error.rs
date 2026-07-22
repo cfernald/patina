@@ -73,23 +73,19 @@ pub enum SmbiosError {
 
 impl From<SmbiosError> for patina::standard::efi::Status {
     fn from(error: SmbiosError) -> Self {
-        let efi_error: patina::base::error::EfiError = error.into();
+        let efi_error: patina::error::EfiError = error.into();
         efi_error.into()
     }
 }
 
-impl From<SmbiosError> for patina::base::error::EfiError {
+impl From<SmbiosError> for patina::error::EfiError {
     fn from(error: SmbiosError) -> Self {
         match error {
             // Resource allocation errors map to OUT_OF_RESOURCES
-            SmbiosError::AllocationFailed | SmbiosError::HandleExhausted => {
-                patina::base::error::EfiError::OutOfResources
-            }
+            SmbiosError::AllocationFailed | SmbiosError::HandleExhausted => patina::error::EfiError::OutOfResources,
 
             // Size errors map to BUFFER_TOO_SMALL
-            SmbiosError::RecordTooSmall | SmbiosError::StringPoolTooSmall => {
-                patina::base::error::EfiError::BufferTooSmall
-            }
+            SmbiosError::RecordTooSmall | SmbiosError::StringPoolTooSmall => patina::error::EfiError::BufferTooSmall,
 
             // Invalid parameters map to INVALID_PARAMETER
             SmbiosError::StringTooLong
@@ -100,18 +96,18 @@ impl From<SmbiosError> for patina::base::error::EfiError {
             | SmbiosError::StringIndexOutOfRange
             | SmbiosError::Type127Managed
             | SmbiosError::HandleInUse
-            | SmbiosError::HandleOutOfRange => patina::base::error::EfiError::InvalidParameter,
+            | SmbiosError::HandleOutOfRange => patina::error::EfiError::InvalidParameter,
 
             // Not found errors map to NOT_FOUND
-            SmbiosError::NoRecordsAvailable | SmbiosError::RecordNotFound => patina::base::error::EfiError::NotFound,
+            SmbiosError::NoRecordsAvailable | SmbiosError::RecordNotFound => patina::error::EfiError::NotFound,
 
             // Version and initialization errors map to UNSUPPORTED
             SmbiosError::UnsupportedVersion | SmbiosError::AlreadyInitialized | SmbiosError::NotInitialized => {
-                patina::base::error::EfiError::Unsupported
+                patina::error::EfiError::Unsupported
             }
 
             // Table integrity errors map to DEVICE_ERROR (indicates corrupted/invalid state)
-            SmbiosError::TableDirectlyModified => patina::base::error::EfiError::DeviceError,
+            SmbiosError::TableDirectlyModified => patina::error::EfiError::DeviceError,
         }
     }
 }
@@ -182,49 +178,49 @@ mod tests {
     #[test]
     fn test_smbios_error_to_efi_error_conversion() {
         // Test resource allocation errors map to OUT_OF_RESOURCES
-        let efi_err: patina::base::error::EfiError = SmbiosError::AllocationFailed.into();
-        assert_eq!(efi_err, patina::base::error::EfiError::OutOfResources);
+        let efi_err: patina::error::EfiError = SmbiosError::AllocationFailed.into();
+        assert_eq!(efi_err, patina::error::EfiError::OutOfResources);
 
-        let efi_err: patina::base::error::EfiError = SmbiosError::HandleExhausted.into();
-        assert_eq!(efi_err, patina::base::error::EfiError::OutOfResources);
+        let efi_err: patina::error::EfiError = SmbiosError::HandleExhausted.into();
+        assert_eq!(efi_err, patina::error::EfiError::OutOfResources);
 
         // Test invalid parameters map to INVALID_PARAMETER
-        let efi_err: patina::base::error::EfiError = SmbiosError::StringTooLong.into();
-        assert_eq!(efi_err, patina::base::error::EfiError::InvalidParameter);
+        let efi_err: patina::error::EfiError = SmbiosError::StringTooLong.into();
+        assert_eq!(efi_err, patina::error::EfiError::InvalidParameter);
 
-        let efi_err: patina::base::error::EfiError = SmbiosError::Type127Managed.into();
-        assert_eq!(efi_err, patina::base::error::EfiError::InvalidParameter);
+        let efi_err: patina::error::EfiError = SmbiosError::Type127Managed.into();
+        assert_eq!(efi_err, patina::error::EfiError::InvalidParameter);
 
-        let efi_err: patina::base::error::EfiError = SmbiosError::HandleInUse.into();
-        assert_eq!(efi_err, patina::base::error::EfiError::InvalidParameter);
+        let efi_err: patina::error::EfiError = SmbiosError::HandleInUse.into();
+        assert_eq!(efi_err, patina::error::EfiError::InvalidParameter);
 
-        let efi_err: patina::base::error::EfiError = SmbiosError::HandleOutOfRange.into();
-        assert_eq!(efi_err, patina::base::error::EfiError::InvalidParameter);
+        let efi_err: patina::error::EfiError = SmbiosError::HandleOutOfRange.into();
+        assert_eq!(efi_err, patina::error::EfiError::InvalidParameter);
 
         // Test size errors map to BUFFER_TOO_SMALL
-        let efi_err: patina::base::error::EfiError = SmbiosError::RecordTooSmall.into();
-        assert_eq!(efi_err, patina::base::error::EfiError::BufferTooSmall);
+        let efi_err: patina::error::EfiError = SmbiosError::RecordTooSmall.into();
+        assert_eq!(efi_err, patina::error::EfiError::BufferTooSmall);
 
-        let efi_err: patina::base::error::EfiError = SmbiosError::StringPoolTooSmall.into();
-        assert_eq!(efi_err, patina::base::error::EfiError::BufferTooSmall);
+        let efi_err: patina::error::EfiError = SmbiosError::StringPoolTooSmall.into();
+        assert_eq!(efi_err, patina::error::EfiError::BufferTooSmall);
 
         // Test not found errors map to NOT_FOUND
-        let efi_err: patina::base::error::EfiError = SmbiosError::RecordNotFound.into();
-        assert_eq!(efi_err, patina::base::error::EfiError::NotFound);
+        let efi_err: patina::error::EfiError = SmbiosError::RecordNotFound.into();
+        assert_eq!(efi_err, patina::error::EfiError::NotFound);
 
-        let efi_err: patina::base::error::EfiError = SmbiosError::NoRecordsAvailable.into();
-        assert_eq!(efi_err, patina::base::error::EfiError::NotFound);
+        let efi_err: patina::error::EfiError = SmbiosError::NoRecordsAvailable.into();
+        assert_eq!(efi_err, patina::error::EfiError::NotFound);
 
         // Test version and initialization errors map to UNSUPPORTED
-        let efi_err: patina::base::error::EfiError = SmbiosError::UnsupportedVersion.into();
-        assert_eq!(efi_err, patina::base::error::EfiError::Unsupported);
+        let efi_err: patina::error::EfiError = SmbiosError::UnsupportedVersion.into();
+        assert_eq!(efi_err, patina::error::EfiError::Unsupported);
 
-        let efi_err: patina::base::error::EfiError = SmbiosError::NotInitialized.into();
-        assert_eq!(efi_err, patina::base::error::EfiError::Unsupported);
+        let efi_err: patina::error::EfiError = SmbiosError::NotInitialized.into();
+        assert_eq!(efi_err, patina::error::EfiError::Unsupported);
 
         // Test table integrity errors map to DEVICE_ERROR
-        let efi_err: patina::base::error::EfiError = SmbiosError::TableDirectlyModified.into();
-        assert_eq!(efi_err, patina::base::error::EfiError::DeviceError);
+        let efi_err: patina::error::EfiError = SmbiosError::TableDirectlyModified.into();
+        assert_eq!(efi_err, patina::error::EfiError::DeviceError);
     }
 
     #[test]

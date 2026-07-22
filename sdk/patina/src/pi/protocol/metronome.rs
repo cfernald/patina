@@ -24,7 +24,7 @@ pub const PROTOCOL_GUID: crate::BinaryGuid = crate::BinaryGuid::from_string("26B
 ///
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.4.2
-pub type WaitForTick = extern "efiapi" fn(*const Protocol, tick_number: u32) -> efi::Status;
+pub type WaitForTick = extern "efiapi" fn(*const MetronomeProtocol, tick_number: u32) -> efi::Status;
 
 /// Used to wait for ticks from a known time source in a platform.
 ///
@@ -35,7 +35,7 @@ pub type WaitForTick = extern "efiapi" fn(*const Protocol, tick_number: u32) -> 
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.4.1
 #[repr(C)]
-pub struct Protocol {
+pub struct MetronomeProtocol {
     /// Waits for a specified number of ticks.
     pub wait_for_tick: WaitForTick,
     /// The period of platform’s known time source in 100 ns units. This value on any platform must not exceed 200

@@ -3,7 +3,7 @@ use arm_gic::{
     gicv3::{GicCpuInterface, GicDistributorContext, GicRedistributorContext, GicRedistributorIterator, GicV3},
 };
 use core::ptr::NonNull;
-use patina::base::error::EfiError;
+use patina::error::EfiError;
 
 use patina::{
     arch::aarch64::{AArch64El, get_current_el},

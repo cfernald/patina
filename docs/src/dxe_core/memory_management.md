@@ -249,7 +249,7 @@ An example of how the `Allocator` trait can be used in the core to allocate memo
 #![feature(allocator_api)]
 # extern crate patina;
 use patina::{
-    efi_types::EfiMemoryType,
+    uefi::memory::EfiMemoryType,
     component::service::{
       Service,
       memory::{

@@ -10,15 +10,15 @@
 use core::{ffi::c_void, ptr};
 
 use alloc::collections::LinkedList;
-use patina::base::error::EfiError;
+use patina::error::EfiError;
 use patina::standard::efi;
 use spin::Mutex;
 
 use crate::{events::EVENT_DB, pecoff::relocation::RelocationBlock, protocols::PROTOCOL_DB};
-use patina::pi::{list_entry, protocols::runtime};
+use patina::pi::{list_entry, protocol::runtime};
 
 struct RuntimeData {
-    runtime_arch_ptr: *mut runtime::Protocol,
+    runtime_arch_ptr: *mut runtime::RuntimeProtocol,
     runtime_images: LinkedList<runtime::ImageEntry, &'static crate::allocator::UefiAllocatorWithFsb>,
     runtime_events: LinkedList<runtime::EventEntry, &'static crate::allocator::UefiAllocatorWithFsb>,
 }
@@ -96,7 +96,7 @@ extern "efiapi" fn runtime_protocol_notify(_event: efi::Event, _context: *mut c_
     let ptr =
         PROTOCOL_DB.locate_protocol(runtime::PROTOCOL_GUID.into_inner()).expect("Failed to locate runtime protocol.");
     let mut data = RUNTIME_DATA.lock();
-    data.runtime_arch_ptr = ptr as *mut runtime::Protocol;
+    data.runtime_arch_ptr = ptr as *mut runtime::RuntimeProtocol;
     data.update_protocol_lists();
 }
 
@@ -177,7 +177,7 @@ mod tests {
     use core::{ptr, sync::atomic::AtomicBool};
 
     fn setup_protocol_and_data() -> RuntimeData {
-        let protocol = runtime::Protocol {
+        let protocol = runtime::RuntimeProtocol {
             image_head: list_entry::Entry { forward_link: ptr::null_mut(), back_link: ptr::null_mut() },
             event_head: list_entry::Entry { forward_link: ptr::null_mut(), back_link: ptr::null_mut() },
             memory_descriptor_size: 0,

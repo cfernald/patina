@@ -13,7 +13,7 @@
 //! # struct ExampleComponent;
 //! # #[patina::component::component]
 //! # impl ExampleComponent {
-//! #     fn entry_point(self) -> patina::base::error::Result<()> { Ok(()) }
+//! #     fn entry_point(self) -> patina::error::Result<()> { Ok(()) }
 //! # }
 //! struct ExamplePlatform;
 //!
@@ -122,12 +122,12 @@ use gcd::SpinLockedGcd;
 use memory_manager::CoreMemoryManager;
 use patina::standard::efi;
 use patina::{
-    base::error::{self, Result},
     component::{IntoComponent, service::performance::PerformanceManager},
+    error::{self, Result},
     performance::config::PerformanceConfig,
     pi::{
         hob::{HobList, get_pi_hob_list_size},
-        protocols::{bds, status_code},
+        protocol::{bds, status_code},
         status_code::{EFI_PROGRESS_CODE, EFI_SOFTWARE_DXE_CORE, EFI_SW_DXE_CORE_PC_HANDOFF_TO_NEXT},
     },
     uefi::boot_services::StandardBootServices,
@@ -277,7 +277,7 @@ type MockCore = Core<MockPlatformInfo>;
 /// # struct ExampleComponent;
 /// # #[patina::component::component]
 /// # impl ExampleComponent {
-/// #     fn entry_point(self) -> patina::base::error::Result<()> { Ok(()) }
+/// #     fn entry_point(self) -> patina::error::Result<()> { Ok(()) }
 /// # }
 /// struct ExamplePlatform;
 ///
@@ -500,7 +500,7 @@ impl<P: PlatformInfo> Core<P> {
         if performance.enabled() {
             // Record the PEI-end / DXE-begin cross-module markers. This runs during core memory initialization, as early
             // as the performance engine can record into its table, so the DXE span is captured close to the phase boundary.
-            let dxe_core_guid = patina::base::guid::constants::DXE_CORE.into_inner();
+            let dxe_core_guid = patina::guid::DXE_CORE_ID.into_inner();
             performance.perf_cross_module_end("PEI", &dxe_core_guid);
             performance.perf_cross_module_begin("DXE", &dxe_core_guid);
 
@@ -568,7 +568,7 @@ impl<P: PlatformInfo> Core<P> {
 
         // Install HobList configuration table
         config_tables::core_install_configuration_table(
-            patina::base::guid::constants::HOB_LIST.into_inner(),
+            patina::pi::guid::HOB_LIST_TABLE_GUID.into_inner(),
             physical_hob_list,
             st,
         )
@@ -679,8 +679,9 @@ fn call_bds() -> ! {
         Ok(status_code_ptr) => {
             if let Some(status_code_protocol_ptr) = NonNull::new(status_code_ptr) {
                 // SAFETY: Some(status_code_protocol_ptr) guarantees that the pointer is non-NULL
-                let status_code_protocol = unsafe { status_code_protocol_ptr.cast::<status_code::Protocol>().as_ref() };
-                let dxe_core_guid = patina::base::guid::constants::DXE_CORE.into_inner();
+                let status_code_protocol =
+                    unsafe { status_code_protocol_ptr.cast::<status_code::StatusCodeProtocol>().as_ref() };
+                let dxe_core_guid = patina::guid::DXE_CORE_ID.into_inner();
                 (status_code_protocol.report_status_code)(
                     EFI_PROGRESS_CODE,
                     EFI_SOFTWARE_DXE_CORE | EFI_SW_DXE_CORE_PC_HANDOFF_TO_NEXT,
@@ -698,7 +699,7 @@ fn call_bds() -> ! {
     match protocols::PROTOCOL_DB.locate_protocol(bds::PROTOCOL_GUID.into_inner()) {
         Ok(bds_ptr) => {
             if let Some(bds_protocol_ptr) = NonNull::new(bds_ptr) {
-                let bds_protocol_ptr = bds_protocol_ptr.cast::<bds::Protocol>();
+                let bds_protocol_ptr = bds_protocol_ptr.cast::<bds::BdsProtocol>();
                 // SAFETY: The BDS arch protocol is the valid C structure as defined by the UEFI specification. The entry
                 // field of the protocol is a valid function pointer that conforms to the expected calling convention.
                 // Some(bds_protocol_ptr) guarantees that the pointer is non-NULL
@@ -780,17 +781,17 @@ mod tests {
     #[test]
     fn test_mock_call_bds_valid_non_null() {
         static BDS_CALLED: AtomicBool = AtomicBool::new(false);
-        extern "efiapi" fn mock_bds(_this: *mut patina::pi::protocols::bds::Protocol) {
+        extern "efiapi" fn mock_bds(_this: *mut patina::pi::protocol::bds::BdsProtocol) {
             BDS_CALLED.store(true, core::sync::atomic::Ordering::Relaxed)
         }
 
         assert!(
             with_reset_global_state(|| {
-                let protocol = Box::leak(Box::new(patina::pi::protocols::bds::Protocol { entry: mock_bds }));
+                let protocol = Box::leak(Box::new(patina::pi::protocol::bds::BdsProtocol { entry: mock_bds }));
 
                 protocols::core_install_protocol_interface(
                     None,
-                    patina::pi::protocols::bds::PROTOCOL_GUID.into_inner(),
+                    patina::pi::protocol::bds::PROTOCOL_GUID.into_inner(),
                     protocol as *mut _ as *mut c_void,
                 )
                 .unwrap();
@@ -813,7 +814,7 @@ mod tests {
             with_reset_global_state(|| {
                 protocols::core_install_protocol_interface(
                     None,
-                    patina::pi::protocols::bds::PROTOCOL_GUID.into_inner(),
+                    patina::pi::protocol::bds::PROTOCOL_GUID.into_inner(),
                     core::ptr::null_mut(),
                 )
                 .unwrap();
@@ -858,13 +859,13 @@ mod tests {
 
         assert!(
             with_reset_global_state(|| {
-                let protocol = Box::leak(Box::new(patina::pi::protocols::status_code::Protocol {
+                let protocol = Box::leak(Box::new(patina::pi::protocol::status_code::StatusCodeProtocol {
                     report_status_code: mock_status_code,
                 }));
 
                 protocols::core_install_protocol_interface(
                     None,
-                    patina::pi::protocols::status_code::PROTOCOL_GUID.into_inner(),
+                    patina::pi::protocol::status_code::PROTOCOL_GUID.into_inner(),
                     protocol as *mut _ as *mut c_void,
                 )
                 .unwrap();
@@ -887,7 +888,7 @@ mod tests {
             with_reset_global_state(|| {
                 protocols::core_install_protocol_interface(
                     None,
-                    patina::pi::protocols::status_code::PROTOCOL_GUID.into_inner(),
+                    patina::pi::protocol::status_code::PROTOCOL_GUID.into_inner(),
                     core::ptr::null_mut(),
                 )
                 .unwrap();

@@ -8,7 +8,7 @@
 //!
 
 use crate::log_registers;
-use patina::pi::protocols::cpu_arch::EfiSystemContext;
+use patina::pi::protocol::cpu_arch::EfiSystemContext;
 use patina_stacktrace::{StackFrame, StackTrace, error::Error};
 
 #[cfg(target_arch = "aarch64")]

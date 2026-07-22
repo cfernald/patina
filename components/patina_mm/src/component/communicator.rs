@@ -25,7 +25,7 @@ use patina::{
         Storage, component,
         service::{IntoService, Service},
     },
-    pi::protocols::communication::EfiMmCommunicateHeader,
+    pi::protocol::communication::EfiMmCommunicateHeader,
     uefi::boot_services::StandardBootServices,
     writelncrlf,
 };
@@ -199,7 +199,7 @@ impl MmCommunicator {
         storage: &mut Storage,
         sw_mmi_trigger: Service<dyn SwMmiTrigger>,
         boot_services: StandardBootServices,
-    ) -> patina::base::error::Result<()> {
+    ) -> patina::error::Result<()> {
         log::info!(target: "mm_comm", "MM Communicator entry...");
 
         // Create the real MM executor

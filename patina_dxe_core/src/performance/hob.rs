@@ -20,7 +20,7 @@ use patina::{
 
 use scroll::Pread;
 
-/// Data inside an [`crate::base::guid::constants::EDKII_FPDT_EXTENDED_FIRMWARE_PERFORMANCE`] guid hob.
+/// Data inside an [`patina::performance::guid::EDKII_FPDT_EXTENDED_FIRMWARE_PERFORMANCE_GUID`] guid hob.
 #[derive(Debug, Default)]
 pub(crate) struct HobPerformanceData {
     /// Number of images loaded.

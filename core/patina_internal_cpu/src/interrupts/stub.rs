@@ -7,7 +7,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-use patina::{base::error::EfiError, pi::protocols::cpu_arch::EfiSystemContext};
+use patina::{error::EfiError, pi::protocol::cpu_arch::EfiSystemContext};
 
 use crate::interrupts::InterruptManager;
 

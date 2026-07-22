@@ -8,10 +8,10 @@
 //!
 
 use patina::{
-    base::error::EfiError,
-    base::{UEFI_PAGE_MASK, UEFI_PAGE_SIZE},
     bit,
-    pi::protocols::cpu_arch::EfiSystemContext,
+    error::EfiError,
+    pi::protocol::cpu_arch::EfiSystemContext,
+    {UEFI_PAGE_MASK, UEFI_PAGE_SIZE},
 };
 #[cfg(target_arch = "x86_64")]
 use patina_mtrr::Mtrr;

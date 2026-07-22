@@ -44,12 +44,12 @@ use patina::pi::{
 use patina::standard::efi::{self, TPL_HIGH_LEVEL};
 pub use uefi_allocator::UefiAllocator;
 
+#[cfg(test)]
+use patina::guid as base_guids;
 use patina::{
-    base::error::EfiError,
-    base::guid::constants as guids,
-    base::{SIZE_4KB, UEFI_PAGE_MASK, UEFI_PAGE_SIZE},
+    error::EfiError,
     uefi::memory::EFI_MAX_MEMORY_TYPE,
-    uefi_size_to_pages, writelncrlf,
+    uefi_size_to_pages, writelncrlf, {SIZE_4KB, UEFI_PAGE_MASK, UEFI_PAGE_SIZE},
 };
 
 // Type alias for a UefiAllocator with a SpinLockedFixedSizeBlockAllocator
@@ -99,7 +99,7 @@ pub(crate) const DEFAULT_PAGE_ALLOCATION_GRANULARITY: usize = SIZE_4KB;
 // granularity requirements for them.
 cfg_if::cfg_if! {
     if #[cfg(target_arch = "aarch64")] {
-        pub(crate) const RUNTIME_PAGE_ALLOCATION_GRANULARITY: usize = patina::base::SIZE_64KB;
+        pub(crate) const RUNTIME_PAGE_ALLOCATION_GRANULARITY: usize = patina::SIZE_64KB;
     } else {
         pub(crate) const RUNTIME_PAGE_ALLOCATION_GRANULARITY: usize = DEFAULT_PAGE_ALLOCATION_GRANULARITY;
     }
@@ -1040,7 +1040,7 @@ pub fn install_memory_type_info_table(system_table: &mut EfiSystemTable) -> Resu
     drop(bin_manager);
 
     config_tables::core_install_configuration_table(
-        guids::MEMORY_TYPE_INFORMATION.into_inner(),
+        patina::pi::hob::MEMORY_TYPE_INFO_HOB_GUID.into_inner(),
         table_ptr,
         system_table,
     )
@@ -1144,7 +1144,7 @@ fn process_hob_allocations(hob_list: &HobList) {
                         };
 
                         if let Err(err) = alloc_res {
-                            if err == EfiError::NotFound && desc.name != guids::ZERO {
+                            if err == EfiError::NotFound && desc.name != patina::BinaryGuid::ZERO {
                                 // Guided Memory Allocation Hobs are typically MemoryAllocationModule or
                                 // MemoryAllocationStack HOBs which have corresponding non-guided allocation HOBs
                                 // associated with them; they are rejected as duplicates if we attempt to log them.
@@ -1640,8 +1640,8 @@ mod tests {
 
     use super::*;
     use patina::pi::{
-        dxe_services,
-        hob::{GUID_EXTENSION, GuidHob, Hob, header},
+        dxe_services, guid as pi_guids,
+        hob::{GUID_EXTENSION, GuidHob, Hob, HobHeader},
     };
     use patina::standard::efi;
 
@@ -1728,7 +1728,7 @@ mod tests {
             hob_list.discover_hobs(physical_hob_list);
 
             let guid_hob = GuidHob {
-                header: header::Hob { r#type: GUID_EXTENSION, length: 48, reserved: 0 },
+                header: HobHeader { r#type: GUID_EXTENSION, length: 48, reserved: 0 },
                 name: MEMORY_TYPE_INFO_HOB_GUID,
             };
             hob_list.push(Hob::GuidHob(
@@ -1745,13 +1745,13 @@ mod tests {
             let mut stack_base_address = 0x18B000;
             stack_base_address = (physical_hob_list as u64).wrapping_add(stack_base_address);
             let stack_hob = Hob::MemoryAllocation(&patina::pi::hob::MemoryAllocation {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<hob::MemoryAllocation>() as u16,
                     reserved: 0x00000000,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
-                    name: guids::HOB_MEMORY_ALLOC_STACK,
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
+                    name: pi_guids::MEMORY_ALLOC_STACK_HOB_GUID,
                     memory_base_address: stack_base_address,
                     memory_length: 0x2000,
                     memory_type: efi::BOOT_SERVICES_DATA,
@@ -1792,7 +1792,7 @@ mod tests {
 
             // Bin descriptor HOB activates bins for PAL_CODE, ACPI_RECLAIM, ACPI_NVS.
             let guid_hob = GuidHob {
-                header: header::Hob { r#type: GUID_EXTENSION, length: 48, reserved: 0 },
+                header: HobHeader { r#type: GUID_EXTENSION, length: 48, reserved: 0 },
                 name: MEMORY_TYPE_INFO_HOB_GUID,
             };
             hob_list.push(Hob::GuidHob(
@@ -1807,13 +1807,13 @@ mod tests {
             // Build a stack HOB to support memory init.
             let stack_base_address = (physical_hob_list as u64).wrapping_add(0x18B000);
             let stack_hob = Hob::MemoryAllocation(&patina::pi::hob::MemoryAllocation {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<hob::MemoryAllocation>() as u16,
                     reserved: 0,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
-                    name: guids::HOB_MEMORY_ALLOC_STACK,
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
+                    name: pi_guids::MEMORY_ALLOC_STACK_HOB_GUID,
                     memory_base_address: stack_base_address,
                     memory_length: 0x2000,
                     memory_type: efi::BOOT_SERVICES_DATA,
@@ -1830,13 +1830,13 @@ mod tests {
 
             // Non-matching: MemoryAllocation with a different GUID. Must be ignored.
             let other_guid_alloc = patina::pi::hob::MemoryAllocation {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<hob::MemoryAllocation>() as u16,
                     reserved: 0,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
-                    name: guids::HOB_MEMORY_ALLOC_STACK,
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
+                    name: pi_guids::MEMORY_ALLOC_STACK_HOB_GUID,
                     memory_base_address: 0,
                     memory_length: (16 * UEFI_PAGE_SIZE) as u64,
                     memory_type: efi::PAL_CODE,
@@ -1847,7 +1847,7 @@ mod tests {
 
             // Non-matching HOB type.
             let unrelated_fv = patina::pi::hob::FirmwareVolume {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: patina::pi::hob::FV,
                     length: core::mem::size_of::<patina::pi::hob::FirmwareVolume>() as u16,
                     reserved: 0,
@@ -1859,12 +1859,12 @@ mod tests {
 
             // Matching GUID + CONVENTIONAL_MEMORY should be ignored.
             let conv_alloc = patina::pi::hob::MemoryAllocation {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<hob::MemoryAllocation>() as u16,
                     reserved: 0,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
                     name: MEMORY_TYPE_INFO_HOB_GUID,
                     memory_base_address: 0,
                     memory_length: (16 * UEFI_PAGE_SIZE) as u64,
@@ -1876,12 +1876,12 @@ mod tests {
 
             // Matching GUID + zero length should be ignored.
             let zero_len_alloc = patina::pi::hob::MemoryAllocation {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<hob::MemoryAllocation>() as u16,
                     reserved: 0,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
                     name: MEMORY_TYPE_INFO_HOB_GUID,
                     memory_base_address: 0,
                     memory_length: 0,
@@ -1894,12 +1894,12 @@ mod tests {
             // Matching GUID + ACPI_MEMORY_NVS (bin). Should seed 16 pages.
             let nvs_pages: u64 = 16;
             let nvs_alloc = patina::pi::hob::MemoryAllocation {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<hob::MemoryAllocation>() as u16,
                     reserved: 0,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
                     name: MEMORY_TYPE_INFO_HOB_GUID,
                     memory_base_address: 0,
                     memory_length: nvs_pages * UEFI_PAGE_SIZE as u64,
@@ -1912,19 +1912,19 @@ mod tests {
             // Matching GUID via MemoryAllocationModule for PAL_CODE (bin). Should seed.
             let pal_pages: u64 = 16;
             let pal_alloc_module = patina::pi::hob::MemoryAllocationModule {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<hob::MemoryAllocationModule>() as u16,
                     reserved: 0,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
                     name: MEMORY_TYPE_INFO_HOB_GUID,
                     memory_base_address: 0,
                     memory_length: pal_pages * UEFI_PAGE_SIZE as u64,
                     memory_type: efi::PAL_CODE,
                     reserved: Default::default(),
                 },
-                module_name: guids::DXE_CORE,
+                module_name: base_guids::DXE_CORE_ID,
                 entry_point: 0,
             };
             seed_list.push(Hob::MemoryAllocationModule(&pal_alloc_module));
@@ -1932,12 +1932,12 @@ mod tests {
             // Matching GUID but non-bin memory type (BOOT_SERVICES_DATA). Reaches
             // seed_statistics_from_hob but is filtered there by the `special` check.
             let bsdata_alloc = patina::pi::hob::MemoryAllocation {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<hob::MemoryAllocation>() as u16,
                     reserved: 0,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
                     name: MEMORY_TYPE_INFO_HOB_GUID,
                     memory_base_address: 0,
                     memory_length: (16 * UEFI_PAGE_SIZE) as u64,
@@ -1997,12 +1997,12 @@ mod tests {
 
             let mut seed_list = HobList::default();
             let alloc = patina::pi::hob::MemoryAllocation {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<hob::MemoryAllocation>() as u16,
                     reserved: 0,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
                     name: MEMORY_TYPE_INFO_HOB_GUID,
                     memory_base_address: 0,
                     memory_length: (16 * UEFI_PAGE_SIZE) as u64,
@@ -2032,13 +2032,13 @@ mod tests {
             let stack_pages = 0x20;
 
             let stack_hob = Hob::MemoryAllocation(&patina::pi::hob::MemoryAllocation {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<hob::MemoryAllocation>() as u16,
                     reserved: 0x00000000,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
-                    name: guids::HOB_MEMORY_ALLOC_STACK,
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
+                    name: pi_guids::MEMORY_ALLOC_STACK_HOB_GUID,
                     memory_base_address: stack_base_address,
                     memory_length: stack_pages * UEFI_PAGE_SIZE as u64,
                     memory_type: efi::BOOT_SERVICES_DATA,
@@ -2065,7 +2065,7 @@ mod tests {
                 .allocate_memory_space(
                     DEFAULT_ALLOCATION_STRATEGY,
                     GcdMemoryType::SystemMemory,
-                    patina::base::UEFI_PAGE_SHIFT,
+                    patina::UEFI_PAGE_SHIFT,
                     fv_len,
                     protocol_db::DXE_CORE_HANDLE,
                     None,
@@ -2084,7 +2084,7 @@ mod tests {
 
             // Build a HOB list containing only the FV HOB pointing at the free system memory region.
             let fv_hob = patina::pi::hob::FirmwareVolume {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: hob::FV,
                     length: core::mem::size_of::<patina::pi::hob::FirmwareVolume>() as u16,
                     reserved: 0,
@@ -2121,13 +2121,13 @@ mod tests {
             stack_base_address = (physical_hob_list as u64).wrapping_add(stack_base_address);
 
             let stack_hob = Hob::MemoryAllocation(&patina::pi::hob::MemoryAllocation {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<hob::MemoryAllocation>() as u16,
                     reserved: 0x00000000,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
-                    name: guids::HOB_MEMORY_ALLOC_STACK,
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
+                    name: pi_guids::MEMORY_ALLOC_STACK_HOB_GUID,
                     memory_base_address: stack_base_address,
                     memory_length: 0x2000,
                     memory_type: efi::BOOT_SERVICES_DATA,
@@ -2169,7 +2169,7 @@ mod tests {
 
                 let expected_pages = match *memory_type {
                     efi::BOOT_SERVICES_DATA => 3, // Stack + build_test_hob_list allocation
-                    _ => granularity / patina::base::SIZE_4KB,
+                    _ => granularity / patina::SIZE_4KB,
                 };
 
                 let claimed = allocator.stats().claimed_pages;

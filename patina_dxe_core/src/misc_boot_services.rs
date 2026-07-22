@@ -10,9 +10,9 @@ use core::{ffi::c_void, slice::from_raw_parts, sync::atomic::Ordering};
 use patina::arch as interrupts;
 use patina::standard::efi;
 use patina::{
-    base::guid::constants as guids,
-    log_debug_assert,
-    pi::{protocols, status_code},
+    guid as base_guids, log_debug_assert,
+    pi::{protocol, status_code},
+    uefi::event::EXIT_BOOT_SERVICES_FAILED_EVENT_GROUP_GUID,
 };
 use spin::Once;
 
@@ -50,8 +50,8 @@ unsafe impl<T> Send for ArchProtocolPtr<T> {}
 // SAFETY: ArchProtocolPtr is Sync because the pointer is initialized once and never mutates the pointed-to data.
 unsafe impl<T> Sync for ArchProtocolPtr<T> {}
 
-static METRONOME_ARCH_PTR: ArchProtocolPtr<protocols::metronome::Protocol> = ArchProtocolPtr::new();
-static WATCHDOG_ARCH_PTR: ArchProtocolPtr<protocols::watchdog::Protocol> = ArchProtocolPtr::new();
+static METRONOME_ARCH_PTR: ArchProtocolPtr<protocol::metronome::MetronomeProtocol> = ArchProtocolPtr::new();
+static WATCHDOG_ARCH_PTR: ArchProtocolPtr<protocol::watchdog::WatchdogProtocol> = ArchProtocolPtr::new();
 
 // TODO [BEGIN]: LOCAL (TEMP) GUID DEFINITIONS (MOVE LATER)
 
@@ -145,7 +145,7 @@ extern "efiapi" fn set_watchdog_timer(
 // This callback is invoked when the Metronome Architectural protocol is installed. It initializes the
 // METRONOME_ARCH_PTR to point to the Metronome Architectural protocol interface.
 extern "efiapi" fn metronome_arch_available(event: efi::Event, _context: *mut c_void) {
-    match PROTOCOL_DB.locate_protocol(protocols::metronome::PROTOCOL_GUID.into_inner()) {
+    match PROTOCOL_DB.locate_protocol(protocol::metronome::PROTOCOL_GUID.into_inner()) {
         Ok(metronome_arch_ptr) => {
             if metronome_arch_ptr.is_null() {
                 panic!("Located metronome protocol pointer is null.");
@@ -165,7 +165,7 @@ extern "efiapi" fn metronome_arch_available(event: efi::Event, _context: *mut c_
 // This callback is invoked when the Watchdog Timer Architectural protocol is installed. It initializes the
 // WATCHDOG_ARCH_PTR to point to the Watchdog Timer Architectural protocol interface.
 extern "efiapi" fn watchdog_arch_available(event: efi::Event, _context: *mut c_void) {
-    match PROTOCOL_DB.locate_protocol(protocols::watchdog::PROTOCOL_GUID.into_inner()) {
+    match PROTOCOL_DB.locate_protocol(protocol::watchdog::PROTOCOL_GUID.into_inner()) {
         Ok(watchdog_arch_ptr) => {
             if watchdog_arch_ptr.is_null() {
                 panic!("Located watchdog protocol pointer is null.");
@@ -206,9 +206,9 @@ pub extern "efiapi" fn exit_boot_services(_handle: efi::Handle, map_key: usize) 
     }
 
     // Disable the timer
-    match PROTOCOL_DB.locate_protocol(protocols::timer::PROTOCOL_GUID.into_inner()) {
+    match PROTOCOL_DB.locate_protocol(protocol::timer::PROTOCOL_GUID.into_inner()) {
         Ok(timer_arch_ptr) => {
-            let timer_arch_ptr = timer_arch_ptr as *mut protocols::timer::Protocol;
+            let timer_arch_ptr = timer_arch_ptr as *mut protocol::timer::TimerProtocol;
             // SAFETY: timer_arch_ptr comes from locate_protocol and is considered valid based on the successful
             // return status from locate_protocol.
             let timer_arch = unsafe { &*(timer_arch_ptr) };
@@ -227,7 +227,7 @@ pub extern "efiapi" fn exit_boot_services(_handle: efi::Handle, map_key: usize) 
         Err(err) => {
             log::error!("Failed to terminate memory map: {err}");
             GCD.unlock_memory_space();
-            EVENT_DB.signal_group(guids::EBS_FAILED.into_inner());
+            EVENT_DB.signal_group(EXIT_BOOT_SERVICES_FAILED_EVENT_GROUP_GUID.into_inner());
             return err.into();
         }
     }
@@ -236,9 +236,9 @@ pub extern "efiapi" fn exit_boot_services(_handle: efi::Handle, map_key: usize) 
     EVENT_DB.signal_group(efi::EVENT_GROUP_EXIT_BOOT_SERVICES);
 
     // Initialize StatusCode and send EFI_SW_BS_PC_EXIT_BOOT_SERVICES
-    match PROTOCOL_DB.locate_protocol(protocols::status_code::PROTOCOL_GUID.into_inner()) {
+    match PROTOCOL_DB.locate_protocol(protocol::status_code::PROTOCOL_GUID.into_inner()) {
         Ok(status_code_ptr) => {
-            let status_code_ptr = status_code_ptr as *mut protocols::status_code::Protocol;
+            let status_code_ptr = status_code_ptr as *mut protocol::status_code::StatusCodeProtocol;
             // SAFETY: status_code_ptr comes from locate_protocol and is considered valid based on the successful
             // return status from locate_protocol.
             let status_code_protocol = unsafe { &*(status_code_ptr) };
@@ -246,7 +246,7 @@ pub extern "efiapi" fn exit_boot_services(_handle: efi::Handle, map_key: usize) 
                 status_code::EFI_PROGRESS_CODE,
                 status_code::EFI_SOFTWARE_EFI_BOOT_SERVICE | status_code::EFI_SW_BS_PC_EXIT_BOOT_SERVICES,
                 0,
-                &guids::DXE_CORE.into_inner(),
+                &base_guids::DXE_CORE_ID.into_inner(),
                 core::ptr::null(),
             );
         }
@@ -266,9 +266,9 @@ pub extern "efiapi" fn exit_boot_services(_handle: efi::Handle, map_key: usize) 
             .expect("The System Table pointer is null. This is invalid.")
             .clear_boot_time_services();
     }
-    match PROTOCOL_DB.locate_protocol(protocols::runtime::PROTOCOL_GUID.into_inner()) {
+    match PROTOCOL_DB.locate_protocol(protocol::runtime::PROTOCOL_GUID.into_inner()) {
         Ok(rt_arch_ptr) => {
-            let rt_arch_ptr = rt_arch_ptr as *mut protocols::runtime::Protocol;
+            let rt_arch_ptr = rt_arch_ptr as *mut protocol::runtime::RuntimeProtocol;
             // SAFETY: rt_arch_ptr comes from locate_protocol and is considered valid based on the successful
             // return status from locate_protocol.
             let rt_arch_protocol = unsafe { &mut *(rt_arch_ptr) };
@@ -297,7 +297,7 @@ pub fn init_misc_boot_services_support(st: &mut EfiSystemTable) {
         .expect("Failed to create metronome available callback.");
 
     PROTOCOL_DB
-        .register_protocol_notify(protocols::metronome::PROTOCOL_GUID.into_inner(), event)
+        .register_protocol_notify(protocol::metronome::PROTOCOL_GUID.into_inner(), event)
         .expect("Failed to register protocol notify on metronome available.");
 
     //set up call back for watchdog arch protocol installation.
@@ -306,7 +306,7 @@ pub fn init_misc_boot_services_support(st: &mut EfiSystemTable) {
         .expect("Failed to create watchdog available callback.");
 
     PROTOCOL_DB
-        .register_protocol_notify(protocols::watchdog::PROTOCOL_GUID.into_inner(), event)
+        .register_protocol_notify(protocol::watchdog::PROTOCOL_GUID.into_inner(), event)
         .expect("Failed to register protocol notify on metronome available.");
 }
 
@@ -319,7 +319,7 @@ mod tests {
         test_support,
     };
     use core::{ffi::c_void, ptr};
-    use patina::pi::protocols::watchdog;
+    use patina::pi::protocol::watchdog;
     use patina::standard::efi;
 
     fn with_locked_state<F>(f: F)
@@ -472,13 +472,13 @@ mod tests {
             //Mock a watchdog protocol
             static SET_PERIOD_CALLED: Once<()> = Once::new();
             extern "efiapi" fn register_handler(
-                _this: *const patina::pi::protocols::watchdog::Protocol,
+                _this: *const patina::pi::protocol::watchdog::WatchdogProtocol,
                 _notify: watchdog::WatchdogTimerNotify,
             ) -> efi::Status {
                 unimplemented!()
             }
             extern "efiapi" fn set_timer_period(
-                _this: *const patina::pi::protocols::watchdog::Protocol,
+                _this: *const patina::pi::protocol::watchdog::WatchdogProtocol,
                 _period: u64,
             ) -> efi::Status {
                 SET_PERIOD_CALLED.call_once(|| {
@@ -487,12 +487,13 @@ mod tests {
                 efi::Status::SUCCESS
             }
             extern "efiapi" fn get_timer_period(
-                _this: *const patina::pi::protocols::watchdog::Protocol,
+                _this: *const patina::pi::protocol::watchdog::WatchdogProtocol,
                 _period: *mut u64,
             ) -> efi::Status {
                 unimplemented!()
             }
-            let watchdog = protocols::watchdog::Protocol { register_handler, set_timer_period, get_timer_period };
+            let watchdog =
+                protocol::watchdog::WatchdogProtocol { register_handler, set_timer_period, get_timer_period };
             // SAFETY: The mock protocol lives for the duration of the test and the pointer is only used by the test.
             unsafe {
                 WATCHDOG_ARCH_PTR.init(&watchdog as *const _ as *mut c_void);
@@ -547,7 +548,7 @@ mod tests {
             //Mock a metronome protocol
             static WAIT_FOR_TICK_CALLED: Once<()> = Once::new();
             extern "efiapi" fn wait_for_tick(
-                _this: *const patina::pi::protocols::metronome::Protocol,
+                _this: *const patina::pi::protocol::metronome::MetronomeProtocol,
                 _tick: u32,
             ) -> efi::Status {
                 WAIT_FOR_TICK_CALLED.call_once(|| {
@@ -556,7 +557,7 @@ mod tests {
                 efi::Status::SUCCESS
             }
 
-            let metronome = protocols::metronome::Protocol {
+            let metronome = protocol::metronome::MetronomeProtocol {
                 tick_period: 10000, //10 microseconds
                 wait_for_tick,
             };

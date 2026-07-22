@@ -1,8 +1,8 @@
 //! Test that duplicate Commands parameters are rejected at compile time.
 
 use patina::{
-    base::error::Result,
     component::{component, params::Commands},
+    error::Result,
 };
 
 pub struct TestComponent;

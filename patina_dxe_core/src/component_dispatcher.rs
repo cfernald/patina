@@ -312,7 +312,7 @@ mod tests {
 
         #[component]
         impl TestComponent {
-            fn entry_point(self) -> patina::base::error::Result<()> {
+            fn entry_point(self) -> patina::error::Result<()> {
                 Ok(())
             }
         }
@@ -385,7 +385,7 @@ mod tests {
         let hob3_bytes = &hob3.as_bytes();
 
         let guid_hob1 = GuidHob {
-            header: patina::pi::hob::header::Hob {
+            header: patina::pi::hob::HobHeader {
                 r#type: patina::pi::hob::GUID_EXTENSION,
                 length: core::mem::size_of::<TestHob1>() as u16,
                 reserved: 0,
@@ -394,7 +394,7 @@ mod tests {
         };
 
         let guid_hob2 = GuidHob {
-            header: patina::pi::hob::header::Hob {
+            header: patina::pi::hob::HobHeader {
                 r#type: patina::pi::hob::GUID_EXTENSION,
                 length: core::mem::size_of::<TestHob2>() as u16,
                 reserved: 0,
@@ -403,7 +403,7 @@ mod tests {
         };
 
         let guid_hob3 = GuidHob {
-            header: patina::pi::hob::header::Hob {
+            header: patina::pi::hob::HobHeader {
                 r#type: patina::pi::hob::GUID_EXTENSION,
                 length: core::mem::size_of::<TestHob3>() as u16,
                 reserved: 0,
@@ -424,7 +424,7 @@ mod tests {
                 self,
                 hob1: patina::component::hob::Hob<TestHob1>,
                 hob2: patina::component::hob::Hob<TestHob2>,
-            ) -> patina::base::error::Result<()> {
+            ) -> patina::error::Result<()> {
                 assert_eq!(hob1.value, HOB1_VALUE);
                 assert_eq!(hob2.value, HOB2_VALUE);
                 Ok(())
@@ -460,10 +460,7 @@ mod tests {
 
         #[component]
         impl TestComponent {
-            fn entry_point(
-                self,
-                _: patina::component::service::Service<dyn TestService>,
-            ) -> patina::base::error::Result<()> {
+            fn entry_point(self, _: patina::component::service::Service<dyn TestService>) -> patina::error::Result<()> {
                 Ok(())
             }
         }
@@ -480,8 +477,8 @@ mod tests {
 
         #[component]
         impl TestComponent {
-            fn entry_point(self) -> patina::base::error::Result<()> {
-                Err(patina::base::error::EfiError::Unsupported)
+            fn entry_point(self) -> patina::error::Result<()> {
+                Err(patina::error::EfiError::Unsupported)
             }
         }
 

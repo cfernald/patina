@@ -53,20 +53,22 @@ use num_traits::WrappingSub;
 /// sections within the Firmware File System. Based on the PI Specification Volume 3.
 pub mod guid {
     /// GUID for Brotli compressed sections.
-    pub const BROTLI_SECTION: crate::BinaryGuid =
+    pub const BROTLI_SECTION_GUID: crate::BinaryGuid =
         crate::BinaryGuid::from_string("3D532050-5CDA-4FD0-879E-0F7F630D5AFB");
     /// GUID for CRC32 checksum sections.
-    pub const CRC32_SECTION: crate::BinaryGuid = crate::BinaryGuid::from_string("FC1BCDB0-7D31-49AA-936A-A4600D9DD083");
+    pub const CRC32_SECTION_GUID: crate::BinaryGuid =
+        crate::BinaryGuid::from_string("FC1BCDB0-7D31-49AA-936A-A4600D9DD083");
     /// GUID for LZMA compressed sections.
-    pub const LZMA_SECTION: crate::BinaryGuid = crate::BinaryGuid::from_string("EE4E5898-3914-4259-9D6E-DC7BD79403CF");
+    pub const LZMA_SECTION_GUID: crate::BinaryGuid =
+        crate::BinaryGuid::from_string("EE4E5898-3914-4259-9D6E-DC7BD79403CF");
     /// GUID for LZMA F86 compressed sections.
-    pub const LZMA_F86_SECTION: crate::BinaryGuid =
+    pub const LZMA_F86_SECTION_GUID: crate::BinaryGuid =
         crate::BinaryGuid::from_string("D42AE6BD-1352-4BFB-909A-CA72A6EAE889");
     /// GUID for LZMA parallel compressed sections.
-    pub const LZMA_PARALLEL_SECTION: crate::BinaryGuid =
+    pub const LZMA_PARALLEL_SECTION_GUID: crate::BinaryGuid =
         crate::BinaryGuid::from_string("BD9921EA-ED91-404A-8B2F-B4D724747C8C");
     /// GUID for Tiano decompression sections.
-    pub const TIANO_DECOMPRESS_SECTION: crate::BinaryGuid =
+    pub const TIANO_DECOMPRESS_SECTION_GUID: crate::BinaryGuid =
         crate::BinaryGuid::from_string("A31280AD-481E-41B6-95E8-127F4C984779");
 }
 
@@ -1155,7 +1157,7 @@ mod unit_tests {
                 let SectionMetaData::GuidDefined(metadata, _guid_specific) = section.meta_data() else {
                     panic!("Unexpected section metadata");
                 };
-                assert_eq!(metadata.section_definition_guid, guid::BROTLI_SECTION);
+                assert_eq!(metadata.section_definition_guid, guid::BROTLI_SECTION_GUID);
                 self.invoked.store(true, core::sync::atomic::Ordering::SeqCst);
                 Ok(Box::new([0u8; 0]))
             }

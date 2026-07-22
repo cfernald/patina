@@ -17,7 +17,7 @@ use alloc::{
 };
 use core::{cmp::Ordering, ffi::c_void, hash::Hasher};
 use patina::standard::efi;
-use patina::{base::error::EfiError, base::hash::Xorshift64starHasher};
+use patina::{error::EfiError, hash::Xorshift64starHasher};
 
 use crate::tpl_mutex;
 

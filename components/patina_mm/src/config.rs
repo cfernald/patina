@@ -22,8 +22,8 @@ use alloc::vec::Vec;
 use core::{fmt, pin::Pin, ptr::NonNull};
 
 use patina::{
-    BinaryGuid, Guid, base::UEFI_PAGE_MASK, management_mode::MmCommBufferStatus,
-    pi::protocols::communication::EfiMmCommunicateHeader, writelncrlf,
+    BinaryGuid, Guid, UEFI_PAGE_MASK, management_mode::MmCommBufferStatus,
+    pi::protocol::communication::EfiMmCommunicateHeader, writelncrlf,
 };
 
 /// Management Mode (MM) Configuration
@@ -428,7 +428,7 @@ impl CommunicateBuffer {
             }
             None => {
                 // If no recipient is set privately, the memory should contain all zeros for the GUID
-                if memory_guid != patina::base::guid::constants::ZERO {
+                if memory_guid != patina::BinaryGuid::ZERO {
                     log::error!(target: "mm_comm", "Buffer {} unexpected GUID in memory when none set privately", self.id);
                     return Err(CommunicateBufferStatus::InvalidRecipient);
                 }
@@ -935,7 +935,7 @@ mod tests {
 
     #[test]
     fn test_from_firmware_region_success() {
-        use patina::base::UEFI_PAGE_SIZE;
+        use patina::UEFI_PAGE_SIZE;
 
         let aligned_buf = Box::new(AlignedBuffer([0u8; 64]));
         let buffer_ptr = aligned_buf.0.as_ptr();
@@ -966,7 +966,7 @@ mod tests {
 
     #[test]
     fn test_from_raw_parts_success() {
-        use patina::base::UEFI_PAGE_SIZE;
+        use patina::UEFI_PAGE_SIZE;
 
         let mut aligned_buf = Box::new(AlignedBuffer([0u8; 64]));
         let buffer = &mut aligned_buf.0;

@@ -1,3 +1,9 @@
+//! ## License
+//!
+//! Copyright (c) Microsoft Corporation.
+//!
+//! SPDX-License-Identifier: Apache-2.0
+
 use core::mem;
 
 use crate::standard::efi::{self, Guid};

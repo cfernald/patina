@@ -15,7 +15,7 @@ extern crate alloc;
 use alloc::{boxed::Box, collections::BTreeSet, string::String, vec::Vec};
 use core::cell::RefCell;
 use patina::standard::efi::{Handle, PhysicalAddress};
-use patina::{base::SIZE_64KB, uefi_size_to_pages};
+use patina::{SIZE_64KB, uefi_size_to_pages};
 use zerocopy::{IntoBytes, Ref};
 use zerocopy_derive::*;
 
@@ -465,7 +465,7 @@ impl SmbiosManager {
     /// that a simple checksum would miss. Not for cryptographic integrity.
     fn calculate_table_checksum(data: &[u8]) -> u64 {
         use core::hash::Hasher;
-        let mut hasher = patina::base::hash::Xorshift64starHasher::default();
+        let mut hasher = patina::hash::Xorshift64starHasher::default();
         hasher.write(data);
         hasher.finish()
     }

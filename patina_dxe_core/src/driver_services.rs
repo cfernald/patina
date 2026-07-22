@@ -12,7 +12,7 @@ use alloc::{
 };
 use core::ptr::NonNull;
 use patina::{
-    base::error::EfiError,
+    error::EfiError,
     uefi::device_path::walker::{concat_device_path_to_boxed_slice, copy_device_path_to_boxed_slice},
 };
 
@@ -166,7 +166,7 @@ fn authenticate_connect(
     {
         let device_path = device_path as *mut efi::protocols::device_path::Protocol;
         if let Ok(security2_ptr) =
-            PROTOCOL_DB.locate_protocol(patina::pi::protocols::security2::PROTOCOL_GUID.into_inner())
+            PROTOCOL_DB.locate_protocol(patina::pi::protocol::security2::PROTOCOL_GUID.into_inner())
         {
             let file_path = {
                 if !recursive {
@@ -183,7 +183,7 @@ fn authenticate_connect(
             if let Ok(mut file_path) = file_path {
                 // SAFETY: Pointer is validated using .expect(), will panic if .as_ref() returns a NULL pointer
                 let security2 = unsafe {
-                    (security2_ptr as *mut patina::pi::protocols::security2::Protocol)
+                    (security2_ptr as *mut patina::pi::protocol::security2::Security2Protocol)
                         .as_ref()
                         .expect("security2 should not be null")
                 };
@@ -1057,7 +1057,7 @@ mod tests {
             let (_, _) = PROTOCOL_DB
                 .install_protocol_interface(
                     None,
-                    patina::pi::protocols::security2::PROTOCOL_GUID.into_inner(),
+                    patina::pi::protocol::security2::PROTOCOL_GUID.into_inner(),
                     security2_ptr,
                 )
                 .unwrap();

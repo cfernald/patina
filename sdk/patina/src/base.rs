@@ -8,15 +8,14 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 
-use crate::standard::efi;
-use num_traits;
-
 use crate::base::error::EfiError;
+use crate::standard::efi;
 
 pub mod c_ptr;
 pub mod error;
 pub mod guid;
 pub mod hash;
+pub mod protocol;
 pub mod string;
 
 /// EFI memory allocation functions work in units of EFI_PAGEs that are 4KB.
@@ -165,7 +164,7 @@ pub const DEFAULT_CACHE_ATTR: u64 = efi::MEMORY_WB;
 /// # Example
 ///
 /// ```rust
-/// use patina::base::UEFI_PAGE_SIZE;
+/// use patina::UEFI_PAGE_SIZE;
 /// use patina::uefi_size_to_pages;
 ///
 /// let size_in_bytes = UEFI_PAGE_SIZE * 3;
@@ -177,7 +176,7 @@ pub const DEFAULT_CACHE_ATTR: u64 = efi::MEMORY_WB;
 #[macro_export]
 macro_rules! uefi_size_to_pages {
     ($size:expr) => {
-        (($size) + patina::base::UEFI_PAGE_MASK) / patina::base::UEFI_PAGE_SIZE
+        (($size) + patina::UEFI_PAGE_MASK) / patina::UEFI_PAGE_SIZE
     };
 }
 
@@ -197,7 +196,7 @@ macro_rules! uefi_size_to_pages {
 /// # Example
 ///
 /// ```rust
-/// use patina::base::UEFI_PAGE_SIZE;
+/// use patina::UEFI_PAGE_SIZE;
 /// use patina::uefi_pages_to_size;
 ///
 /// let pages = 3;
@@ -209,7 +208,7 @@ macro_rules! uefi_size_to_pages {
 #[macro_export]
 macro_rules! uefi_pages_to_size {
     ($pages:expr) => {
-        ($pages) * $crate::base::UEFI_PAGE_SIZE
+        ($pages) * $crate::UEFI_PAGE_SIZE
     };
 }
 
@@ -255,7 +254,7 @@ where
 /// # Example
 ///
 /// ```rust
-/// use patina::base::align_down;
+/// use patina::align_down;
 ///
 /// let addr: u64 = 1023;
 /// let align: u64 = 512;
@@ -301,8 +300,8 @@ where
 /// # Example
 ///
 /// ```rust
-/// use patina::base::align_up;
-/// use patina::base::error::EfiError;
+/// use patina::align_up;
+/// use patina::error::EfiError;
 ///
 /// let addr: u64 = 1025;
 /// let align: u64 = 512;
@@ -354,7 +353,7 @@ where
 ///
 /// # Example
 /// ```rust
-/// use patina::base::align_range;
+/// use patina::align_range;
 /// let base: u64 = 1023;
 /// let length: u64 = 2048;
 /// let align: u64 = 512;

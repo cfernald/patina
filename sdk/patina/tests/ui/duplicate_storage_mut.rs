@@ -1,8 +1,8 @@
 //! Test that duplicate &mut Storage parameters are rejected at compile time.
 
 use patina::{
-    base::error::Result,
     component::{Storage, component},
+    error::Result,
 };
 
 pub struct TestComponent;

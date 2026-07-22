@@ -18,9 +18,7 @@ extern crate alloc;
 use core::ffi::c_char;
 
 use alloc::string::ToString;
-use patina::Char8Str;
-use patina::standard::efi;
-use patina::uefi::{protocol::ProtocolInterface, tpl_mutex::TplMutex};
+use patina::{Char8Str, protocol::ProtocolInterface, standard::efi, uefi::tpl_mutex::TplMutex};
 
 use crate::service::{SMBIOS_HANDLE_PI_RESERVED, SmbiosHandle, SmbiosTableHeader, SmbiosType};
 
@@ -470,7 +468,7 @@ mod tests {
 
     #[test]
     fn test_protocol_guid() {
-        use patina::uefi::protocol::ProtocolInterface;
+        use patina::protocol::ProtocolInterface;
 
         // Verify the GUID matches the EDK2 SMBIOS protocol GUID
         let expected_guid = patina::BinaryGuid::from_string("03583FF6-CB36-4940-947E-B9B39F4AFAF7");

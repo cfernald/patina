@@ -1,8 +1,8 @@
 //! Test that &mut Storage with Config<T> is rejected at compile time.
 
 use patina::{
-    base::error::Result,
     component::{Storage, component, params::Config},
+    error::Result,
 };
 
 pub struct TestComponent;

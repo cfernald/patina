@@ -74,7 +74,7 @@ pub const PROTOCOL_GUID: crate::BinaryGuid = crate::BinaryGuid::from_string("94A
 ///                                     drivers from the device path specified by DevicePath. The
 ///                                     image has been added into the list of the deferred images.
 pub type EfiSecurity2FileAuthentication = extern "efiapi" fn(
-    this: *mut Protocol,
+    this: *mut Security2Protocol,
     file: *mut efi::protocols::device_path::Protocol,
     file_buffer: *mut c_void,
     file_size: usize,
@@ -86,7 +86,7 @@ pub type EfiSecurity2FileAuthentication = extern "efiapi" fn(
 /// image against a policy (whether a white-list/black-list of public image verification keys
 /// or registered hashes).
 #[repr(C)]
-pub struct Protocol {
+pub struct Security2Protocol {
     /// Function to check file authentication state. See [`EfiSecurity2FileAuthentication`] for more details.
     pub file_authentication: EfiSecurity2FileAuthentication,
 }

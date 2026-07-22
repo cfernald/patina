@@ -12,10 +12,11 @@
 
 use crate::config::CommunicateBuffer;
 use patina::{
-    base::UEFI_PAGE_SIZE,
+    UEFI_PAGE_SIZE,
     management_mode::protocol::mm_comm_buffer_update::{self, MmCommBufferUpdateProtocol},
     standard::efi,
-    uefi::boot_services::{BootServices, StandardBootServices, event::EventType, tpl::Tpl},
+    uefi::boot_services::{BootServices, StandardBootServices, tpl::Tpl},
+    uefi::event::EventType,
 };
 use zerocopy::FromBytes;
 
@@ -49,14 +50,14 @@ pub(super) struct ProtocolNotifyContext {
 ///
 /// # Returns
 /// - `Ok(&'static ProtocolNotifyContext)`: Context that should be stored for later use
-/// - `Err(patina::base::error::Error)`: If event creation or protocol notify registration fails
+/// - `Err(patina::error::Error)`: If event creation or protocol notify registration fails
 ///
 /// # Safety
 /// - The returned context is leaked and will live for a static lifetime
 pub(super) fn register_buffer_update_notify(
     boot_services: StandardBootServices,
     updatable_buffer_id: u8,
-) -> patina::base::error::Result<&'static ProtocolNotifyContext> {
+) -> patina::error::Result<&'static ProtocolNotifyContext> {
     log::trace!(target: "mm_comm", "Setting up protocol notify callback for buffer ID {}", updatable_buffer_id);
 
     let context = Box::leak(Box::new(ProtocolNotifyContext {
@@ -74,11 +75,11 @@ pub(super) fn register_buffer_update_notify(
     )?;
 
     log::trace!(target: "mm_comm", "Registering protocol notify - callback may fire synchronously");
-    context.boot_services.register_protocol_notify(mm_comm_buffer_update::GUID.as_efi_guid(), event)?;
+    context.boot_services.register_protocol_notify(mm_comm_buffer_update::PROTOCOL_GUID.as_efi_guid(), event)?;
     log::debug!(
         target: "mm_comm",
         "Registered protocol notify on {} with updatable_buffer_id={}",
-        mm_comm_buffer_update::GUID,
+        mm_comm_buffer_update::PROTOCOL_GUID,
         updatable_buffer_id
     );
 
@@ -167,7 +168,7 @@ pub(super) fn apply_pending_buffer_update(
 #[cfg_attr(coverage, coverage(off))]
 extern "efiapi" fn protocol_notify_callback(_event: efi::Event, context: &'static ProtocolNotifyContext) {
     log::trace!(target: "mm_comm", "=== Protocol callback ENTRY ===");
-    log::info!(target: "mm_comm", "Protocol notify callback triggered for {}", mm_comm_buffer_update::GUID);
+    log::info!(target: "mm_comm", "Protocol notify callback triggered for {}", mm_comm_buffer_update::PROTOCOL_GUID);
 
     let updatable_buffer_id = context.updatable_buffer_id;
     log::debug!(target: "mm_comm", "Updatable buffer ID: {}", updatable_buffer_id);
@@ -177,7 +178,7 @@ extern "efiapi" fn protocol_notify_callback(_event: efi::Event, context: &'stati
     let protocol_ptr = match unsafe {
         context
             .boot_services
-            .locate_protocol_unchecked(mm_comm_buffer_update::GUID.as_efi_guid(), core::ptr::null_mut())
+            .locate_protocol_unchecked(mm_comm_buffer_update::PROTOCOL_GUID.as_efi_guid(), core::ptr::null_mut())
     } {
         Ok(ptr) => ptr,
         Err(status) => {

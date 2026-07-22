@@ -9,13 +9,29 @@ use spin::rwlock::RwLock;
 use arm_gic::{InterruptGroup, Trigger, gicv3::GicCpuInterface};
 use patina::{
     BinaryGuid,
-    base::guid::constants::{HARDWARE_INTERRUPT_PROTOCOL, HARDWARE_INTERRUPT_PROTOCOL_V2},
     component::{component, service::Service},
+    protocol::ProtocolInterface,
     uefi::boot_services::{BootServices, StandardBootServices},
-    uefi::protocol::ProtocolInterface,
 };
 
 use super::GicBases;
+
+/// Hardware Interrupt protocol GUID.
+///
+/// This protocol provides a means of registering and unregistering interrupt handlers for AARCH64 systems.
+/// It is defined in EDK II `ArmPkg/Include/Protocol/HardwareInterrupt.h`, not in the UEFI/PI specifications,
+/// and is produced solely by the DXE Core on AARCH64 systems.
+///
+/// (`2890B3EA-053D-1643-AD0C-D64808DA3FF1`)
+const HARDWARE_INTERRUPT_PROTOCOL: BinaryGuid = BinaryGuid::from_string("2890B3EA-053D-1643-AD0C-D64808DA3FF1");
+
+/// Hardware Interrupt v2 protocol GUID.
+///
+/// Extends the Hardware Interrupt Protocol to support interrupt type query. Defined in EDK II
+/// `ArmPkg/Include/Protocol/HardwareInterrupt2.h` and produced solely by the DXE Core on AARCH64 systems.
+///
+/// (`32898322-2DA1-474A-BAAA-F3F7CF569470`)
+const HARDWARE_INTERRUPT_PROTOCOL_V2: BinaryGuid = BinaryGuid::from_string("32898322-2DA1-474A-BAAA-F3F7CF569470");
 
 pub type HwInterruptHandler = Option<extern "efiapi" fn(u64, &mut ExceptionContext)>;
 
@@ -501,7 +517,7 @@ impl HwInterruptProtocolInstaller {
         self,
         interrupt_manager: Service<dyn InterruptManager>,
         boot_services: StandardBootServices,
-    ) -> patina::base::error::Result<()> {
+    ) -> patina::error::Result<()> {
         log::info!("GIC initializing {:x?}", (self.gic_bases.gicd, self.gic_bases.gicr));
         // SAFETY: The invariants of the `GicBases` struct upholds the safety requirements for this function.
         let aarch64_int = unsafe {

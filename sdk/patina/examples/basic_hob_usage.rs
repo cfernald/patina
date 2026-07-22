@@ -184,7 +184,7 @@ mod util {
         let as_slice = Box::leak(data.into_boxed_slice());
 
         let hob = Box::leak(Box::new(GuidHob {
-            header: patina::pi::hob::header::Hob {
+            header: patina::pi::hob::HobHeader {
                 r#type: patina::pi::hob::GUID_EXTENSION,
                 length: std::mem::size_of::<CustomHob1>() as u16,
                 reserved: 0,
@@ -202,7 +202,7 @@ mod util {
         let as_slice = Box::leak(data.into_boxed_slice());
 
         let hob = Box::leak(Box::new(GuidHob {
-            header: patina::pi::hob::header::Hob {
+            header: patina::pi::hob::HobHeader {
                 r#type: patina::pi::hob::GUID_EXTENSION,
                 length: std::mem::size_of::<CustomHob2>() as u16,
                 reserved: 0,

@@ -12,17 +12,19 @@ use crate::{GCD, allocator::DEFAULT_PAGE_ALLOCATION_GRANULARITY, protocols::PROT
 use core::ffi::c_void;
 use patina::standard::efi;
 use patina::{
-    base::guid::constants::ZERO,
+    BinaryGuid,
     pi::{
         BootMode,
         dxe_services::GcdMemoryType,
-        hob::{self, HobList, ResourceDescriptorV2, header},
+        hob::{self, HobHeader, HobList, MemoryAllocationHeader, ResourceDescriptorV2},
     },
 };
 use patina_internal_cpu::paging::{CacheAttributeValue, PatinaPageTable};
 use patina_paging::{MemoryAttributes, PtError};
 use spin::{Once, RwLock};
 use std::{any::Any, cell::RefCell, fs::File, io::Read, slice};
+
+const ZERO: BinaryGuid = BinaryGuid::ZERO;
 
 #[macro_export]
 macro_rules! test_collateral {
@@ -432,7 +434,7 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
     // for future changes.
     //
     let phit = hob::PhaseHandoffInformationTable {
-        header: header::Hob {
+        header: HobHeader {
             r#type: hob::HANDOFF,
             length: core::mem::size_of::<hob::PhaseHandoffInformationTable>() as u16,
             reserved: 0x00000000,
@@ -449,11 +451,11 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
             + (core::mem::size_of::<ResourceDescriptorV2>() as u64) * 7
             + (core::mem::size_of::<hob::MemoryAllocation>() as u64) * 11  // 10 memory type allocations + 1 MMIO
             + core::mem::size_of::<hob::FirmwareVolume>() as u64
-            + core::mem::size_of::<header::Hob>() as u64,
+            + core::mem::size_of::<HobHeader>() as u64,
     };
 
     let cpu = hob::Cpu {
-        header: header::Hob { r#type: hob::CPU, length: core::mem::size_of::<hob::Cpu>() as u16, reserved: 0 },
+        header: HobHeader { r#type: hob::CPU, length: core::mem::size_of::<hob::Cpu>() as u16, reserved: 0 },
         size_of_memory_space: 48,
         size_of_io_space: 16,
         reserved: Default::default(),
@@ -461,12 +463,12 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
 
     let resource_descriptor1 = ResourceDescriptorV2 {
         v1: hob::ResourceDescriptor {
-            header: header::Hob {
+            header: HobHeader {
                 r#type: hob::RESOURCE_DESCRIPTOR2,
                 length: core::mem::size_of::<ResourceDescriptorV2>() as u16,
                 reserved: 0x00000000,
             },
-            owner: patina::base::guid::constants::ZERO,
+            owner: ZERO,
             resource_type: hob::EFI_RESOURCE_SYSTEM_MEMORY,
             resource_attribute: hob::TESTED_MEMORY_ATTRIBUTES | hob::EFI_RESOURCE_ATTRIBUTE_WRITE_BACK_CACHEABLE,
             physical_start: mem_base + 0xE0000,
@@ -477,12 +479,12 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
 
     let resource_descriptor2 = ResourceDescriptorV2 {
         v1: hob::ResourceDescriptor {
-            header: header::Hob {
+            header: HobHeader {
                 r#type: hob::RESOURCE_DESCRIPTOR2,
                 length: core::mem::size_of::<ResourceDescriptorV2>() as u16,
                 reserved: 0x00000000,
             },
-            owner: patina::base::guid::constants::ZERO,
+            owner: ZERO,
             resource_type: hob::EFI_RESOURCE_SYSTEM_MEMORY,
             resource_attribute: hob::INITIALIZED_MEMORY_ATTRIBUTES | hob::EFI_RESOURCE_ATTRIBUTE_WRITE_BACK_CACHEABLE,
             physical_start: mem_base + 0x190000,
@@ -493,12 +495,12 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
 
     let resource_descriptor3 = ResourceDescriptorV2 {
         v1: hob::ResourceDescriptor {
-            header: header::Hob {
+            header: HobHeader {
                 r#type: hob::RESOURCE_DESCRIPTOR2,
                 length: core::mem::size_of::<ResourceDescriptorV2>() as u16,
                 reserved: 0x00000000,
             },
-            owner: patina::base::guid::constants::ZERO,
+            owner: ZERO,
             resource_type: hob::EFI_RESOURCE_MEMORY_MAPPED_IO,
             resource_attribute: hob::EFI_RESOURCE_ATTRIBUTE_PRESENT
                 | hob::EFI_RESOURCE_ATTRIBUTE_INITIALIZED
@@ -511,12 +513,12 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
 
     let resource_descriptor4 = ResourceDescriptorV2 {
         v1: hob::ResourceDescriptor {
-            header: header::Hob {
+            header: HobHeader {
                 r#type: hob::RESOURCE_DESCRIPTOR2,
                 length: core::mem::size_of::<ResourceDescriptorV2>() as u16,
                 reserved: 0x00000000,
             },
-            owner: patina::base::guid::constants::ZERO,
+            owner: ZERO,
             resource_type: hob::EFI_RESOURCE_FIRMWARE_DEVICE,
             resource_attribute: hob::EFI_RESOURCE_ATTRIBUTE_PRESENT
                 | hob::EFI_RESOURCE_ATTRIBUTE_INITIALIZED
@@ -529,12 +531,12 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
 
     let resource_descriptor5 = ResourceDescriptorV2 {
         v1: hob::ResourceDescriptor {
-            header: header::Hob {
+            header: HobHeader {
                 r#type: hob::RESOURCE_DESCRIPTOR2,
                 length: core::mem::size_of::<ResourceDescriptorV2>() as u16,
                 reserved: 0x00000000,
             },
-            owner: patina::base::guid::constants::ZERO,
+            owner: ZERO,
             resource_type: hob::EFI_RESOURCE_MEMORY_RESERVED,
             resource_attribute: hob::EFI_RESOURCE_ATTRIBUTE_PRESENT
                 | hob::EFI_RESOURCE_ATTRIBUTE_INITIALIZED
@@ -547,12 +549,12 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
 
     let resource_descriptor6 = ResourceDescriptorV2 {
         v1: hob::ResourceDescriptor {
-            header: header::Hob {
+            header: HobHeader {
                 r#type: hob::RESOURCE_DESCRIPTOR2,
                 length: core::mem::size_of::<ResourceDescriptorV2>() as u16,
                 reserved: 0x00000000,
             },
-            owner: patina::base::guid::constants::ZERO,
+            owner: ZERO,
             resource_type: hob::EFI_RESOURCE_IO,
             resource_attribute: hob::EFI_RESOURCE_ATTRIBUTE_PRESENT | hob::EFI_RESOURCE_ATTRIBUTE_INITIALIZED,
             physical_start: 0x1000,
@@ -563,12 +565,12 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
 
     let resource_descriptor7 = ResourceDescriptorV2 {
         v1: hob::ResourceDescriptor {
-            header: header::Hob {
+            header: HobHeader {
                 r#type: hob::RESOURCE_DESCRIPTOR2,
                 length: core::mem::size_of::<ResourceDescriptorV2>() as u16,
                 reserved: 0x00000000,
             },
-            owner: patina::base::guid::constants::ZERO,
+            owner: ZERO,
             resource_type: hob::EFI_RESOURCE_IO_RESERVED,
             resource_attribute: hob::EFI_RESOURCE_ATTRIBUTE_PRESENT,
             physical_start: 0x0000,
@@ -578,12 +580,12 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
     };
 
     let mut allocation_hob_template = hob::MemoryAllocation {
-        header: header::Hob {
+        header: HobHeader {
             r#type: hob::MEMORY_ALLOCATION,
             length: core::mem::size_of::<hob::MemoryAllocation>() as u16,
             reserved: 0x00000000,
         },
-        alloc_descriptor: header::MemoryAllocation {
+        alloc_descriptor: MemoryAllocationHeader {
             name: ZERO,
             memory_base_address: 0,
             memory_length: 0x1000,
@@ -593,7 +595,7 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
     };
 
     let firmware_volume_hob = hob::FirmwareVolume {
-        header: header::Hob {
+        header: HobHeader {
             r#type: hob::FV,
             length: core::mem::size_of::<hob::FirmwareVolume>() as u16,
             reserved: 0x00000000,
@@ -602,8 +604,7 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
         length: 0x80000,
     };
 
-    let end =
-        header::Hob { r#type: hob::END_OF_HOB_LIST, length: core::mem::size_of::<header::Hob>() as u16, reserved: 0 };
+    let end = HobHeader { r#type: hob::END_OF_HOB_LIST, length: core::mem::size_of::<HobHeader>() as u16, reserved: 0 };
 
     // SAFETY: Test code - constructing a test HOB list by copying structures into allocated memory.
     // The memory is allocated in this function.
@@ -665,7 +666,7 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
             } as u64;
 
             // Make sure the memory region is aligned as needed.
-            address = patina::base::align_up(address, granularity).unwrap();
+            address = patina::align_up(address, granularity).unwrap();
             allocation_hob_template.alloc_descriptor.memory_base_address = address;
             allocation_hob_template.alloc_descriptor.memory_type = *memory_type;
             allocation_hob_template.alloc_descriptor.memory_length = granularity;
@@ -689,7 +690,7 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
         core::ptr::copy(&firmware_volume_hob, cursor as *mut hob::FirmwareVolume, 1);
         cursor = cursor.offset(firmware_volume_hob.header.length as isize);
 
-        core::ptr::copy(&end, cursor as *mut header::Hob, 1);
+        core::ptr::copy(&end, cursor as *mut HobHeader, 1);
     }
     mem.as_ptr() as *const c_void
 }
@@ -748,10 +749,10 @@ mod tests {
     use super::*;
     use crate::{
         c_void,
-        test_support::{BootMode, get_memory, header, hob},
+        test_support::{BootMode, HobHeader, MemoryAllocationHeader, get_memory, hob},
     };
     use patina::{
-        base::guid::constants as guids,
+        guid as base_guids,
         pi::hob::{Hob::MemoryAllocationModule, ResourceDescriptorV2},
     };
 
@@ -765,7 +766,7 @@ mod tests {
         // Build a test HOB list that describes memory
 
         let phit = hob::PhaseHandoffInformationTable {
-            header: header::Hob {
+            header: HobHeader {
                 r#type: hob::HANDOFF,
                 length: core::mem::size_of::<hob::PhaseHandoffInformationTable>() as u16,
                 reserved: 0x00000000,
@@ -780,11 +781,11 @@ mod tests {
                 + core::mem::size_of::<hob::PhaseHandoffInformationTable>() as u64
                 + core::mem::size_of::<hob::Cpu>() as u64
                 + core::mem::size_of::<ResourceDescriptorV2>() as u64  // Only 1 V2 system memory HOB
-                + core::mem::size_of::<header::Hob>() as u64,
+                + core::mem::size_of::<HobHeader>() as u64,
         };
 
         let cpu = hob::Cpu {
-            header: header::Hob { r#type: hob::CPU, length: core::mem::size_of::<hob::Cpu>() as u16, reserved: 0 },
+            header: HobHeader { r#type: hob::CPU, length: core::mem::size_of::<hob::Cpu>() as u16, reserved: 0 },
             size_of_memory_space: 48,
             size_of_io_space: 16,
             reserved: Default::default(),
@@ -792,12 +793,12 @@ mod tests {
 
         let resource_descriptor1 = ResourceDescriptorV2 {
             v1: hob::ResourceDescriptor {
-                header: header::Hob {
+                header: HobHeader {
                     r#type: hob::RESOURCE_DESCRIPTOR2,
                     length: core::mem::size_of::<ResourceDescriptorV2>() as u16,
                     reserved: 0x00000000,
                 },
-                owner: patina::base::guid::constants::ZERO,
+                owner: ZERO,
                 resource_type: hob::EFI_RESOURCE_SYSTEM_MEMORY,
                 resource_attribute: hob::TESTED_MEMORY_ATTRIBUTES,
                 physical_start: mem_base + 0xE0000,
@@ -807,27 +808,24 @@ mod tests {
         };
 
         let mut allocation_hob_template: hob::MemoryAllocationModule = hob::MemoryAllocationModule {
-            header: header::Hob {
+            header: HobHeader {
                 r#type: hob::MEMORY_ALLOCATION,
                 length: core::mem::size_of::<hob::MemoryAllocationModule>() as u16,
                 reserved: 0x00000000,
             },
-            alloc_descriptor: header::MemoryAllocation {
+            alloc_descriptor: MemoryAllocationHeader {
                 name: ZERO,
                 memory_base_address: 0,
                 memory_length: 0x1000,
                 memory_type: efi::LOADER_CODE,
                 reserved: Default::default(),
             },
-            module_name: guids::DXE_CORE,
+            module_name: base_guids::DXE_CORE_ID,
             entry_point: 0,
         };
 
-        let end = header::Hob {
-            r#type: hob::END_OF_HOB_LIST,
-            length: core::mem::size_of::<header::Hob>() as u16,
-            reserved: 0,
-        };
+        let end =
+            HobHeader { r#type: hob::END_OF_HOB_LIST, length: core::mem::size_of::<HobHeader>() as u16, reserved: 0 };
 
         // SAFETY: Test code - constructing a compact test HOB list by copying structures into allocated memory.
         // The memory is valid and large enough to hold all HOB structures in the given unit test infrastructure
@@ -866,13 +864,13 @@ mod tests {
                 allocation_hob_template.alloc_descriptor.memory_base_address =
                     resource_descriptor1.v1.physical_start + idx as u64 * 0x1000;
                 allocation_hob_template.alloc_descriptor.memory_type = *memory_type;
-                allocation_hob_template.module_name = guids::DXE_CORE;
+                allocation_hob_template.module_name = base_guids::DXE_CORE_ID;
 
                 core::ptr::copy(&allocation_hob_template, cursor as *mut hob::MemoryAllocationModule, 1);
                 cursor = cursor.offset(allocation_hob_template.header.length as isize);
             }
 
-            core::ptr::copy(&end, cursor as *mut header::Hob, 1);
+            core::ptr::copy(&end, cursor as *mut HobHeader, 1);
         }
         mem.as_ptr() as *const c_void
     }
@@ -890,7 +888,7 @@ mod tests {
         let dxe_core_hob = hob_list
             .iter()
             .find_map(|hob| match hob {
-                MemoryAllocationModule(module) if module.module_name == guids::DXE_CORE => Some(module),
+                MemoryAllocationModule(module) if module.module_name == base_guids::DXE_CORE_ID => Some(module),
                 _ => None,
             })
             .ok_or("DXE Core MemoryAllocationModule HOB not found")?;

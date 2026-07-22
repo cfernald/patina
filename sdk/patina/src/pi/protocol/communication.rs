@@ -77,11 +77,11 @@ pub const EFI_MM_INITIALIZATION_GUID: crate::BinaryGuid =
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.9, Section IV-5.7.1
 pub type Communicate =
-    extern "efiapi" fn(this: *const Protocol, comm_buffer: *mut c_void, comm_size: usize) -> efi::Status;
+    extern "efiapi" fn(this: *const CommunicationProtocol, comm_buffer: *mut c_void, comm_size: usize) -> efi::Status;
 
 #[repr(C)]
 /// MM Communication Protocol structure.
-pub struct Protocol {
+pub struct CommunicationProtocol {
     /// Communicate with the MM environment.
     /// See [`Communicate`] for more details.
     pub communicate: Communicate,

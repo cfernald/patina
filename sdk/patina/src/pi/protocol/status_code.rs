@@ -52,7 +52,7 @@ pub type ReportStatusCode =
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-14.2.1
 #[repr(C)]
-pub struct Protocol {
+pub struct StatusCodeProtocol {
     /// Function to report status codes.
     pub report_status_code: ReportStatusCode,
 }

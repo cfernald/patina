@@ -44,7 +44,7 @@ struct BrotliSectionExtractor {}
 impl SectionExtractor for BrotliSectionExtractor {
     fn extract(&self, section: &patina::pi::fw_fs::Section) -> Result<Box<[u8]>, efi::Status> {
         if let SectionMetaData::GuidDefined(guid_header, _) = section.meta_data()
-            && guid_header.section_definition_guid == guid::BROTLI_SECTION
+            && guid_header.section_definition_guid == guid::BROTLI_SECTION_GUID
         {
             let data = section.section_data();
             let out_size =

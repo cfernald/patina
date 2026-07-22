@@ -37,7 +37,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 use criterion::{Bencher, Criterion, criterion_group, criterion_main};
-use patina::base::guid::{Guid, OwnedGuid};
+use patina::guid::{Guid, OwnedGuid};
 use patina::standard::efi;
 
 const TEST_GUID_STRING: &str = "12345678-9abc-def0-1122-334455667788";
@@ -108,7 +108,7 @@ fn bench_r_efi_eq_same(b: &mut Bencher<'_>, _input: &usize) {
 
 fn bench_r_efi_eq_different(b: &mut Bencher<'_>, _input: &usize) {
     let r_efi_guid1 = create_r_efi_guid();
-    let r_efi_guid_different: efi::Guid = patina::base::guid::constants::ZERO.into();
+    let r_efi_guid_different: efi::Guid = patina::BinaryGuid::ZERO.into();
     b.iter(|| r_efi_guid1 == r_efi_guid_different)
 }
 

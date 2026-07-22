@@ -53,6 +53,12 @@
 //! uefi_driver_binding.install().unwrap();
 //!
 //! ```
+//!
+//! ## License
+//!
+//! Copyright (c) Microsoft Corporation.
+//!
+//! SPDX-License-Identifier: Apache-2.0
 
 #[cfg(any(test, feature = "mockall"))]
 use mockall::automock;

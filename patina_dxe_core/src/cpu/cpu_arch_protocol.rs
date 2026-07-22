@@ -14,19 +14,19 @@ use core::ffi::c_void;
 use patina::standard::efi;
 use patina::{
     arch,
-    base::error::{EfiError, Result},
     component::{
         Storage, component,
         service::{IntoService, Service},
     },
+    error::{EfiError, Result},
+    protocol::ProtocolInterface,
     uefi::boot_services::{BootServices, StandardBootServices},
-    uefi::protocol::ProtocolInterface,
 };
 use patina_internal_cpu::interrupts::{self, ExceptionType, HandlerType, InterruptManager, Interrupts};
 
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use patina::pi::protocols::cpu_arch::{CpuFlushType, CpuInitType, InterruptHandler, PROTOCOL_GUID, Protocol};
+use patina::pi::protocol::cpu_arch::{CpuArchProtocol, CpuFlushType, CpuInitType, InterruptHandler, PROTOCOL_GUID};
 
 /// Cached CPU timer period. A value of zero indicates the period has not yet been queried from the
 /// architecture layer.
@@ -48,7 +48,7 @@ impl InterruptManager for DxeInterruptManager {
 
 #[repr(C)]
 struct EfiCpuArchProtocolImpl {
-    protocol: Protocol,
+    protocol: CpuArchProtocol,
 
     // Crate accessible fields
     pub(crate) interrupt_manager: Service<dyn InterruptManager>,
@@ -61,7 +61,7 @@ unsafe impl ProtocolInterface for EfiCpuArchProtocolImpl {
 
 // Helper to convert a raw protocol pointer to a reference. Returns `None` when the caller passes a
 // null pointer so the caller can determine the appropriate action to take.
-fn get_impl_ref<'a>(this: *const Protocol) -> Option<&'a EfiCpuArchProtocolImpl> {
+fn get_impl_ref<'a>(this: *const CpuArchProtocol) -> Option<&'a EfiCpuArchProtocolImpl> {
     if this.is_null() {
         return None;
     }
@@ -72,7 +72,7 @@ fn get_impl_ref<'a>(this: *const Protocol) -> Option<&'a EfiCpuArchProtocolImpl>
     Some(unsafe { &*(this as *const EfiCpuArchProtocolImpl) })
 }
 
-fn get_impl_ref_mut<'a>(this: *mut Protocol) -> Option<&'a mut EfiCpuArchProtocolImpl> {
+fn get_impl_ref_mut<'a>(this: *mut CpuArchProtocol) -> Option<&'a mut EfiCpuArchProtocolImpl> {
     if this.is_null() {
         return None;
     }
@@ -86,7 +86,7 @@ fn get_impl_ref_mut<'a>(this: *mut Protocol) -> Option<&'a mut EfiCpuArchProtoco
 // EfiCpuArchProtocolImpl function pointers implementations.
 #[cfg_attr(coverage, coverage(off))]
 extern "efiapi" fn flush_data_cache(
-    this: *const Protocol,
+    this: *const CpuArchProtocol,
     start: efi::PhysicalAddress,
     length: u64,
     flush_type: CpuFlushType,
@@ -100,19 +100,19 @@ extern "efiapi" fn flush_data_cache(
         .unwrap_or_else(|err| err.into())
 }
 
-extern "efiapi" fn enable_interrupt(this: *const Protocol) -> efi::Status {
+extern "efiapi" fn enable_interrupt(this: *const CpuArchProtocol) -> efi::Status {
     arch::enable_interrupts();
 
     efi::Status::SUCCESS
 }
 
-extern "efiapi" fn disable_interrupt(this: *const Protocol) -> efi::Status {
+extern "efiapi" fn disable_interrupt(this: *const CpuArchProtocol) -> efi::Status {
     arch::disable_interrupts();
 
     efi::Status::SUCCESS
 }
 
-extern "efiapi" fn get_interrupt_state(this: *const Protocol, state: *mut bool) -> efi::Status {
+extern "efiapi" fn get_interrupt_state(this: *const CpuArchProtocol, state: *mut bool) -> efi::Status {
     if state.is_null() {
         return efi::Status::INVALID_PARAMETER;
     }
@@ -123,7 +123,7 @@ extern "efiapi" fn get_interrupt_state(this: *const Protocol, state: *mut bool) 
     efi::Status::SUCCESS
 }
 
-extern "efiapi" fn init(this: *const Protocol, init_type: CpuInitType) -> efi::Status {
+extern "efiapi" fn init(this: *const CpuArchProtocol, init_type: CpuInitType) -> efi::Status {
     if this.is_null() {
         return efi::Status::INVALID_PARAMETER;
     }
@@ -132,7 +132,7 @@ extern "efiapi" fn init(this: *const Protocol, init_type: CpuInitType) -> efi::S
 }
 
 extern "efiapi" fn register_interrupt_handler(
-    this: *const Protocol,
+    this: *const CpuArchProtocol,
     interrupt_type: isize,
     interrupt_handler: InterruptHandler,
 ) -> efi::Status {
@@ -185,7 +185,7 @@ fn get_cpu_timer_value(timer_index: u32) -> Result<(u64, u64)> {
 }
 
 extern "efiapi" fn get_timer_value(
-    this: *const Protocol,
+    this: *const CpuArchProtocol,
     timer_index: u32,
     timer_value: *mut u64,
     timer_period: *mut u64,
@@ -213,7 +213,7 @@ extern "efiapi" fn get_timer_value(
 }
 
 extern "efiapi" fn set_memory_attributes(
-    _this: *const Protocol,
+    _this: *const CpuArchProtocol,
     base_address: efi::PhysicalAddress,
     length: u64,
     attributes: u64,
@@ -227,7 +227,7 @@ extern "efiapi" fn set_memory_attributes(
 impl EfiCpuArchProtocolImpl {
     fn new(interrupt_manager: Service<dyn InterruptManager>) -> Self {
         Self {
-            protocol: Protocol {
+            protocol: CpuArchProtocol {
                 flush_data_cache,
                 enable_interrupt,
                 disable_interrupt,
@@ -274,7 +274,7 @@ mod tests {
     use super::*;
 
     use mockall::{mock, predicate::*};
-    use patina::pi::protocols::cpu_arch::{EfiExceptionType, EfiSystemContext};
+    use patina::pi::protocol::cpu_arch::{EfiExceptionType, EfiSystemContext};
 
     mock! {
         InterruptManager {}

@@ -22,11 +22,8 @@ use core::{ops::DerefMut, ptr::NonNull};
 
 use patina::{
     component::{Storage, service::IntoService},
-    uefi::boot_services::{
-        BootServices, StandardBootServices,
-        event::{EventTimerType, EventType},
-        tpl::Tpl,
-    },
+    uefi::boot_services::{BootServices, StandardBootServices, tpl::Tpl},
+    uefi::event::{EventTimerType, EventType},
     writelncrlf,
 };
 
@@ -94,7 +91,7 @@ impl TestRecord {
     }
 
     /// Schedules the test to be run according to its triggers.
-    pub fn schedule_run(&self, storage: &mut Storage) -> patina::base::error::Result<()> {
+    pub fn schedule_run(&self, storage: &mut Storage) -> patina::error::Result<()> {
         let name = self.test_case.name;
 
         for trigger in self.test_case.triggers {
@@ -194,7 +191,7 @@ impl Recorder {
     }
 
     /// Registers UEFI event callbacks to log the test results at specific points in the boot process.
-    pub fn initialize(&self, storage: &mut Storage) -> patina::base::error::Result<()> {
+    pub fn initialize(&self, storage: &mut Storage) -> patina::error::Result<()> {
         // Log results at ready to boot
         storage.boot_services().create_event_ex(
             EventType::NOTIFY_SIGNAL,

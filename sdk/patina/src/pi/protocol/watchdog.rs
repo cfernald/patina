@@ -29,26 +29,26 @@ pub type WatchdogTimerNotify = extern "efiapi" fn(u64);
 ///
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.14.2
-pub type RegisterHandler = extern "efiapi" fn(*const Protocol, WatchdogTimerNotify) -> efi::Status;
+pub type RegisterHandler = extern "efiapi" fn(*const WatchdogProtocol, WatchdogTimerNotify) -> efi::Status;
 
 /// Sets the amount of time in the future to fire the watchdog timer.
 ///
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.14.3
-pub type SetTimerPeriod = extern "efiapi" fn(*const Protocol, u64) -> efi::Status;
+pub type SetTimerPeriod = extern "efiapi" fn(*const WatchdogProtocol, u64) -> efi::Status;
 
 /// Retrieves the amount of time in 100 ns units that the system will wait before firing the watchdog timer.
 ///
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.14.4
-pub type GetTimerPeriod = extern "efiapi" fn(*const Protocol, *mut u64) -> efi::Status;
+pub type GetTimerPeriod = extern "efiapi" fn(*const WatchdogProtocol, *mut u64) -> efi::Status;
 
 /// Used to program the watchdog timer and optionally register a handler when the watchdog timer fires.
 ///
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.14.1
 #[repr(C)]
-pub struct Protocol {
+pub struct WatchdogProtocol {
     /// Registers a handler function for watchdog timer expiry.
     pub register_handler: RegisterHandler,
     /// Sets the period of the watchdog timer.

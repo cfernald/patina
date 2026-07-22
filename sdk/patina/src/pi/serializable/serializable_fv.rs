@@ -11,8 +11,8 @@ use crate::pi::{
         FfsSectionHeader::{NOT_COMPRESSED, STANDARD_COMPRESSION},
         FfsSectionType, FirmwareVolume, SectionMetaData,
         guid::{
-            BROTLI_SECTION, CRC32_SECTION, LZMA_F86_SECTION, LZMA_PARALLEL_SECTION, LZMA_SECTION,
-            TIANO_DECOMPRESS_SECTION,
+            BROTLI_SECTION_GUID, CRC32_SECTION_GUID, LZMA_F86_SECTION_GUID, LZMA_PARALLEL_SECTION_GUID,
+            LZMA_SECTION_GUID, TIANO_DECOMPRESS_SECTION_GUID,
         },
     },
     serializable::{format_guid, hex_format},
@@ -73,7 +73,7 @@ pub struct PeHeaderInfo {
 impl From<FirmwareVolume<'_>> for FirmwareVolumeSerDe {
     fn from(fv: FirmwareVolume) -> Self {
         // Get the FV name, length, base address, and attributes
-        let fv_name = format_guid(&fv.fv_name().unwrap_or(crate::base::guid::constants::ZERO));
+        let fv_name = format_guid(&fv.fv_name().unwrap_or(crate::BinaryGuid::ZERO));
         let fv_length = fv.size() as usize;
         let fv_attributes = fv.attributes();
         let files = fv
@@ -107,12 +107,12 @@ impl From<FirmwareVolume<'_>> for FirmwareVolumeSerDe {
                                 _ => format!("{:#x?}", compression.compression_type),
                             },
                             SectionMetaData::GuidDefined(guid, _) => match guid.section_definition_guid {
-                                BROTLI_SECTION => "Brotli Compressed".to_string(),
-                                CRC32_SECTION => "CRC32 Compressed".to_string(),
-                                LZMA_SECTION => "LZMA Compressed".to_string(),
-                                LZMA_F86_SECTION => "LZMA F86 Compressed".to_string(),
-                                LZMA_PARALLEL_SECTION => "LZMA Parallel Compressed".to_string(),
-                                TIANO_DECOMPRESS_SECTION => "Tiano Compressed".to_string(),
+                                BROTLI_SECTION_GUID => "Brotli Compressed".to_string(),
+                                CRC32_SECTION_GUID => "CRC32 Compressed".to_string(),
+                                LZMA_SECTION_GUID => "LZMA Compressed".to_string(),
+                                LZMA_F86_SECTION_GUID => "LZMA F86 Compressed".to_string(),
+                                LZMA_PARALLEL_SECTION_GUID => "LZMA Parallel Compressed".to_string(),
+                                TIANO_DECOMPRESS_SECTION_GUID => "Tiano Compressed".to_string(),
                                 _ => format_guid(&guid.section_definition_guid),
                             },
                             _ => "uncompressed".to_string(),

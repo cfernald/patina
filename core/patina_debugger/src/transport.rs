@@ -33,7 +33,7 @@ impl<'a, T: SerialIO> SerialConnection<'a, T> {
 }
 
 impl<T: SerialIO> Connection for SerialConnection<'_, T> {
-    type Error = patina::base::error::EfiError;
+    type Error = patina::error::EfiError;
 
     /// Write a byte to the serial transport.
     fn write(&mut self, byte: u8) -> Result<(), Self::Error> {

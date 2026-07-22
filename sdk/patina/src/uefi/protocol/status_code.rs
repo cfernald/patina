@@ -14,31 +14,33 @@ use core::{mem, ptr, slice};
 
 use crate::standard::efi;
 
-use crate::pi::protocols::status_code::{
+use crate::base::protocol::ProtocolInterface;
+use crate::pi::protocol::status_code::{
     self, EfiStatusCodeData, EfiStatusCodeType, EfiStatusCodeValue, ReportStatusCode,
 };
-
-use super::ProtocolInterface;
 
 /// Rust definition of the UEFI Status Code Protocol.
 ///
 /// <https://uefi.org/specs/PI/1.9/V2_DXE_Runtime_Protocols.html#status-code-runtime-protocol>
 #[repr(transparent)]
 pub struct StatusCodeRuntimeProtocol {
-    protocol: status_code::Protocol,
+    protocol: status_code::StatusCodeProtocol,
 }
+
+/// GUID identifying the Status Code Runtime protocol.
+pub const PROTOCOL_GUID: crate::BinaryGuid = status_code::PROTOCOL_GUID;
 
 // SAFETY: StatusCodeRuntimeProtocol implements the UEFI Status Code Runtime protocol interface.
 // The PROTOCOL_GUID matches the PI specification. The repr(transparent) ensures that the
 // structure layout matches the underlying r_efi protocol definition.
 unsafe impl ProtocolInterface for StatusCodeRuntimeProtocol {
-    const PROTOCOL_GUID: crate::BinaryGuid = status_code::PROTOCOL_GUID;
+    const PROTOCOL_GUID: crate::BinaryGuid = PROTOCOL_GUID;
 }
 
 impl StatusCodeRuntimeProtocol {
     /// Creates a new instance of the Status Code Runtime Protocol with the given implementation.
     pub fn new(report_status_code: ReportStatusCode) -> Self {
-        Self { protocol: status_code::Protocol { report_status_code } }
+        Self { protocol: status_code::StatusCodeProtocol { report_status_code } }
     }
 
     /// Reports a status code to the platform firmware with data.

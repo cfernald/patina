@@ -16,7 +16,7 @@
 //!
 
 use core::ops::{Deref, DerefMut};
-use patina::{base::error::EfiError, pi::protocols::cpu_arch::EfiSystemContext, standard};
+use patina::{error::EfiError, pi::protocol::cpu_arch::EfiSystemContext, standard};
 
 mod exception_handling;
 
@@ -170,7 +170,7 @@ pub enum HandlerType {
     /// No handler is registered.
     None,
     /// Handler is a UEFI compliant routine.
-    UefiRoutine(patina::pi::protocols::cpu_arch::InterruptHandler),
+    UefiRoutine(patina::pi::protocol::cpu_arch::InterruptHandler),
     /// Handler is a implementation of the interrupt handler trait.
     Handler(&'static dyn InterruptHandler),
 }

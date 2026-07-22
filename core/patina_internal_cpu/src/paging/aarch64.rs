@@ -11,7 +11,7 @@
 use patina_paging::{MemoryAttributes, PageTable, PagingType, PtError, aarch64::AArch64PageTable};
 
 use crate::paging::{CacheAttributeValue, PatinaPageTable};
-use patina::pi::protocols::cpu_arch::CpuFlushType;
+use patina::pi::protocol::cpu_arch::CpuFlushType;
 use patina::standard::efi;
 use patina_paging::page_allocator::PageAllocator;
 

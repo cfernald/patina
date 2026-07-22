@@ -15,13 +15,13 @@
 //!
 //! // Generate HOBs to initialize a new HOB list
 //! fn gen_capsule() -> hob::Capsule {
-//!   let header = hob::header::Hob { r#type: hob::UEFI_CAPSULE, length: size_of::<hob::Capsule>() as u16, reserved: 0 };
+//!   let header = hob::HobHeader { r#type: hob::UEFI_CAPSULE, length: size_of::<hob::Capsule>() as u16, reserved: 0 };
 //!
 //!   hob::Capsule { header, base_address: 0, length: 0x12 }
 //! }
 //!
 //! fn gen_firmware_volume2() -> hob::FirmwareVolume2 {
-//!   let header = hob::header::Hob { r#type: hob::FV2, length: size_of::<hob::FirmwareVolume2>() as u16, reserved: 0 };
+//!   let header = hob::HobHeader { r#type: hob::FV2, length: size_of::<hob::FirmwareVolume2>() as u16, reserved: 0 };
 //!
 //!   hob::FirmwareVolume2 {
 //!     header,
@@ -33,7 +33,7 @@
 //! }
 //!
 //! fn gen_end_of_hoblist() -> hob::PhaseHandoffInformationTable {
-//!   let header = hob::header::Hob {
+//!   let header = hob::HobHeader {
 //!     r#type: hob::END_OF_HOB_LIST,
 //!     length: size_of::<hob::PhaseHandoffInformationTable>() as u16,
 //!     reserved: 0,
@@ -134,79 +134,75 @@ pub const UNUSED: u16 = 0xFFFE;
 /// Indicates the end of the HOB list. This HOB must be the last one in the HOB list.
 pub const END_OF_HOB_LIST: u16 = 0xFFFF;
 
-/// HOB header structures and definitions.
-pub mod header {
-    use crate::pi::hob::EfiPhysicalAddress;
-    use crate::standard::efi::MemoryType;
+use crate::standard::efi::MemoryType;
 
-    /// Describes the format and size of the data inside the HOB. All HOBs must contain
-    /// this generic HOB header.
+/// Describes the format and size of the data inside the HOB. All HOBs must contain
+/// this generic HOB header.
+///
+/// This header provides the foundation for traversing the HOB list by containing
+/// the type identifier and length information. The HOB list is composed of consecutive
+/// HOB structures that allows iteration from one HOB to the next until the end-of-list
+/// marker is encountered.
+///
+#[repr(C)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct HobHeader {
+    // EFI_HOB_GENERIC_HEADER
+    /// Identifies the HOB data structure type.
+    /// This field specifies which HOB structure follows this header,
+    /// such as memory allocation, resource descriptor, or firmware volume.
+    pub r#type: u16,
+
+    /// The length in bytes of the HOB.
+    /// This includes the HOB header and all associated data. Used for
+    /// traversing to the next HOB in the HOB list.
+    pub length: u16,
+
+    /// This field must always be set to zero.
     ///
-    /// This header provides the foundation for traversing the HOB list by containing
-    /// the type identifier and length information. The HOB list is composed of consecutive
-    /// HOB structures that allows iteration from one HOB to the next until the end-of-list
-    /// marker is encountered.
+    pub reserved: u32,
+}
+
+/// Memory allocation HOB header that describes allocated memory regions.
+///
+/// This header describes memory that has been allocated during the HOB producer phase
+/// and provides information needed for the HOB consumer phase to incorporate these
+/// allocations into the system memory map. The Name field identifies the purpose
+/// and allows for specific handling by components that understand the allocation type.
+///
+#[repr(C)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct MemoryAllocationHeader {
+    // EFI_HOB_MEMORY_ALLOCATION_HEADER
+    /// A GUID that defines the memory allocation region's type and purpose.
+    /// This GUID identifies the specific type of memory allocation and may
+    /// indicate additional data structures that follow this header. Well-known
+    /// GUIDs include allocations for stack, BSP store, and module images.
     ///
-    #[repr(C)]
-    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-    pub struct Hob {
-        // EFI_HOB_GENERIC_HEADER
-        /// Identifies the HOB data structure type.
-        /// This field specifies which HOB structure follows this header,
-        /// such as memory allocation, resource descriptor, or firmware volume.
-        pub r#type: u16,
+    pub name: crate::BinaryGuid,
 
-        /// The length in bytes of the HOB.
-        /// This includes the HOB header and all associated data. Used for
-        /// traversing to the next HOB in the HOB list.
-        pub length: u16,
-
-        /// This field must always be set to zero.
-        ///
-        pub reserved: u32,
-    }
-
-    /// Memory allocation HOB header that describes allocated memory regions.
+    /// The base address of memory allocated by this HOB.
+    /// This is the physical address where the memory allocation begins,
+    /// and it will be included in the memory map during DXE phase
+    /// memory map construction.
     ///
-    /// This header describes memory that has been allocated during the HOB producer phase
-    /// and provides information needed for the HOB consumer phase to incorporate these
-    /// allocations into the system memory map. The Name field identifies the purpose
-    /// and allows for specific handling by components that understand the allocation type.
+    pub memory_base_address: EfiPhysicalAddress,
+
+    /// The length in bytes of memory allocated by this HOB.
+    /// This specifies the size of the memory region from the base address
+    /// that has been allocated and should be reflected in the memory map.
+    pub memory_length: u64,
+
+    /// Defines the type of memory allocated by this HOB.
+    /// The memory type follows EFI memory type definitions and determines
+    /// how this memory region will be treated in the memory map,
+    /// such as whether it's available for allocation or reserved.
     ///
-    #[repr(C)]
-    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-    pub struct MemoryAllocation {
-        // EFI_HOB_MEMORY_ALLOCATION_HEADER
-        /// A GUID that defines the memory allocation region's type and purpose.
-        /// This GUID identifies the specific type of memory allocation and may
-        /// indicate additional data structures that follow this header. Well-known
-        /// GUIDs include allocations for stack, BSP store, and module images.
-        ///
-        pub name: crate::BinaryGuid,
+    pub memory_type: MemoryType,
 
-        /// The base address of memory allocated by this HOB.
-        /// This is the physical address where the memory allocation begins,
-        /// and it will be included in the memory map during DXE phase
-        /// memory map construction.
-        ///
-        pub memory_base_address: EfiPhysicalAddress,
-
-        /// The length in bytes of memory allocated by this HOB.
-        /// This specifies the size of the memory region from the base address
-        /// that has been allocated and should be reflected in the memory map.
-        pub memory_length: u64,
-
-        /// Defines the type of memory allocated by this HOB.
-        /// The memory type follows EFI memory type definitions and determines
-        /// how this memory region will be treated in the memory map,
-        /// such as whether it's available for allocation or reserved.
-        ///
-        pub memory_type: MemoryType,
-
-        /// This field will always be set to zero.
-        ///
-        pub reserved: [u8; 4],
-    }
+    /// This field will always be set to zero.
+    ///
+    pub reserved: [u8; 4],
 }
 
 /// Describes pool memory allocations.
@@ -217,7 +213,7 @@ pub mod header {
 /// memory allocation mechanism within the HOB list. The size of the memory allocation
 /// is stipulated by the HobLength field in the generic HOB header.
 ///
-pub type MemoryPool = header::Hob;
+pub type MemoryPool = HobHeader;
 
 /// Phase Handoff Information Table (PHIT) HOB.
 ///
@@ -234,7 +230,7 @@ pub type MemoryPool = header::Hob;
 pub struct PhaseHandoffInformationTable {
     /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_HANDOFF.
     ///
-    pub header: header::Hob, // EFI_HOB_GENERIC_HEADER
+    pub header: HobHeader, // EFI_HOB_GENERIC_HEADER
 
     /// The version number pertaining to the PHIT HOB definition.
     /// This value is four bytes in length to provide an 8-byte aligned entry
@@ -282,12 +278,12 @@ pub struct MemoryAllocation {
     // EFI_HOB_MEMORY_ALLOCATION
     /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_MEMORY_ALLOCATION.
     ///
-    pub header: header::Hob,
+    pub header: HobHeader,
 
     /// An instance of the EFI_HOB_MEMORY_ALLOCATION_HEADER that describes the
     /// various attributes of the logical memory allocation.
     ///
-    pub alloc_descriptor: header::MemoryAllocation,
+    pub alloc_descriptor: MemoryAllocationHeader,
     // Additional data pertaining to the "Name" Guid memory
     // may go here.
     //
@@ -326,13 +322,13 @@ pub type MemoryAllocationBspStore = MemoryAllocation;
 pub struct MemoryAllocationModule {
     /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_MEMORY_ALLOCATION.
     ///
-    pub header: header::Hob,
+    pub header: HobHeader,
 
     /// An instance of the EFI_HOB_MEMORY_ALLOCATION_HEADER that describes the
     /// various attributes of the logical memory allocation. The type field will be
     /// used for subsequent inclusion in the memory map.
     ///
-    pub alloc_descriptor: header::MemoryAllocation,
+    pub alloc_descriptor: MemoryAllocationHeader,
 
     /// The GUID specifying the values of the firmware file system name
     /// that contains the HOB consumer phase component.
@@ -518,7 +514,7 @@ pub struct ResourceDescriptor {
     // EFI_HOB_RESOURCE_DESCRIPTOR
     /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_RESOURCE_DESCRIPTOR.
     ///
-    pub header: header::Hob,
+    pub header: HobHeader,
 
     /// A GUID representing the owner of the resource.
     /// This GUID is used by HOB consumer phase components to correlate device
@@ -600,7 +596,7 @@ pub struct GuidHob {
     // EFI_HOB_GUID_TYPE
     /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_GUID_EXTENSION.
     ///
-    pub header: header::Hob,
+    pub header: HobHeader,
 
     /// A GUID that defines the contents of this HOB.
     ///
@@ -624,7 +620,7 @@ pub struct FirmwareVolume {
     // EFI_HOB_FIRMWARE_VOLUME
     /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_FV.
     ///
-    pub header: header::Hob,
+    pub header: HobHeader,
 
     /// The physical memory-mapped base address of the firmware volume.
     ///
@@ -650,7 +646,7 @@ pub struct FirmwareVolume2 {
     // EFI_HOB_FIRMWARE_VOLUME2
     /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_FV2.
     ///
-    pub header: header::Hob,
+    pub header: HobHeader,
 
     /// The physical memory-mapped base address of the firmware volume.
     ///
@@ -686,7 +682,7 @@ pub struct FirmwareVolume3 {
     // EFI_HOB_FIRMWARE_VOLUME3
     /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_FV3.
     ///
-    pub header: header::Hob,
+    pub header: HobHeader,
 
     /// The physical memory-mapped base address of the firmware volume.
     ///
@@ -730,7 +726,7 @@ pub struct Cpu {
     // EFI_HOB_CPU
     /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_CPU.
     ///
-    pub header: header::Hob,
+    pub header: HobHeader,
 
     /// Identifies the maximum physical memory addressability of the processor.
     ///
@@ -759,7 +755,7 @@ pub struct Capsule {
     // EFI_HOB_CAPSULE
     /// The HOB generic header where Header.HobType = EFI_HOB_TYPE_UEFI_CAPSULE.
     ///
-    pub header: header::Hob,
+    pub header: HobHeader,
 
     /// The physical memory-mapped base address of a UEFI capsule. This value is set to
     /// point to the base of the contiguous memory of the UEFI capsule.
@@ -879,18 +875,18 @@ impl HobTrait for Hob<'_> {
 /// println!("HOB list size: {}", size);
 /// ```
 pub unsafe fn get_pi_hob_list_size(hob_list: *const c_void) -> usize {
-    let mut hob_header: *const header::Hob = hob_list as *const header::Hob;
+    let mut hob_header: *const HobHeader = hob_list as *const HobHeader;
     let mut hob_list_len = 0;
 
     loop {
         // SAFETY: The caller must ensure that `hob_list` is a valid pointer to a properly formatted HOB list.
-        let current_header = unsafe { hob_header.cast::<header::Hob>().as_ref().expect("Could not get hob list len") };
+        let current_header = unsafe { hob_header.cast::<HobHeader>().as_ref().expect("Could not get hob list len") };
         hob_list_len += current_header.length as usize;
         if current_header.r#type == END_OF_HOB_LIST {
             break;
         }
         let next_hob = hob_header as usize + current_header.length as usize;
-        hob_header = next_hob as *const header::Hob;
+        hob_header = next_hob as *const HobHeader;
     }
 
     hob_list_len
@@ -898,7 +894,7 @@ pub unsafe fn get_pi_hob_list_size(hob_list: *const c_void) -> usize {
 
 impl Hob<'_> {
     /// Returns the HOB header for this Hand-Off Block
-    pub fn header(&self) -> header::Hob {
+    pub fn header(&self) -> HobHeader {
         match self {
             Hob::Handoff(hob) => hob.header,
             Hob::MemoryAllocation(hob) => hob.header,
@@ -912,7 +908,7 @@ impl Hob<'_> {
             Hob::Cpu(hob) => hob.header,
             Hob::ResourceDescriptorV2(hob) => hob.v1.header,
             Hob::Misc(hob_type) => {
-                header::Hob { r#type: *hob_type, length: mem::size_of::<header::Hob>() as u16, reserved: 0 }
+                HobHeader { r#type: *hob_type, length: mem::size_of::<HobHeader>() as u16, reserved: 0 }
             }
         }
     }
@@ -921,7 +917,7 @@ impl Hob<'_> {
 /// A HOB iterator.
 ///
 pub struct HobIter<'a> {
-    hob_ptr: *const header::Hob,
+    hob_ptr: *const HobHeader,
     _a: PhantomData<&'a ()>,
 }
 
@@ -985,7 +981,7 @@ impl<'a> Iterator for HobIter<'a> {
                 hob_type => Hob::Misc(hob_type),
             }
         };
-        self.hob_ptr = (self.hob_ptr as usize + hob_header.length as usize) as *const header::Hob;
+        self.hob_ptr = (self.hob_ptr as usize + hob_header.length as usize) as *const HobHeader;
         Some(hob)
     }
 }
@@ -1024,7 +1020,7 @@ pub(crate) mod tests {
     // # Returns
     // A FirmwareVolume hob
     pub(crate) fn gen_firmware_volume() -> hob::FirmwareVolume {
-        let header = hob::header::Hob { r#type: hob::FV, length: size_of::<hob::FirmwareVolume>() as u16, reserved: 0 };
+        let header = hob::HobHeader { r#type: hob::FV, length: size_of::<hob::FirmwareVolume>() as u16, reserved: 0 };
 
         hob::FirmwareVolume { header, base_address: 0, length: 0x0123456789abcdef }
     }
@@ -1033,8 +1029,7 @@ pub(crate) mod tests {
     // # Returns
     // A FirmwareVolume2 hob
     pub(crate) fn gen_firmware_volume2() -> hob::FirmwareVolume2 {
-        let header =
-            hob::header::Hob { r#type: hob::FV2, length: size_of::<hob::FirmwareVolume2>() as u16, reserved: 0 };
+        let header = hob::HobHeader { r#type: hob::FV2, length: size_of::<hob::FirmwareVolume2>() as u16, reserved: 0 };
 
         hob::FirmwareVolume2 {
             header,
@@ -1049,8 +1044,7 @@ pub(crate) mod tests {
     // # Returns
     // A FirmwareVolume3 hob
     pub(crate) fn gen_firmware_volume3() -> hob::FirmwareVolume3 {
-        let header =
-            hob::header::Hob { r#type: hob::FV3, length: size_of::<hob::FirmwareVolume3>() as u16, reserved: 0 };
+        let header = hob::HobHeader { r#type: hob::FV3, length: size_of::<hob::FirmwareVolume3>() as u16, reserved: 0 };
 
         hob::FirmwareVolume3 {
             header,
@@ -1067,7 +1061,7 @@ pub(crate) mod tests {
     // # Returns
     // A ResourceDescriptor hob
     pub(crate) fn gen_resource_descriptor() -> hob::ResourceDescriptor {
-        let header = hob::header::Hob {
+        let header = hob::HobHeader {
             r#type: hob::RESOURCE_DESCRIPTOR,
             length: size_of::<hob::ResourceDescriptor>() as u16,
             reserved: 0,
@@ -1098,13 +1092,13 @@ pub(crate) mod tests {
     // # Returns
     // A MemoryAllocation hob
     pub(crate) fn gen_memory_allocation() -> hob::MemoryAllocation {
-        let header = hob::header::Hob {
+        let header = hob::HobHeader {
             r#type: hob::MEMORY_ALLOCATION,
             length: size_of::<hob::MemoryAllocation>() as u16,
             reserved: 0,
         };
 
-        let alloc_descriptor = hob::header::MemoryAllocation {
+        let alloc_descriptor = hob::MemoryAllocationHeader {
             name: crate::BinaryGuid::from_fields(1, 2, 3, 4, 5, &[6, 7, 8, 9, 10, 11]),
             memory_base_address: 0,
             memory_length: 0x0123456789abcdef,
@@ -1116,13 +1110,13 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn gen_memory_allocation_module() -> hob::MemoryAllocationModule {
-        let header = hob::header::Hob {
+        let header = hob::HobHeader {
             r#type: hob::MEMORY_ALLOCATION,
             length: size_of::<hob::MemoryAllocationModule>() as u16,
             reserved: 0,
         };
 
-        let alloc_descriptor = hob::header::MemoryAllocation {
+        let alloc_descriptor = hob::MemoryAllocationHeader {
             name: crate::BinaryGuid::from_fields(1, 2, 3, 4, 5, &[6, 7, 8, 9, 10, 11]),
             memory_base_address: 0,
             memory_length: 0x0123456789abcdef,
@@ -1140,7 +1134,7 @@ pub(crate) mod tests {
 
     pub(crate) fn gen_capsule() -> hob::Capsule {
         let header =
-            hob::header::Hob { r#type: hob::UEFI_CAPSULE, length: size_of::<hob::Capsule>() as u16, reserved: 0 };
+            hob::HobHeader { r#type: hob::UEFI_CAPSULE, length: size_of::<hob::Capsule>() as u16, reserved: 0 };
 
         hob::Capsule { header, base_address: 0, length: 0x12 }
     }
@@ -1155,7 +1149,7 @@ pub(crate) mod tests {
     pub(crate) fn gen_guid_hob() -> Vec<u8> {
         let data: &[u8] = &[1_u8, 2, 3, 4, 5, 6, 7, 8];
         let hob = hob::GuidHob {
-            header: hob::header::Hob {
+            header: hob::HobHeader {
                 r#type: hob::GUID_EXTENSION,
                 length: (size_of::<hob::GuidHob>() + data.len()) as u16,
                 reserved: 0,
@@ -1186,7 +1180,7 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn gen_phase_handoff_information_table() -> hob::PhaseHandoffInformationTable {
-        let header = hob::header::Hob {
+        let header = hob::HobHeader {
             r#type: hob::HANDOFF,
             length: size_of::<hob::PhaseHandoffInformationTable>() as u16,
             reserved: 0,
@@ -1208,7 +1202,7 @@ pub(crate) mod tests {
     // # Returns
     // A PhaseHandoffInformationTable hob
     pub(crate) fn gen_end_of_hoblist() -> hob::PhaseHandoffInformationTable {
-        let header = hob::header::Hob {
+        let header = hob::HobHeader {
             r#type: hob::END_OF_HOB_LIST,
             length: size_of::<hob::PhaseHandoffInformationTable>() as u16,
             reserved: 0,
@@ -1227,7 +1221,7 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn gen_cpu() -> hob::Cpu {
-        let header = hob::header::Hob { r#type: hob::CPU, length: size_of::<hob::Cpu>() as u16, reserved: 0 };
+        let header = hob::HobHeader { r#type: hob::CPU, length: size_of::<hob::Cpu>() as u16, reserved: 0 };
 
         hob::Cpu { header, size_of_memory_space: 0, size_of_io_space: 0, reserved: [0; 6] }
     }
