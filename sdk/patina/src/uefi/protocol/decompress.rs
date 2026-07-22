@@ -10,37 +10,27 @@ use core::ffi::c_void;
 
 use crate::standard::efi;
 use crate::{
+    base::protocol::ProtocolInterface,
     log_debug_assert,
-    uefi::{
-        decompress::{DecompressionAlgorithm, decompress_into_with_algo},
-        protocol::ProtocolInterface,
-    },
+    uefi::decompress::{DecompressionAlgorithm, decompress_into_with_algo},
 };
 
-/// The ffi interface for the get_info function of the `EfiDecompressProtocol`.
-pub type GetInfoFn =
-    extern "efiapi" fn(*mut EfiDecompressProtocol, *mut c_void, u32, *mut u32, *mut u32) -> efi::Status;
-/// The ffi interface for the decompress function of the `EfiDecompressProtocol`.
-pub type DecompressFn = extern "efiapi" fn(
-    *mut EfiDecompressProtocol,
-    *const c_void,
-    u32,
-    *mut c_void,
-    u32,
-    *mut c_void,
-    u32,
-) -> efi::Status;
+/// The ffi interface for the get_info function of the `DecompressProtocol`.
+pub type GetInfoFn = extern "efiapi" fn(*mut DecompressProtocol, *mut c_void, u32, *mut u32, *mut u32) -> efi::Status;
+/// The ffi interface for the decompress function of the `DecompressProtocol`.
+pub type DecompressFn =
+    extern "efiapi" fn(*mut DecompressProtocol, *const c_void, u32, *mut c_void, u32, *mut c_void, u32) -> efi::Status;
 
 /// C struct for the EFI Decompress protocol.
 #[repr(C)]
-pub struct EfiDecompressProtocol {
+pub struct DecompressProtocol {
     /// FFI interface to get information about the necessary allocation sizes for decompression.
     get_info: GetInfoFn,
     /// FFI interface to decompress data and return it.
     decompress: DecompressFn,
 }
 
-impl EfiDecompressProtocol {
+impl DecompressProtocol {
     /// Calls the get_info function of the protocol.
     pub const fn new() -> Self {
         Self { get_info: Self::get_info, decompress: Self::decompress }
@@ -52,7 +42,7 @@ impl EfiDecompressProtocol {
     }
 
     extern "efiapi" fn get_info(
-        _: *mut EfiDecompressProtocol,
+        _: *mut DecompressProtocol,
         src: *mut c_void,
         src_size: u32,
         dst_size: *mut u32,
@@ -86,7 +76,7 @@ impl EfiDecompressProtocol {
 
     /// FFI interface to decompress data and return it.
     extern "efiapi" fn decompress(
-        _: *mut EfiDecompressProtocol,
+        _: *mut DecompressProtocol,
         source_buffer: *const c_void,
         source_size: u32,
         destination_buffer: *mut c_void,
@@ -95,7 +85,7 @@ impl EfiDecompressProtocol {
         _scratch_size: u32,
     ) -> efi::Status {
         if source_buffer.is_null() || destination_buffer.is_null() {
-            log_debug_assert!("EfiDecompressProtocol::decompress called with null pointer");
+            log_debug_assert!("DecompressProtocol::decompress called with null pointer");
             return efi::Status::INVALID_PARAMETER;
         }
 
@@ -112,15 +102,18 @@ impl EfiDecompressProtocol {
     }
 }
 
-impl Default for EfiDecompressProtocol {
+impl Default for DecompressProtocol {
     fn default() -> Self {
         Self::new()
     }
 }
 
-// SAFETY: EfiDecompressProtocol implements the UEFI Decompress protocol interface.
+/// GUID identifying the UEFI Decompress protocol.
+pub const PROTOCOL_GUID: crate::BinaryGuid = crate::BinaryGuid::from_string("D8117CFE-94A6-11D4-9A3A-0090273FC14D");
+
+// SAFETY: DecompressProtocol implements the UEFI Decompress protocol interface.
 // The PROTOCOL_GUID matches the UEFI specification for the Decompress protocol.
 // The protocol structure layout matches the UEFI protocol requirements.
-unsafe impl ProtocolInterface for EfiDecompressProtocol {
-    const PROTOCOL_GUID: crate::BinaryGuid = crate::BinaryGuid::from_string("D8117CFE-94A6-11D4-9A3A-0090273FC14D");
+unsafe impl ProtocolInterface for DecompressProtocol {
+    const PROTOCOL_GUID: crate::BinaryGuid = PROTOCOL_GUID;
 }

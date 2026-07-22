@@ -27,7 +27,7 @@ impl Crc32SectionExtractor {
 impl SectionExtractor for Crc32SectionExtractor {
     fn extract(&self, section: &patina_ffs::section::Section) -> Result<alloc::vec::Vec<u8>, FirmwareFileSystemError> {
         if let SectionHeader::GuidDefined(guid_header, crc_header, _) = section.header()
-            && guid_header.section_definition_guid == fw_fs::guid::CRC32_SECTION
+            && guid_header.section_definition_guid == fw_fs::guid::CRC32_SECTION_GUID
         {
             let crc32_bytes = crc_header.get(..4).ok_or(FirmwareFileSystemError::DataCorrupt)?;
             let crc32 = u32::from_le_bytes(crc32_bytes.try_into().unwrap());

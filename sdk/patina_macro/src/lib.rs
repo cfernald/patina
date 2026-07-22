@@ -143,7 +143,7 @@ pub fn hob_config(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 ///
 /// #[patina_test]
 /// #[on(timer = 1000000)]
-/// #[on(event = patina::guids::EVENT_GROUP_END_OF_DXE)]
+/// #[on(event = patina::pi::event::END_OF_DXE_EVENT_GROUP_GUID)]
 /// fn multi_triggered_test_case() -> Result {
 ///  todo!()
 /// }

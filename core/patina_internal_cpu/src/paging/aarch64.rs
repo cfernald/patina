@@ -14,7 +14,7 @@ use crate::{
     cpu::aarch64::flush_data_cache_range,
     paging::{CacheAttributeValue, PatinaPageTable},
 };
-use patina::pi::protocols::cpu_arch::CpuFlushType;
+use patina::pi::protocol::cpu_arch::CpuFlushType;
 use patina_paging::page_allocator::PageAllocator;
 use r_efi::efi;
 

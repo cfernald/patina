@@ -22,11 +22,8 @@ use core::{ops::DerefMut, ptr::NonNull};
 
 use patina::{
     component::{Storage, service::IntoService},
-    uefi::boot_services::{
-        BootServices, StandardBootServices,
-        event::{EventTimerType, EventType},
-        tpl::Tpl,
-    },
+    uefi::boot_services::{BootServices, StandardBootServices, tpl::Tpl},
+    uefi::event::{EventTimerType, EventType},
     writelncrlf,
 };
 

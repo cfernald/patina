@@ -32,7 +32,7 @@ pub const PROTOCOL_GUID: crate::BinaryGuid = crate::BinaryGuid::from_string("B7D
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.8.1
 #[repr(C)]
 #[derive(Debug)]
-pub struct Protocol {
+pub struct RuntimeProtocol {
     /// List head for registered runtime images.
     pub image_head: list_entry::Entry,
     /// List head for registered runtime events.

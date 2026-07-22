@@ -51,7 +51,7 @@ pub const PROTOCOL_GUID: crate::BinaryGuid = crate::BinaryGuid::from_string("378
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.9, Section IV-5.7.4
 pub type Communicate2 = extern "efiapi" fn(
-    this: *const Protocol,
+    this: *const Communication2Protocol,
     comm_buffer_physical: *mut c_void,
     comm_buffer_virtual: *mut c_void,
     comm_size: usize,
@@ -59,7 +59,7 @@ pub type Communicate2 = extern "efiapi" fn(
 
 #[repr(C)]
 /// MM Communication Protocol structure.
-pub struct Protocol {
+pub struct Communication2Protocol {
     /// Communicate with the MM environment (v2).
     /// See [`Communicate2`] for more details.
     pub communicate2: Communicate2,

@@ -9,7 +9,7 @@
 use alloc::vec::Vec;
 use core::result::Result;
 use lzma_rust2::{LzmaReader, Read};
-use patina::pi::fw_fs::guid::LZMA_SECTION;
+use patina::pi::fw_fs::guid::LZMA_SECTION_GUID;
 use patina_ffs::{
     FirmwareFileSystemError,
     section::{Section, SectionExtractor, SectionHeader},
@@ -36,7 +36,7 @@ impl LzmaSectionExtractor {
 impl SectionExtractor for LzmaSectionExtractor {
     fn extract(&self, section: &Section) -> Result<Vec<u8>, FirmwareFileSystemError> {
         if let SectionHeader::GuidDefined(guid_header, _, _) = section.header()
-            && guid_header.section_definition_guid == LZMA_SECTION
+            && guid_header.section_definition_guid == LZMA_SECTION_GUID
         {
             let data = section.try_content_as_slice()?;
 

@@ -58,14 +58,14 @@ pub const COMMUNICATE_HEADER_V3_GUID: crate::BinaryGuid =
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.9, Section IV-5.7.6
 pub type Communicate3 = extern "efiapi" fn(
-    this: *const Protocol,
+    this: *const Communication3Protocol,
     comm_buffer_physical: *mut c_void,
     comm_buffer_virtual: *mut c_void,
 ) -> efi::Status;
 
 #[repr(C)]
 /// MM Communication Protocol structure.
-pub struct Protocol {
+pub struct Communication3Protocol {
     /// Communicate with the MM environment (v3).
     /// See [`Communicate3`] for more details.
     pub communicate3: Communicate3,

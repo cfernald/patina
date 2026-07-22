@@ -14,7 +14,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-use crate::pi::protocols::status_code::{EfiStatusCodeType, EfiStatusCodeValue};
+use crate::pi::protocol::status_code::{EfiStatusCodeType, EfiStatusCodeValue};
 // Required for IA32, X64, IPF, ARM and EBC defines for CPU exception types
 use crate::standard::efi::protocols::debug_support;
 

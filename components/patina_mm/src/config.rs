@@ -23,7 +23,7 @@ use core::{fmt, pin::Pin, ptr::NonNull};
 
 use patina::{
     BinaryGuid, Guid, base::UEFI_PAGE_MASK, management_mode::MmCommBufferStatus,
-    pi::protocols::communication::EfiMmCommunicateHeader, writelncrlf,
+    pi::protocol::communication::EfiMmCommunicateHeader, writelncrlf,
 };
 
 /// Management Mode (MM) Configuration
@@ -428,7 +428,7 @@ impl CommunicateBuffer {
             }
             None => {
                 // If no recipient is set privately, the memory should contain all zeros for the GUID
-                if memory_guid != patina::base::guid::constants::ZERO {
+                if memory_guid != patina::BinaryGuid::ZERO {
                     log::error!(target: "mm_comm", "Buffer {} unexpected GUID in memory when none set privately", self.id);
                     return Err(CommunicateBufferStatus::InvalidRecipient);
                 }

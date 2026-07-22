@@ -7,7 +7,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-use patina::uefi::protocol::ProtocolInterface;
+use patina::base::protocol::ProtocolInterface;
 use r_efi::efi;
 
 /// C struct for the Advanced Logger protocol version 2.

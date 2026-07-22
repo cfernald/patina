@@ -49,8 +49,8 @@ This code which `unwrap`s on logger initialization panics unnecessarily:
 use patina_adv_logger::{component::AdvancedLoggerComponent, logger::AdvancedLogger};
 use log::LevelFilter;
 use patina::{
-    log::Format,
-    serial::uart::UartNull,
+    debug::log::Format,
+    peripheral::serial::uart::UartNull,
 };
 
 static LOGGER: AdvancedLogger<UartNull> = AdvancedLogger::new(
@@ -74,8 +74,8 @@ Consider replacing it with `match` and returning a `Result`:
 # use patina_adv_logger::{component::AdvancedLoggerComponent, logger::AdvancedLogger};
 # use log::LevelFilter;
 # use patina::{
-#     log::Format,
-#     serial::uart::UartNull,
+#     debug::log::Format,
+#     peripheral::serial::uart::UartNull,
 # };
 # static LOGGER: AdvancedLogger<UartNull> = AdvancedLogger::new(
 #     Format::Standard,
@@ -165,7 +165,7 @@ caller.
 # extern crate patina_internal_core;
 # extern crate patina;
 use patina_internal_core::collections::Error as PicError;
-use patina::error::EfiError;
+use patina::base::error::EfiError;
 
 // An error type for working with the GCD
 pub enum Error {
@@ -191,7 +191,7 @@ impl From<PicError> for Error {
 }
 
 // The GCD eventually bubbles up to external EFIAPI functions, so lets also make it easy to convert the `Error` type
-// to `patina::error::EfiError`
+// to `patina::base::error::EfiError`
 impl From<Error> for EfiError {
     fn from(value: Error) -> EfiError {
         match value {

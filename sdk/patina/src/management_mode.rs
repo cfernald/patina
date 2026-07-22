@@ -10,6 +10,8 @@
 //!
 
 pub mod comm_buffer_hob;
+pub mod event;
+pub mod guid;
 pub mod protocol;
 
 // Re-export commonly used items for easier access

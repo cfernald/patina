@@ -358,7 +358,7 @@ mod tests {
         component::service::{IntoService, perf_timer::ArchTimerFunctionality},
         debug::log::Format,
         peripheral::serial::uart::UartNull,
-        pi::hob::{GUID_EXTENSION, GuidHob, header},
+        pi::hob::{GUID_EXTENSION, GuidHob, HobHeader},
     };
     use r_efi::efi;
 
@@ -429,7 +429,7 @@ mod tests {
             ptr::write(
                 hob,
                 GuidHob {
-                    header: header::Hob { r#type: GUID_EXTENSION, length: HOB_LEN as u16, reserved: 0 },
+                    header: HobHeader { r#type: GUID_EXTENSION, length: HOB_LEN as u16, reserved: 0 },
                     name: memory_log::ADV_LOGGER_HOB_GUID,
                 },
             )

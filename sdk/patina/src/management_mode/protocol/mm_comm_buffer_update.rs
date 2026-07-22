@@ -14,7 +14,7 @@ use crate::BinaryGuid;
 use zerocopy_derive::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// GUID for the MM Communication Buffer Update Protocol
-pub const GUID: BinaryGuid = BinaryGuid::from_string("2a22e38f-9d1c-49d0-bdce-7ddac16da45d");
+pub const PROTOCOL_GUID: BinaryGuid = BinaryGuid::from_string("2a22e38f-9d1c-49d0-bdce-7ddac16da45d");
 
 /// MM Communication Buffer
 ///

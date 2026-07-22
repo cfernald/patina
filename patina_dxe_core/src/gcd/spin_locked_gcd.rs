@@ -12,13 +12,14 @@ use core::{fmt::Display, ptr};
 use patina::{base::DEFAULT_CACHE_ATTR, base::error::EfiError, log_debug_assert};
 
 use patina::{
-    base::guid::constants::{self as guids, CACHE_ATTRIBUTE_CHANGE_EVENT_GROUP},
+    base::guid as base_guids,
     base::{SIZE_4GB, UEFI_PAGE_MASK, UEFI_PAGE_SHIFT, UEFI_PAGE_SIZE, align_up},
     function,
     pi::{
         dxe_services::{self, GcdMemoryType, MemorySpaceDescriptor},
-        hob,
+        guid as pi_guids, hob,
     },
+    uefi::event::CACHE_ATTRIBUTE_CHANGE_EVENT_GROUP_GUID,
     uefi_pages_to_size, uefi_size_to_pages, writelncrlf,
 };
 use patina_internal_core::collections::{Error as SliceError, Rbt, SliceKey, node_size};
@@ -2191,7 +2192,7 @@ impl SpinLockedGcd {
                                 "Cache attributes for memory region {base_address:#x?} of length {len:#x?} were updated to {new_cache_attributes:#x?} from {old_cache_attrs:#x?}, sending cache attributes changed event",
                             );
 
-                            EVENT_DB.signal_group(CACHE_ATTRIBUTE_CHANGE_EVENT_GROUP.into_inner());
+                            EVENT_DB.signal_group(CACHE_ATTRIBUTE_CHANGE_EVENT_GROUP_GUID.into_inner());
                         } else if unmapped && old_cache_attributes.is_none() {
                             // in this case the region was unmapped and we had no caching attributes set up
                             log::trace!(
@@ -2199,7 +2200,7 @@ impl SpinLockedGcd {
                                 "Cache attributes for memory region {base_address:#x?} of length {len:#x?} were updated to {new_cache_attributes:#x?} from an unmapped state, sending cache attributes changed event",
                             );
 
-                            EVENT_DB.signal_group(CACHE_ATTRIBUTE_CHANGE_EVENT_GROUP.into_inner());
+                            EVENT_DB.signal_group(CACHE_ATTRIBUTE_CHANGE_EVENT_GROUP_GUID.into_inner());
                         }
                     }
 
@@ -2359,10 +2360,12 @@ impl SpinLockedGcd {
         let dxe_core_hob = hob_list
             .iter()
             .find_map(|x| match x {
-                Hob::MemoryAllocationModule(module) if module.module_name == guids::DXE_CORE => Some(module),
+                Hob::MemoryAllocationModule(module) if module.module_name == base_guids::DXE_CORE_ID => Some(module),
                 _ => None,
             })
-            .expect("Did not find MemoryAllocationModule Hob for DxeCore. Use patina::guid::DXE_CORE as FFS GUID.");
+            .expect(
+                "Did not find MemoryAllocationModule Hob for DxeCore. Use patina::base::guid::DXE_CORE_ID as FFS GUID.",
+            );
 
         // SAFETY: the DXE core HOB points to the loaded image buffer and size.
         let pe_info = unsafe {
@@ -2465,7 +2468,7 @@ impl SpinLockedGcd {
         // Find the stack hob and set attributes.
         if let Some(stack_hob) = hob_list.iter().find_map(|x| match x {
             patina::pi::hob::Hob::MemoryAllocation(hob::MemoryAllocation { header: _, alloc_descriptor: desc })
-                if desc.name == guids::HOB_MEMORY_ALLOC_STACK =>
+                if desc.name == pi_guids::MEMORY_ALLOC_STACK_HOB_GUID =>
             {
                 Some(desc)
             }
@@ -5640,31 +5643,31 @@ mod tests {
             let dxe_core_base = address + 0x1000;
             let dxe_core_len = 0x1000000;
             let hob = Hob::MemoryAllocationModule(&patina::pi::hob::MemoryAllocationModule {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: patina::pi::hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<patina::pi::hob::MemoryAllocationModule>() as u16,
                     reserved: 0,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
-                    name: guids::DXE_CORE,
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
+                    name: base_guids::DXE_CORE_ID,
                     memory_base_address: dxe_core_base as u64,
                     memory_length: dxe_core_len as u64,
                     memory_type: efi::BOOT_SERVICES_DATA,
                     reserved: [0; 4],
                 },
-                module_name: guids::DXE_CORE,
+                module_name: base_guids::DXE_CORE_ID,
                 entry_point: dxe_core_base as u64 + 0x1000,
             });
 
             // Add a stack HOB
             let stack_hob = Hob::MemoryAllocation(&patina::pi::hob::MemoryAllocation {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<hob::MemoryAllocation>() as u16,
                     reserved: 0x00000000,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
-                    name: guids::HOB_MEMORY_ALLOC_STACK,
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
+                    name: pi_guids::MEMORY_ALLOC_STACK_HOB_GUID,
                     memory_base_address: 0x2000,
                     memory_length: 0x40000,
                     memory_type: efi::BOOT_SERVICES_DATA,
@@ -5737,7 +5740,7 @@ mod tests {
                     patina::pi::hob::Hob::MemoryAllocation(hob::MemoryAllocation {
                         header: _,
                         alloc_descriptor: desc,
-                    }) if desc.name == guids::HOB_MEMORY_ALLOC_STACK => Some(desc),
+                    }) if desc.name == pi_guids::MEMORY_ALLOC_STACK_HOB_GUID => Some(desc),
                     _ => None,
                 })
                 .unwrap();
@@ -7344,19 +7347,19 @@ mod tests {
             let dxe_core_base = address + 0x1000;
             let dxe_core_len = 0x1000000;
             let dxe_core_hob = Hob::MemoryAllocationModule(&patina::pi::hob::MemoryAllocationModule {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: patina::pi::hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<patina::pi::hob::MemoryAllocationModule>() as u16,
                     reserved: 0,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
-                    name: guids::DXE_CORE,
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
+                    name: base_guids::DXE_CORE_ID,
                     memory_base_address: dxe_core_base as u64,
                     memory_length: dxe_core_len as u64,
                     memory_type: efi::BOOT_SERVICES_DATA,
                     reserved: [0; 4],
                 },
-                module_name: guids::DXE_CORE,
+                module_name: base_guids::DXE_CORE_ID,
                 entry_point: dxe_core_base as u64 + 0x1000,
             });
             let mut hob_list = HobList::new();
@@ -7409,19 +7412,19 @@ mod tests {
             // SAFETY: address/size come from the test buffer and are valid to initialize memory blocks.
             let dxe_core_len = 0x1000000;
             let dxe_core_hob = Hob::MemoryAllocationModule(&patina::pi::hob::MemoryAllocationModule {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: patina::pi::hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<patina::pi::hob::MemoryAllocationModule>() as u16,
                     reserved: 0,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
-                    name: guids::DXE_CORE,
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
+                    name: base_guids::DXE_CORE_ID,
                     memory_base_address: dxe_core_base as u64,
                     memory_length: dxe_core_len as u64,
                     memory_type: efi::BOOT_SERVICES_DATA,
                     reserved: [0; 4],
                 },
-                module_name: guids::DXE_CORE,
+                module_name: base_guids::DXE_CORE_ID,
                 entry_point: dxe_core_base as u64 + 0x1000,
             });
             let mut hob_list = HobList::new();
@@ -7429,13 +7432,13 @@ mod tests {
 
             // Add a stack HOB with zero base address and length
             let stack_hob = Hob::MemoryAllocation(&patina::pi::hob::MemoryAllocation {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<hob::MemoryAllocation>() as u16,
                     reserved: 0x00000000,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
-                    name: guids::HOB_MEMORY_ALLOC_STACK,
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
+                    name: pi_guids::MEMORY_ALLOC_STACK_HOB_GUID,
                     memory_base_address: 0,
                     memory_length: 0,
                     memory_type: efi::BOOT_SERVICES_DATA,
@@ -7489,19 +7492,19 @@ mod tests {
             let dxe_core_base = address + 0x1000;
             let dxe_core_len = 0x1000000;
             let dxe_core_hob = Hob::MemoryAllocationModule(&patina::pi::hob::MemoryAllocationModule {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: patina::pi::hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<patina::pi::hob::MemoryAllocationModule>() as u16,
                     reserved: 0,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
-                    name: guids::DXE_CORE,
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
+                    name: base_guids::DXE_CORE_ID,
                     memory_base_address: dxe_core_base as u64,
                     memory_length: dxe_core_len as u64,
                     memory_type: efi::BOOT_SERVICES_DATA,
                     reserved: [0; 4],
                 },
-                module_name: guids::DXE_CORE,
+                module_name: base_guids::DXE_CORE_ID,
                 entry_point: dxe_core_base as u64 + 0x1000,
             });
             let mut hob_list = HobList::new();
@@ -7509,13 +7512,13 @@ mod tests {
 
             // Add a stack HOB with zero base address and length
             let stack_hob = Hob::MemoryAllocation(&patina::pi::hob::MemoryAllocation {
-                header: patina::pi::hob::header::Hob {
+                header: patina::pi::hob::HobHeader {
                     r#type: hob::MEMORY_ALLOCATION,
                     length: core::mem::size_of::<hob::MemoryAllocation>() as u16,
                     reserved: 0x00000000,
                 },
-                alloc_descriptor: patina::pi::hob::header::MemoryAllocation {
-                    name: guids::HOB_MEMORY_ALLOC_STACK,
+                alloc_descriptor: patina::pi::hob::MemoryAllocationHeader {
+                    name: pi_guids::MEMORY_ALLOC_STACK_HOB_GUID,
                     memory_base_address: 0x1000,
                     memory_length: 0x40000,
                     memory_type: efi::BOOT_SERVICES_DATA,

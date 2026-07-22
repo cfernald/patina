@@ -78,7 +78,7 @@ impl MmCommunicateHeader {
         }
 
         // Byte-by-byte copy to avoid alignment issues
-        let mut header = MmCommunicateHeader { header_guid: patina::base::guid::constants::ZERO, message_length: 0 };
+        let mut header = MmCommunicateHeader { header_guid: patina::BinaryGuid::ZERO, message_length: 0 };
 
         // SAFETY: MmCommunicateHeader is repr(C) with well-defined size and layout
         let header_bytes = unsafe { core::slice::from_raw_parts_mut(&mut header as *mut Self as *mut u8, Self::SIZE) };

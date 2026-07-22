@@ -29,44 +29,44 @@ pub const PROTOCOL_GUID: crate::BinaryGuid = crate::BinaryGuid::from_string("8F6
 ///
 /// On input, Attributes is a pointer to a caller-allocated EFI_FVB_ATTRIBUTES_2 in
 /// which the current attributes and capabilities are returned.
-pub type GetAttributes = extern "efiapi" fn(*mut Protocol, *mut EfiFvbAttributes2) -> Status;
+pub type GetAttributes = extern "efiapi" fn(*mut FirmwareVolumeBlockProtocol, *mut EfiFvbAttributes2) -> Status;
 
 /// Sets firmware volume attributes and returns new attributes.
 ///
 /// Modifies the current attributes of the firmware volume according to the input parameter,
 /// then returns the new attributes value in the same parameter.
-pub type SetAttributes = extern "efiapi" fn(*mut Protocol, *mut EfiFvbAttributes2) -> Status;
+pub type SetAttributes = extern "efiapi" fn(*mut FirmwareVolumeBlockProtocol, *mut EfiFvbAttributes2) -> Status;
 
 /// Retrieves the physical address of the device.
 ///
 /// Retrieves the physical address of a memory mapped FV. This function should
 /// only be called for memory mapped FVs.
-pub type GetPhysicalAddress = extern "efiapi" fn(*mut Protocol, *mut EfiPhysicalAddress) -> Status;
+pub type GetPhysicalAddress = extern "efiapi" fn(*mut FirmwareVolumeBlockProtocol, *mut EfiPhysicalAddress) -> Status;
 
 /// Gets the size of a specific block within a firmware volume.
 ///
 /// Retrieves the size, in bytes, of a specific block within a firmware volume and
 /// the number of similar-sized blocks in the firmware volume.
-pub type GetBlockSize = extern "efiapi" fn(*mut Protocol, Lba, *mut usize, *mut usize) -> Status;
+pub type GetBlockSize = extern "efiapi" fn(*mut FirmwareVolumeBlockProtocol, Lba, *mut usize, *mut usize) -> Status;
 
 /// Reads data beginning at the specified offset.
 ///
 /// Reads the specified number of bytes into the provided buffer from the specified block offset.
 /// The read operation may be performed on all the blocks in the firmware volume.
-pub type Read = extern "efiapi" fn(*mut Protocol, Lba, usize, *mut usize, *mut c_void) -> Status;
+pub type Read = extern "efiapi" fn(*mut FirmwareVolumeBlockProtocol, Lba, usize, *mut usize, *mut c_void) -> Status;
 
 /// Writes data beginning at the specified offset.
 ///
 /// Writes the specified number of bytes from the input buffer to the block. The write
 /// operation may be performed on all the blocks in the firmware volume.
-pub type Write = extern "efiapi" fn(*mut Protocol, Lba, usize, *mut usize, *mut c_void) -> Status;
+pub type Write = extern "efiapi" fn(*mut FirmwareVolumeBlockProtocol, Lba, usize, *mut usize, *mut c_void) -> Status;
 
 /// Erases and initializes specified firmware volume blocks.
 ///
 /// The variable argument list is a list of tuples that specify logical block addresses and
 /// the number of blocks to erase. The list is terminated with EFI_LBA_LIST_TERMINATOR.
 pub type EraseBlocks = extern "efiapi" fn(
-    *mut Protocol,
+    *mut FirmwareVolumeBlockProtocol,
     //... //TODO: variadic functions and eficall! do not mix presently.
 ) -> Status;
 
@@ -80,7 +80,7 @@ pub type EraseBlocks = extern "efiapi" fn(
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section III-3.4.2.1
 #[repr(C)]
-pub struct Protocol {
+pub struct FirmwareVolumeBlockProtocol {
     /// Returns the attributes and current settings of the firmware volume.
     pub get_attributes: GetAttributes,
     /// Modifies the current settings of the firmware volume according to the input parameter.
@@ -101,7 +101,7 @@ pub struct Protocol {
 
 // SAFETY: The only non-send type in this structure is `Handle` which itself is actually `Send` as it is an opaque
 // pointer used purely as a token for identification purposes.
-unsafe impl Send for Protocol {}
+unsafe impl Send for FirmwareVolumeBlockProtocol {}
 // SAFETY: The only non-sync type in this structure is `Handle` which itself is actually `Send` as it is an opaque
 // pointer used purely as a token for identification purposes.
-unsafe impl Sync for Protocol {}
+unsafe impl Sync for FirmwareVolumeBlockProtocol {}

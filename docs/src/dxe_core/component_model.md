@@ -100,7 +100,7 @@ Once the component and its params are fully registered, the component is stored 
 # pub struct ExampleComponent;
 # #[component]
 # impl ExampleComponent {
-#   fn entry_point(self) -> patina::error::Result<()> { Ok(()) }
+#   fn entry_point(self) -> patina::base::error::Result<()> { Ok(()) }
 # }
 use patina_dxe_core::*;
 

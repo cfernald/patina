@@ -51,20 +51,20 @@ pub struct EfiFvWriteFileData {
 ///
 /// Gets the current attributes and status of the firmware volume. These attributes
 /// control volume behavior and indicate current operational capabilities.
-pub type GetVolumeAttributes = extern "efiapi" fn(*const Protocol, *mut EfiFvAttributes) -> Status;
+pub type GetVolumeAttributes = extern "efiapi" fn(*const FirmwareVolumeProtocol, *mut EfiFvAttributes) -> Status;
 
 /// Modifies the current settings of the firmware volume.
 ///
 /// Sets the firmware volume attributes according to the input parameter, then
 /// returns the new settings. Some attributes may not be modifiable after creation.
-pub type SetVolumeAttributes = extern "efiapi" fn(*const Protocol, *mut EfiFvAttributes) -> Status;
+pub type SetVolumeAttributes = extern "efiapi" fn(*const FirmwareVolumeProtocol, *mut EfiFvAttributes) -> Status;
 
 /// Reads an entire file from the firmware volume.
 ///
 /// Locates a file within a firmware volume and reads the entire file into a buffer.
 /// The caller specifies the file to read by its GUID name.
 pub type ReadFile = extern "efiapi" fn(
-    *const Protocol,
+    *const FirmwareVolumeProtocol,
     *const Guid,
     *mut *mut c_void,
     *mut usize,
@@ -78,7 +78,7 @@ pub type ReadFile = extern "efiapi" fn(
 /// Locates a file by GUID and extracts a specific section by type and instance.
 /// This allows selective reading of particular components within a file.
 pub type ReadSection = extern "efiapi" fn(
-    *const Protocol,
+    *const FirmwareVolumeProtocol,
     *const Guid,
     EfiSectionType,
     usize,
@@ -91,14 +91,15 @@ pub type ReadSection = extern "efiapi" fn(
 ///
 /// Writes data to the firmware volume according to the specified write policy.
 /// The write policy determines how the operation handles existing files.
-pub type WriteFile = extern "efiapi" fn(*const Protocol, u32, EfiFvWritePolicy, *mut EfiFvWriteFileData) -> Status;
+pub type WriteFile =
+    extern "efiapi" fn(*const FirmwareVolumeProtocol, u32, EfiFvWritePolicy, *mut EfiFvWriteFileData) -> Status;
 
 /// Enumerates files in the firmware volume.
 ///
 /// Retrieves the next file in the firmware volume. Repeated calls enumerate all
 /// files within the volume, providing file metadata for each entry.
 pub type GetNextFile = extern "efiapi" fn(
-    *const Protocol,
+    *const FirmwareVolumeProtocol,
     *mut c_void,
     *mut EfiFvFileType,
     *mut Guid,
@@ -110,13 +111,13 @@ pub type GetNextFile = extern "efiapi" fn(
 ///
 /// Returns information about the firmware volume. The information type is specified
 /// by the InformationType GUID parameter.
-pub type GetInfo = extern "efiapi" fn(*const Protocol, *const Guid, *mut usize, *mut c_void) -> Status;
+pub type GetInfo = extern "efiapi" fn(*const FirmwareVolumeProtocol, *const Guid, *mut usize, *mut c_void) -> Status;
 
 /// Modifies volume-specific information.
 ///
 /// Sets information about the firmware volume. The information type is specified
 /// by the InformationType GUID parameter.
-pub type SetInfo = extern "efiapi" fn(*const Protocol, *const Guid, usize, *const c_void) -> Status;
+pub type SetInfo = extern "efiapi" fn(*const FirmwareVolumeProtocol, *const Guid, usize, *const c_void) -> Status;
 
 /// The Firmware Volume Protocol provides file-level access to the firmware volume. Each firmware volume driver must
 /// produce an instance of the Firmware Volume Protocol if the firmware volume is to be visible to the system during
@@ -126,7 +127,7 @@ pub type SetInfo = extern "efiapi" fn(*const Protocol, *const Guid, usize, *cons
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section III-3.4.1.1
 #[repr(C)]
-pub struct Protocol {
+pub struct FirmwareVolumeProtocol {
     /// Gets the current attributes of the firmware volume.
     pub get_volume_attributes: GetVolumeAttributes,
     /// Sets the attributes of the firmware volume.
@@ -151,7 +152,7 @@ pub struct Protocol {
 
 // SAFETY: The only non-send type in this structure is `Handle` which itself is actually `Send` as it is an opaque
 // pointer used purely as a token for identification purposes.
-unsafe impl Send for Protocol {}
+unsafe impl Send for FirmwareVolumeProtocol {}
 // SAFETY: The only non-sync type in this structure is `Handle` which itself is actually `Send` as it is an opaque
 // pointer used purely as a token for identification purposes.
-unsafe impl Sync for Protocol {}
+unsafe impl Sync for FirmwareVolumeProtocol {}

@@ -17,6 +17,7 @@ pub mod c_ptr;
 pub mod error;
 pub mod guid;
 pub mod hash;
+pub mod protocol;
 
 /// EFI memory allocation functions work in units of EFI_PAGEs that are 4KB.
 /// This should in no way be confused with the page size of the processor.

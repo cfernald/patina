@@ -12,7 +12,6 @@ pub mod global_allocator;
 
 pub mod allocation;
 pub mod boxed;
-pub mod event;
 pub mod protocol_handler;
 pub mod tpl;
 
@@ -33,13 +32,10 @@ use spin::Once;
 
 use crate::standard::efi::{self, protocols::device_path::Protocol};
 
-use crate::{
-    log_debug_assert,
-    uefi::{memory::EfiMemoryType, protocol::ProtocolInterface},
-};
+use crate::uefi::event::{EventNotifyCallback, EventTimerType, EventType};
+use crate::{base::protocol::ProtocolInterface, log_debug_assert, uefi::memory::EfiMemoryType};
 use allocation::{AllocType, MemoryMap};
 use boxed::BootServicesBox;
-use event::{EventNotifyCallback, EventTimerType, EventType};
 use protocol_handler::{HandleSearchType, Registration};
 use tpl::{Tpl, TplGuard};
 

@@ -9,7 +9,7 @@
 use crate::cpu::Cpu;
 use patina::{
     base::error::EfiError,
-    pi::protocols::cpu_arch::{CpuFlushType, CpuInitType},
+    pi::protocol::cpu_arch::{CpuFlushType, CpuInitType},
 };
 use r_efi::efi;
 

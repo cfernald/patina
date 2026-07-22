@@ -25,7 +25,7 @@ use patina::{
         Storage, component,
         service::{IntoService, Service},
     },
-    pi::protocols::communication::EfiMmCommunicateHeader,
+    pi::protocol::communication::EfiMmCommunicateHeader,
     uefi::boot_services::StandardBootServices,
     writelncrlf,
 };

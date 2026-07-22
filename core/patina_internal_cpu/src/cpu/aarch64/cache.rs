@@ -8,7 +8,7 @@
 //!
 #[cfg(not(test))]
 use core::arch::asm;
-use patina::pi::protocols::cpu_arch::CpuFlushType;
+use patina::pi::protocol::cpu_arch::CpuFlushType;
 use r_efi::efi;
 
 fn clean_data_entry_by_mva(_mva: efi::PhysicalAddress) {

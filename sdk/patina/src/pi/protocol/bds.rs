@@ -21,14 +21,14 @@ pub const PROTOCOL_GUID: crate::BinaryGuid = crate::BinaryGuid::from_string("665
 ///
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.2.2
-pub type BdsEntry = extern "efiapi" fn(*mut Protocol);
+pub type BdsEntry = extern "efiapi" fn(*mut BdsProtocol);
 
 /// Transfers control from the DXE phase to an operating system or system utility.
 ///
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.2.1
 #[repr(C)]
-pub struct Protocol {
+pub struct BdsProtocol {
     /// BDS architectural protocol entry point.
     pub entry: BdsEntry,
 }

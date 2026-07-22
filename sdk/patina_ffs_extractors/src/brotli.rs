@@ -67,7 +67,7 @@ impl BrotliSectionExtractor {
 impl SectionExtractor for BrotliSectionExtractor {
     fn extract(&self, section: &Section) -> Result<Vec<u8>, FirmwareFileSystemError> {
         if let SectionHeader::GuidDefined(guid_header, _, _) = section.header()
-            && guid_header.section_definition_guid == fw_fs::guid::BROTLI_SECTION
+            && guid_header.section_definition_guid == fw_fs::guid::BROTLI_SECTION_GUID
         {
             let data = section.try_content_as_slice()?;
             let out_size = u64::from_le_bytes(

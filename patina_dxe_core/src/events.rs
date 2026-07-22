@@ -13,7 +13,7 @@ use core::{
 
 use r_efi::efi;
 
-use patina::pi::protocols::timer;
+use patina::pi::protocol::timer;
 
 use patina_internal_cpu::{cpu::EfiCpu, interrupts};
 
@@ -352,7 +352,7 @@ extern "efiapi" fn timer_tick(time: u64) {
 extern "efiapi" fn timer_available_callback(event: efi::Event, _context: *mut c_void) {
     match PROTOCOL_DB.locate_protocol(timer::PROTOCOL_GUID.into_inner()) {
         Ok(timer_arch_ptr) => {
-            let timer_arch_ptr = timer_arch_ptr as *mut timer::Protocol;
+            let timer_arch_ptr = timer_arch_ptr as *mut timer::TimerProtocol;
             // SAFETY: timer_arch_ptr was successfully returned from locate_protocol.
             let timer_arch = unsafe { &*(timer_arch_ptr) };
             (timer_arch.register_handler)(timer_arch_ptr, timer_tick);

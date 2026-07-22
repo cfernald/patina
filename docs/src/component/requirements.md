@@ -101,7 +101,7 @@ be used as seen below:
 # extern crate patina;
 # extern crate patina_test;
 use patina::{
-   error::Result,
+   base::error::Result,
    component::component,
 };
 use patina_test::patina_test;

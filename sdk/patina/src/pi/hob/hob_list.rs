@@ -16,9 +16,9 @@
 
 use crate::pi::hob::{
     CPU, Capsule, Cpu, END_OF_HOB_LIST, FV, FV2, FV3, FirmwareVolume, FirmwareVolume2, FirmwareVolume3, GUID_EXTENSION,
-    GuidHob, HANDOFF, Hob, HobTrait, MEMORY_ALLOCATION, MemoryAllocation, MemoryAllocationModule,
+    GuidHob, HANDOFF, Hob, HobHeader, HobTrait, MEMORY_ALLOCATION, MemoryAllocation, MemoryAllocationModule,
     PhaseHandoffInformationTable, RESOURCE_DESCRIPTOR, RESOURCE_DESCRIPTOR2, ResourceDescriptor, ResourceDescriptorV2,
-    UEFI_CAPSULE, header,
+    UEFI_CAPSULE,
 };
 use core::{ffi::c_void, mem, slice};
 
@@ -167,7 +167,7 @@ impl<'a> HobList<'a> {
     /// # Example(s)
     /// ```no_run
     /// use core::{ffi::c_void, mem::size_of};
-    /// use patina::pi::hob::{HobList, Hob, header, FirmwareVolume, FV};
+    /// use patina::pi::hob::{HobList, Hob, HobHeader, FirmwareVolume, FV};
     ///
     /// fn example(hob_list: *const c_void) {
     ///   // example discovering and adding hobs to a hob list
@@ -175,7 +175,7 @@ impl<'a> HobList<'a> {
     ///   the_hob_list.discover_hobs(hob_list);
     ///
     ///   // example pushing a hob onto the list
-    ///   let header = header::Hob {
+    ///   let header = HobHeader {
     ///       r#type: FV,
     ///       length: size_of::<FirmwareVolume>() as u16,
     ///       reserved: 0,
@@ -215,7 +215,7 @@ impl<'a> HobList<'a> {
         // Validates that a HOB's declared length matches the size of the type it will be cast to.
         //
         // A size mismatch panics in debug builds and logs a warning and returns `false` in release builds.
-        fn hob_size_ok<T>(hob: &header::Hob) -> bool {
+        fn hob_size_ok<T>(hob: &HobHeader) -> bool {
             let hob_len = hob.length as usize;
             let hob_size = mem::size_of::<T>();
             if hob_len != hob_size {
@@ -228,11 +228,11 @@ impl<'a> HobList<'a> {
             true
         }
 
-        let mut hob_header: *const header::Hob = hob_list as *const header::Hob;
+        let mut hob_header: *const HobHeader = hob_list as *const HobHeader;
 
         loop {
             // SAFETY: hob_header points to valid HOB data provided by firmware. Each HOB has a valid header.
-            let current_header = unsafe { hob_header.cast::<header::Hob>().as_ref().expect(NOT_NULL) };
+            let current_header = unsafe { hob_header.cast::<HobHeader>().as_ref().expect(NOT_NULL) };
             match current_header.r#type {
                 HANDOFF => {
                     if hob_size_ok::<PhaseHandoffInformationTable>(current_header) {
@@ -333,10 +333,10 @@ impl<'a> HobList<'a> {
             let next_hob = hob_header as usize + current_header.length as usize;
             // Guard against malformed HOBs: length must advance past the header to avoid infinite
             // loops, and the addition must not overflow the address space.
-            if (current_header.length as usize) < mem::size_of::<header::Hob>() || next_hob < hob_header as usize {
+            if (current_header.length as usize) < mem::size_of::<HobHeader>() || next_hob < hob_header as usize {
                 break;
             }
-            hob_header = next_hob as *const header::Hob;
+            hob_header = next_hob as *const HobHeader;
         }
     }
 
@@ -720,7 +720,7 @@ mod tests {
     fn test_hoblist_discover_undersized_guid_hob_does_not_underflow() {
         // A GUID extension HOB whose declared length is smaller than the `GuidHob` header is malformed.
         let guid_hob_size = size_of::<hob::GuidHob>();
-        let header_size = size_of::<hob::header::Hob>();
+        let header_size = size_of::<hob::HobHeader>();
         let malformed_len = (guid_hob_size - header_size) as u16;
         assert!(
             (malformed_len as usize) >= header_size,
@@ -729,9 +729,9 @@ mod tests {
 
         // Layout: [undersized GUID_EXTENSION header | ... | END_OF_HOB_LIST].
         let write_header = |buf: &mut [u8], offset: usize, r#type: u16, length: u16| {
-            let header = hob::header::Hob { r#type, length, reserved: 0 };
-            // SAFETY: Test code - `header::Hob` is `repr(C)` plain data serialized into the test-allocated buffer.
-            let bytes = unsafe { from_raw_parts(&header as *const _ as *const u8, size_of::<hob::header::Hob>()) };
+            let header = hob::HobHeader { r#type, length, reserved: 0 };
+            // SAFETY: Test code - `HobHeader` is `repr(C)` plain data serialized into the test-allocated buffer.
+            let bytes = unsafe { from_raw_parts(&header as *const _ as *const u8, size_of::<hob::HobHeader>()) };
             buf[offset..offset + bytes.len()].copy_from_slice(bytes);
         };
 

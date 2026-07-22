@@ -385,7 +385,7 @@ mod tests {
         let hob3_bytes = &hob3.as_bytes();
 
         let guid_hob1 = GuidHob {
-            header: patina::pi::hob::header::Hob {
+            header: patina::pi::hob::HobHeader {
                 r#type: patina::pi::hob::GUID_EXTENSION,
                 length: core::mem::size_of::<TestHob1>() as u16,
                 reserved: 0,
@@ -394,7 +394,7 @@ mod tests {
         };
 
         let guid_hob2 = GuidHob {
-            header: patina::pi::hob::header::Hob {
+            header: patina::pi::hob::HobHeader {
                 r#type: patina::pi::hob::GUID_EXTENSION,
                 length: core::mem::size_of::<TestHob2>() as u16,
                 reserved: 0,
@@ -403,7 +403,7 @@ mod tests {
         };
 
         let guid_hob3 = GuidHob {
-            header: patina::pi::hob::header::Hob {
+            header: patina::pi::hob::HobHeader {
                 r#type: patina::pi::hob::GUID_EXTENSION,
                 length: core::mem::size_of::<TestHob3>() as u16,
                 reserved: 0,

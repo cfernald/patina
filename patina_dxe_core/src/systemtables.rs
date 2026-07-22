@@ -910,7 +910,7 @@ impl SystemTableChecksumInstaller {
 
         for guid in &GUIDS {
             let event = bs.create_event(
-                patina::uefi::boot_services::event::EventType::NOTIFY_SIGNAL,
+                patina::uefi::event::EventType::NOTIFY_SIGNAL,
                 patina::uefi::boot_services::tpl::Tpl::CALLBACK,
                 Some(callback),
                 core::ptr::null_mut(),

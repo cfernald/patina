@@ -1021,7 +1021,7 @@ mod test {
                 let SectionHeader::GuidDefined(metadata, _, _) = section.header() else {
                     panic!("Unexpected section metadata");
                 };
-                assert_eq!(metadata.section_definition_guid, fw_fs::guid::BROTLI_SECTION);
+                assert_eq!(metadata.section_definition_guid, fw_fs::guid::BROTLI_SECTION_GUID);
                 self.invoked.store(true, core::sync::atomic::Ordering::SeqCst);
                 Err(FirmwareFileSystemError::Unsupported)
             }
@@ -1369,7 +1369,7 @@ mod test {
         impl SectionExtractor for LzmaExtractorComposer {
             fn extract(&self, section: &Section) -> Result<Vec<u8>, FirmwareFileSystemError> {
                 if let SectionHeader::GuidDefined(guid_header, _, _) = section.header()
-                    && guid_header.section_definition_guid == fw_fs::guid::LZMA_SECTION
+                    && guid_header.section_definition_guid == fw_fs::guid::LZMA_SECTION_GUID
                 {
                     let data = section.try_content_as_slice()?;
                     let mut reader = LzmaReader::new_mem_limit(data, patina::base::SIZE_512MB as u32, None)
@@ -1436,7 +1436,7 @@ mod test {
         impl SectionExtractor for LzmaExtractorComposer {
             fn extract(&self, section: &Section) -> Result<Vec<u8>, FirmwareFileSystemError> {
                 if let SectionHeader::GuidDefined(guid_header, _, _) = section.header()
-                    && guid_header.section_definition_guid == fw_fs::guid::LZMA_SECTION
+                    && guid_header.section_definition_guid == fw_fs::guid::LZMA_SECTION_GUID
                 {
                     let data = section.try_content_as_slice()?;
                     let mut reader = LzmaReader::new_mem_limit(data, patina::base::SIZE_512MB as u32, None)
@@ -1459,7 +1459,7 @@ mod test {
         impl SectionComposer for LzmaExtractorComposer {
             fn compose(&self, section: &Section) -> Result<(SectionHeader, Vec<u8>), FirmwareFileSystemError> {
                 if let SectionHeader::GuidDefined(guid_header, _, _) = section.header()
-                    && guid_header.section_definition_guid == fw_fs::guid::LZMA_SECTION
+                    && guid_header.section_definition_guid == fw_fs::guid::LZMA_SECTION_GUID
                 {
                     let mut content = Vec::new();
                     let mut section_iter = section.sub_sections().peekable();
@@ -1504,7 +1504,7 @@ mod test {
         let lzma_section = &mut logo_file.sections_mut()[0];
         match lzma_section.header() {
             SectionHeader::GuidDefined(header, _, _) => {
-                assert_eq!(header.section_definition_guid, fw_fs::guid::LZMA_SECTION);
+                assert_eq!(header.section_definition_guid, fw_fs::guid::LZMA_SECTION_GUID);
             }
             _ => panic!("Expected LZMA section header"),
         }
@@ -1534,7 +1534,7 @@ mod test {
         let lzma_section = &mut logo_file.sections_mut()[0];
         match lzma_section.header() {
             SectionHeader::GuidDefined(header, _, _) => {
-                assert_eq!(header.section_definition_guid, fw_fs::guid::LZMA_SECTION);
+                assert_eq!(header.section_definition_guid, fw_fs::guid::LZMA_SECTION_GUID);
             }
             _ => panic!("Expected LZMA section header"),
         }

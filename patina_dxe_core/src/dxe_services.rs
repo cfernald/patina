@@ -2160,7 +2160,7 @@ mod tests {
             static CORE: MockCore = MockCore::new(NullSectionExtractor::new());
             CORE.override_instance();
             // Any GUID is fine; there are no pending drivers in this test harness
-            let guid: efi::Guid = patina::base::guid::constants::ZERO.into();
+            let guid: efi::Guid = patina::BinaryGuid::ZERO.into();
             let s = MockCore::schedule_efiapi(core::ptr::null_mut(), &guid);
             assert_eq!(s, efi::Status::NOT_FOUND);
         });

@@ -35,25 +35,26 @@ pub enum CpuFlushType {
 ///
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.3.2
-pub type FlushDataCache = extern "efiapi" fn(*const Protocol, efi::PhysicalAddress, u64, CpuFlushType) -> efi::Status;
+pub type FlushDataCache =
+    extern "efiapi" fn(*const CpuArchProtocol, efi::PhysicalAddress, u64, CpuFlushType) -> efi::Status;
 
 /// Enables interrupt processing by the processor.
 ///
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.3.3
-pub type EnableInterrupt = extern "efiapi" fn(*const Protocol) -> efi::Status;
+pub type EnableInterrupt = extern "efiapi" fn(*const CpuArchProtocol) -> efi::Status;
 
 /// Disables interrupt processing by the processor.
 ///
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.3.4
-pub type DisableInterrupt = extern "efiapi" fn(*const Protocol) -> efi::Status;
+pub type DisableInterrupt = extern "efiapi" fn(*const CpuArchProtocol) -> efi::Status;
 
 /// Retrieves the processor's current interrupt state. Returns `TRUE` if interrupts are enabled, `FALSE` if disabled.
 ///
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.3.5
-pub type GetInterruptState = extern "efiapi" fn(*const Protocol, *mut bool) -> efi::Status;
+pub type GetInterruptState = extern "efiapi" fn(*const CpuArchProtocol, *mut bool) -> efi::Status;
 
 #[repr(C)]
 /// CPU initialization types.
@@ -67,7 +68,7 @@ pub enum CpuInitType {
 ///
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.3.6
-pub type Init = extern "efiapi" fn(*const Protocol, CpuInitType) -> efi::Status;
+pub type Init = extern "efiapi" fn(*const CpuArchProtocol, CpuInitType) -> efi::Status;
 
 /// Specifies which processor exception to hook.
 ///
@@ -93,28 +94,29 @@ pub type InterruptHandler = extern "efiapi" fn(EfiExceptionType, EfiSystemContex
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.3.7
 pub type RegisterInterruptHandler =
-    extern "efiapi" fn(*const Protocol, EfiExceptionType, InterruptHandler) -> efi::Status;
+    extern "efiapi" fn(*const CpuArchProtocol, EfiExceptionType, InterruptHandler) -> efi::Status;
 
 /// Returns a timer value from one of the processor's internal timers. Optionally returns the timer period in
 /// femtoseconds for each increment. Returns unsupported if the processor contains no readable timers.
 ///
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.3.8
-pub type GetTimerValue = extern "efiapi" fn(*const Protocol, u32, *mut u64, *mut u64) -> efi::Status;
+pub type GetTimerValue = extern "efiapi" fn(*const CpuArchProtocol, u32, *mut u64, *mut u64) -> efi::Status;
 
 /// Changes memory region attributes to support specified memory attributes. Used by DXE Service
 /// `SetMemorySpaceAttributes()` to modify memory region properties visible to the processor.
 ///
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.3.9
-pub type SetMemoryAttributes = extern "efiapi" fn(*const Protocol, efi::PhysicalAddress, u64, u64) -> efi::Status;
+pub type SetMemoryAttributes =
+    extern "efiapi" fn(*const CpuArchProtocol, efi::PhysicalAddress, u64, u64) -> efi::Status;
 
 /// Abstracts the processor services that are required to implement some of the DXE services.
 ///
 /// # Documentation
 /// UEFI Platform Initialization Specification, Release 1.8, Section II-12.3.1
 #[repr(C)]
-pub struct Protocol {
+pub struct CpuArchProtocol {
     /// Flushes the CPU data cache.
     pub flush_data_cache: FlushDataCache,
     /// Enables CPU interrupts.
