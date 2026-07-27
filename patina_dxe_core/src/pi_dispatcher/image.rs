@@ -1426,7 +1426,7 @@ fn get_file_buffer_from_sfs(file_path: NonNull<Protocol>) -> Result<(Vec<u8>, ef
             .collect::<Result<Vec<_>, _>>()?;
         let filename = Char16Str::from_units_until_nul(&filename)?;
 
-        file = file.open(filename.as_units_with_nul().to_vec(), efi::protocols::file::MODE_READ, 0)?;
+        file = file.open(filename, efi::protocols::file::MODE_READ, 0)?;
     }
 
     // if execution comes here, the above loop was successfully able to open all the files on the remaining device path,

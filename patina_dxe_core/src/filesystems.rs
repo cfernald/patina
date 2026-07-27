@@ -8,8 +8,7 @@
 //!
 use alloc::{vec, vec::Vec};
 use core::{ffi::c_void, mem::size_of};
-use patina::error::EfiError;
-use patina::standard::efi;
+use patina::{Char16Str, error::EfiError, standard::efi};
 
 use crate::protocols::PROTOCOL_DB;
 
@@ -20,7 +19,7 @@ pub struct SimpleFile<'a> {
 
 impl SimpleFile<'_> {
     /// Opens the given filename with appropriate mode/attributes and returns a new instance of SimpleFile for it.
-    pub fn open(&mut self, filename: Vec<u16>, mode: u64, attributes: u64) -> Result<Self, EfiError> {
+    pub fn open(&mut self, filename: &Char16Str, mode: u64, attributes: u64) -> Result<Self, EfiError> {
         let mut file_ptr = core::ptr::null_mut();
         // SAFETY: self.file is a valid pointer to a file protocol instance
         // obtained from the protocol database during the construction of this

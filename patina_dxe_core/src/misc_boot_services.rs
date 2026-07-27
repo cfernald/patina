@@ -319,6 +319,7 @@ mod tests {
         test_support,
     };
     use core::{ffi::c_void, ptr};
+    use patina::char16;
     use patina::pi::protocol::watchdog;
     use patina::standard::efi;
 
@@ -446,13 +447,15 @@ mod tests {
                 log::warn!("Disable watchdog timer returned unexpected status: {status}");
             }
 
-            let data: [efi::Char16; 6] = [b'H' as u16, b'e' as u16, b'l' as u16, b'l' as u16, b'o' as u16, 0];
+            let data = char16!("Hello");
             let data_ptr = data.as_ptr() as *mut efi::Char16;
 
             // Test case 3: Set the watchdog timer with non-null data - should return NOT_READY
             // SAFETY: The unsafe block is required because r-efi declares set_watchdog_timer as an
             // unsafe extern "efiapi" function pointer. The Patina implementation is fully safe.
-            let status = unsafe { (st.boot_services().get().set_watchdog_timer)(300, 0, data.len(), data_ptr) };
+            let status = unsafe {
+                (st.boot_services().get().set_watchdog_timer)(300, 0, data.as_units_with_nul().len(), data_ptr)
+            };
             if status == efi::Status::NOT_READY {
                 log::debug!("Set watchdog timer with data correctly returned NOT_READY");
             } else {
@@ -462,7 +465,9 @@ mod tests {
             // Test case 4: Disable the watchdog timer with non-null data - should return NOT_READY
             // SAFETY: The unsafe block is required because r-efi declares set_watchdog_timer as an
             // unsafe extern "efiapi" function pointer. The Patina implementation is fully safe.
-            let status = unsafe { (st.boot_services().get().set_watchdog_timer)(0, 0, data.len(), data_ptr) };
+            let status = unsafe {
+                (st.boot_services().get().set_watchdog_timer)(0, 0, data.as_units_with_nul().len(), data_ptr)
+            };
             if status == efi::Status::NOT_READY {
                 log::debug!("Disable watchdog timer with data correctly returned NOT_READY");
             } else {
