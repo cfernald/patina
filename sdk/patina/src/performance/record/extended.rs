@@ -10,7 +10,7 @@
 use core::fmt::Debug;
 
 use super::PerformanceRecord;
-use crate::performance::error::Error;
+use crate::{Char8String, performance::error::Error};
 
 /// A performance string event record which includes a GUID.
 #[derive(Debug)]
@@ -105,8 +105,8 @@ impl PerformanceRecord for DynamicStringEventRecord<'_> {
         write_u32_le(buff, offset, self.acpi_id)?;
         write_u64_le(buff, offset, self.timestamp)?;
         write_bytes(buff, offset, self.guid.as_bytes())?;
-        write_bytes(buff, offset, self.string.as_bytes())?;
-        write_u8(buff, offset, 0)?; // terminator
+        let string = Char8String::try_from_str(self.string).map_err(|_| Error::Serialization)?;
+        write_bytes(buff, offset, string.as_bytes_with_nul())?;
         Ok(())
     }
 }
@@ -167,8 +167,8 @@ impl PerformanceRecord for DualGuidStringEventRecord<'_> {
         write_u64_le(buff, offset, self.timestamp)?;
         write_bytes(buff, offset, self.guid_1.as_bytes())?;
         write_bytes(buff, offset, self.guid_2.as_bytes())?;
-        write_bytes(buff, offset, self.string.as_bytes())?;
-        write_u8(buff, offset, 0)?;
+        let string = Char8String::try_from_str(self.string).map_err(|_| Error::Serialization)?;
+        write_bytes(buff, offset, string.as_bytes_with_nul())?;
         Ok(())
     }
 }
@@ -278,8 +278,8 @@ impl PerformanceRecord for GuidQwordStringEventRecord<'_> {
         write_u64_le(buff, offset, self.timestamp)?;
         write_bytes(buff, offset, self.guid.as_bytes())?;
         write_u64_le(buff, offset, self.qword)?;
-        write_bytes(buff, offset, self.string.as_bytes())?;
-        write_u8(buff, offset, 0)?;
+        let string = Char8String::try_from_str(self.string).map_err(|_| Error::Serialization)?;
+        write_bytes(buff, offset, string.as_bytes_with_nul())?;
         Ok(())
     }
 }
@@ -324,10 +324,6 @@ fn write_uint<T: IntoLeBytes>(dest: &mut [u8], offset: &mut usize, v: T) -> Resu
     write_bytes(dest, offset, bytes.as_ref())
 }
 
-fn write_u8(dest: &mut [u8], offset: &mut usize, v: u8) -> Result<(), Error> {
-    write_uint(dest, offset, v)
-}
-
 fn write_u16_le(dest: &mut [u8], offset: &mut usize, v: u16) -> Result<(), Error> {
     write_uint(dest, offset, v)
 }
@@ -338,4 +334,80 @@ fn write_u32_le(dest: &mut [u8], offset: &mut usize, v: u32) -> Result<(), Error
 
 fn write_u64_le(dest: &mut [u8], offset: &mut usize, v: u64) -> Result<(), Error> {
     write_uint(dest, offset, v)
+}
+
+#[cfg(test)]
+#[cfg_attr(coverage, coverage(off))]
+mod tests {
+    use super::*;
+
+    fn guid(byte: u8) -> crate::BinaryGuid {
+        crate::BinaryGuid::from_bytes(&[byte; 16])
+    }
+
+    #[test]
+    fn test_dynamic_string_event_record_write_data_into() {
+        let record = DynamicStringEventRecord::new(1, 2, 3, guid(1), "EFI");
+        let mut buf = [0u8; 64];
+        let mut offset = 0;
+        record.write_data_into(&mut buf, &mut offset).unwrap();
+        assert_eq!(offset, 34); // 2 + 4 + 8 + 16 + 3 chars + 1 nul
+        assert_eq!(&buf[30..34], b"EFI\0");
+    }
+
+    #[test]
+    fn test_dynamic_string_event_record_write_data_into_latin1_extended() {
+        // 'é' (U+00E9) is valid Latin-1 and must be encoded as a single byte (0xE9), not the
+        // two-byte UTF-8 sequence [0xC3, 0xA9].
+        let record = DynamicStringEventRecord::new(1, 2, 3, guid(1), "caf\u{e9}");
+        let mut buf = [0u8; 64];
+        let mut offset = 0;
+        record.write_data_into(&mut buf, &mut offset).unwrap();
+        assert_eq!(offset, 35); // 30 + 4 chars + 1 nul
+        assert_eq!(&buf[30..35], &[b'c', b'a', b'f', 0xE9, 0]);
+    }
+
+    #[test]
+    fn test_dynamic_string_event_record_write_data_into_rejects_non_latin1() {
+        let record = DynamicStringEventRecord::new(1, 2, 3, guid(1), "bad \u{1F600}");
+        let mut buf = [0u8; 64];
+        let mut offset = 0;
+        assert_eq!(record.write_data_into(&mut buf, &mut offset), Err(Error::Serialization));
+    }
+
+    #[test]
+    fn test_dual_guid_string_event_record_write_data_into() {
+        let record = DualGuidStringEventRecord::new(1, 2, 3, guid(1), guid(2), "EFI");
+        let mut buf = [0u8; 64];
+        let mut offset = 0;
+        record.write_data_into(&mut buf, &mut offset).unwrap();
+        assert_eq!(offset, 50); // 2 + 4 + 8 + 16 + 16 + 3 chars + 1 nul
+        assert_eq!(&buf[46..50], b"EFI\0");
+    }
+
+    #[test]
+    fn test_dual_guid_string_event_record_write_data_into_rejects_non_latin1() {
+        let record = DualGuidStringEventRecord::new(1, 2, 3, guid(1), guid(2), "bad \u{1F600}");
+        let mut buf = [0u8; 64];
+        let mut offset = 0;
+        assert_eq!(record.write_data_into(&mut buf, &mut offset), Err(Error::Serialization));
+    }
+
+    #[test]
+    fn test_guid_qword_string_event_record_write_data_into() {
+        let record = GuidQwordStringEventRecord::new(1, 2, 3, guid(1), 64, "EFI");
+        let mut buf = [0u8; 64];
+        let mut offset = 0;
+        record.write_data_into(&mut buf, &mut offset).unwrap();
+        assert_eq!(offset, 42); // 2 + 4 + 8 + 16 + 8 + 3 chars + 1 nul
+        assert_eq!(&buf[38..42], b"EFI\0");
+    }
+
+    #[test]
+    fn test_guid_qword_string_event_record_write_data_into_rejects_non_latin1() {
+        let record = GuidQwordStringEventRecord::new(1, 2, 3, guid(1), 64, "bad \u{1F600}");
+        let mut buf = [0u8; 64];
+        let mut offset = 0;
+        assert_eq!(record.write_data_into(&mut buf, &mut offset), Err(Error::Serialization));
+    }
 }

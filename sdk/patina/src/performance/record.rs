@@ -10,7 +10,7 @@
 pub mod extended;
 pub mod known;
 
-use crate::{BinaryGuid, performance::error::Error, performance_debug_assert};
+use crate::{BinaryGuid, Char8Str, performance::error::Error, performance_debug_assert};
 use alloc::vec::Vec;
 use core::{fmt, fmt::Debug, mem};
 use zerocopy::{FromBytes, IntoBytes};
@@ -376,12 +376,11 @@ impl DynamicStringEventRecordData {
     pub const NAME: &'static str = "Dynamic String Event";
 
     /// Get the string portion from the full record data
-    pub fn extract_string(full_data: &[u8]) -> &str {
+    pub fn extract_string(full_data: &[u8]) -> &Char8Str {
         let Some(string_bytes) = full_data.get(core::mem::size_of::<Self>()..) else {
-            return "";
+            return Char8Str::EMPTY;
         };
-        let string_len = string_bytes.iter().position(|&b| b == 0).unwrap_or(string_bytes.len());
-        core::str::from_utf8(string_bytes.get(..string_len).unwrap_or(string_bytes)).unwrap_or("<invalid UTF-8>")
+        Char8Str::from_bytes_until_nul(string_bytes).unwrap_or(Char8Str::EMPTY)
     }
 }
 
@@ -420,12 +419,11 @@ impl DualGuidStringEventRecordData {
     pub const NAME: &'static str = "Dual GUID String Event";
 
     /// Get the string portion from the full record data
-    pub fn extract_string(full_data: &[u8]) -> &str {
+    pub fn extract_string(full_data: &[u8]) -> &Char8Str {
         let Some(string_bytes) = full_data.get(core::mem::size_of::<Self>()..) else {
-            return "";
+            return Char8Str::EMPTY;
         };
-        let string_len = string_bytes.iter().position(|&b| b == 0).unwrap_or(string_bytes.len());
-        core::str::from_utf8(string_bytes.get(..string_len).unwrap_or(string_bytes)).unwrap_or("<invalid UTF-8>")
+        Char8Str::from_bytes_until_nul(string_bytes).unwrap_or(Char8Str::EMPTY)
     }
 }
 
@@ -508,12 +506,11 @@ impl GuidQwordStringEventRecordData {
     pub const NAME: &'static str = "GUID QWORD String Event";
 
     /// Get the string portion from the full record data
-    pub fn extract_string(full_data: &[u8]) -> &str {
+    pub fn extract_string(full_data: &[u8]) -> &Char8Str {
         let Some(string_bytes) = full_data.get(core::mem::size_of::<Self>()..) else {
-            return "";
+            return Char8Str::EMPTY;
         };
-        let string_len = string_bytes.iter().position(|&b| b == 0).unwrap_or(string_bytes.len());
-        core::str::from_utf8(string_bytes.get(..string_len).unwrap_or(string_bytes)).unwrap_or("<invalid UTF-8>")
+        Char8Str::from_bytes_until_nul(string_bytes).unwrap_or(Char8Str::EMPTY)
     }
 }
 
@@ -902,12 +899,13 @@ mod tests {
     }
 
     #[test]
-    fn test_dynamic_string_event_record_data_extract_string_invalid_utf8() {
+    fn test_dynamic_string_event_record_data_extract_string_latin1_high_bytes() {
+        // Note: CHAR8 is ASCII/ISO-Latin-1, so bytes above 0x7F are valid characters rather than an error.
         let mut data = vec![0u8; core::mem::size_of::<DynamicStringEventRecordData>()];
-        data.extend_from_slice(&[0xFF, 0xFE, 0xFD, 0x00]); // Invalid UTF-8
+        data.extend_from_slice(&[0xFF, 0xFE, 0xFD, 0x00]);
 
         let extracted = DynamicStringEventRecordData::extract_string(&data);
-        assert_eq!(extracted, "<invalid UTF-8>");
+        assert_eq!(extracted, "\u{FF}\u{FE}\u{FD}");
     }
 
     #[test]
@@ -915,8 +913,10 @@ mod tests {
         let mut data = vec![0u8; core::mem::size_of::<DynamicStringEventRecordData>()];
         data.extend_from_slice(b"NoNull");
 
+        // Note: Unterminated data cannot be represented as a valid `Char8Str`, so extraction falls back
+        // to an empty string.
         let extracted = DynamicStringEventRecordData::extract_string(&data);
-        assert_eq!(extracted, "NoNull");
+        assert_eq!(extracted, "");
     }
 
     #[test]

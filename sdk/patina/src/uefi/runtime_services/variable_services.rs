@@ -11,6 +11,7 @@ use alloc::{vec, vec::Vec};
 use fallible_streaming_iterator::FallibleStreamingIterator;
 
 use super::RuntimeServices;
+use crate::Char16Str;
 
 /// Status information returned by [`RuntimeServices::get_variable_unchecked`]
 #[derive(Debug)]
@@ -112,10 +113,10 @@ impl<'a, R: RuntimeServices> VariableNameIterator<'a, R> {
     }
 
     /// Produce a new iterator, starting from a given variable
-    pub fn new_from_variable(name: &[u16], namespace: &efi::Guid, runtime_services: &'a R) -> Self {
+    pub fn new_from_variable(name: &Char16Str, namespace: &efi::Guid, runtime_services: &'a R) -> Self {
         Self {
             rs: runtime_services,
-            current: VariableIdentifier { name: name.to_vec(), namespace: *namespace },
+            current: VariableIdentifier { name: name.as_units_with_nul().to_vec(), namespace: *namespace },
             next: VariableIdentifier { name: Vec::<u16>::new(), namespace: Guid::from_bytes(&[0x0; 16]) },
             finished: false,
         }
@@ -205,7 +206,8 @@ mod test {
     fn test_variable_name_iterator_from_second() {
         let rs = runtime_services!(get_next_variable_name = mock_efi_get_next_variable_name);
 
-        let mut iter = VariableNameIterator::new_from_variable(&DUMMY_FIRST_NAME, &DUMMY_FIRST_NAMESPACE, &rs);
+        let name = Char16Str::from_units_with_nul(&DUMMY_FIRST_NAME).unwrap();
+        let mut iter = VariableNameIterator::new_from_variable(name, &DUMMY_FIRST_NAMESPACE, &rs);
 
         // Make sure the first result corresponds to DUMMY_SECOND_NAME
         let mut status = iter.next();

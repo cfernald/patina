@@ -28,6 +28,8 @@ use spin::Once;
 use crate::standard::efi;
 use variable_services::{GetVariableStatus, VariableInfo};
 
+use crate::{Char16Str, Char16String};
+
 /// The UEFI spec runtime services.
 /// Wrapper around [`efi::RuntimeServices`]
 ///
@@ -128,20 +130,22 @@ pub trait RuntimeServices {
     ///
     /// UEFI Spec Documentation: [8.2.3. EFI_RUNTIME_SERVICES.SetVariable()](https://uefi.org/specs/UEFI/2.10/08_Services_Runtime_Services.html#setvariable)
     ///
-    fn set_variable<T>(&self, name: &[u16], namespace: &efi::Guid, attributes: u32, data: &T) -> Result<(), efi::Status>
+    fn set_variable<T>(
+        &self,
+        name: &Char16Str,
+        namespace: &efi::Guid,
+        attributes: u32,
+        data: &T,
+    ) -> Result<(), efi::Status>
     where
         T: AsRef<[u8]> + 'static,
     {
-        if !name.contains(&0) {
-            debug_assert!(false, "Name passed into set_variable is not null-terminated.");
-            return Err(efi::Status::INVALID_PARAMETER);
-        }
-
         // Keep a local copy of name to unburden the caller of having to pass in a mutable slice
-        let mut name_vec = name.to_vec();
+        let mut name_vec = name.as_units_with_nul().to_vec();
 
-        // SAFETY: name_vec is a valid, null-terminated UTF-16 string as verified above.
-        // The unchecked variant is called with proper parameters that satisfy its preconditions.
+        // SAFETY: name_vec is a valid, null-terminated UCS-2 string because it was derived from a
+        // validated Char16Str. The unchecked variant is called with proper parameters that satisfy
+        // its preconditions.
         unsafe { self.set_variable_unchecked(name_vec.as_mut_slice(), namespace, attributes, data.as_ref()) }
     }
 
@@ -153,20 +157,15 @@ pub trait RuntimeServices {
     ///
     fn get_variable<T>(
         &self,
-        name: &[u16],
+        name: &Char16Str,
         namespace: &efi::Guid,
         size_hint: Option<usize>,
     ) -> Result<(T, u32), efi::Status>
     where
         T: TryFrom<Vec<u8>> + 'static,
     {
-        if !name.contains(&0) {
-            debug_assert!(false, "Name passed into get_variable is not null-terminated.");
-            return Err(efi::Status::INVALID_PARAMETER);
-        }
-
         // Keep a local copy of name to unburden the caller of having to pass in a mutable slice
-        let mut name_vec = name.to_vec();
+        let mut name_vec = name.as_units_with_nul().to_vec();
 
         // We can't simply allocate an empty buffer of size T because we can't assume
         // the TryFrom representation of T will be the same as T
@@ -182,7 +181,7 @@ pub trait RuntimeServices {
         // call.
         let mut first_attempt = true;
         loop {
-            // SAFETY: name_vec is a valid, null-terminated UTF-16 string. The data buffer, when provided,
+            // SAFETY: name_vec is a valid, null-terminated UCS-2 string. The data buffer, when provided,
             // is properly sized based on either the size_hint or the result from the first call.
             unsafe {
                 let status = self.get_variable_unchecked(
@@ -215,19 +214,14 @@ pub trait RuntimeServices {
     /// Helper function to get a UEFI variable's size and attributes
     fn get_variable_size_and_attributes(
         &self,
-        name: &[u16],
+        name: &Char16Str,
         namespace: &efi::Guid,
     ) -> Result<(usize, u32), efi::Status> {
-        if !name.contains(&0) {
-            debug_assert!(false, "Name passed into set_variable is not null-terminated.");
-            return Err(efi::Status::INVALID_PARAMETER);
-        }
-
         // Keep a local copy of name to unburden the caller of having to pass in a mutable slice
-        let mut name_vec = name.to_vec();
+        let mut name_vec = name.as_units_with_nul().to_vec();
 
-        // SAFETY: name_vec is a valid, null-terminated UTF-16 string as verified above.
-        // Calling with None buffer is safe and returns size/attributes only.
+        // SAFETY: name_vec is a valid, null-terminated UCS-2 string because it was derived from a
+        // validated Char16Str. Calling with None buffer is safe and returns size/attributes only.
         unsafe {
             match self.get_variable_unchecked(name_vec.as_mut_slice(), namespace, None) {
                 GetVariableStatus::BufferTooSmall { data_size, attributes } => Ok((data_size, attributes)),
@@ -250,22 +244,27 @@ pub trait RuntimeServices {
     ///
     fn get_next_variable_name(
         &self,
-        prev_name: &[u16],
+        prev_name: &Char16Str,
         prev_namespace: &efi::Guid,
-    ) -> Result<(Vec<u16>, efi::Guid), efi::Status> {
-        if prev_name.is_empty() {
-            debug_assert!(false, "Zero-length name passed into get_next_variable_name.");
-            return Err(efi::Status::INVALID_PARAMETER);
-        }
-
+    ) -> Result<(Char16String, efi::Guid), efi::Status> {
         let mut next_name = Vec::<u16>::new();
         let mut next_namespace: efi::Guid = efi::Guid::from_bytes(&[0x0; 16]);
 
-        // SAFETY: prev_name is validated to be non-empty above. The next_name and next_namespace
-        // are valid mutable references that will be populated by the unchecked call.
+        // SAFETY: prev_name is guaranteed non-empty and null-terminated by the Char16Str invariant.
+        // The next_name and next_namespace are valid mutable references that will be populated by
+        // the unchecked call.
         unsafe {
-            self.get_next_variable_name_unchecked(prev_name, prev_namespace, &mut next_name, &mut next_namespace)?;
+            self.get_next_variable_name_unchecked(
+                prev_name.as_units_with_nul(),
+                prev_namespace,
+                &mut next_name,
+                &mut next_namespace,
+            )?;
         };
+
+        // The firmware call above populates next_name as a valid, null-terminated UCS-2 buffer on
+        // success; treat anything else as a firmware error rather than panicking.
+        let next_name = Char16String::from_units_with_nul(next_name).map_err(|_| efi::Status::DEVICE_ERROR)?;
 
         Ok((next_name, next_namespace))
     }
@@ -534,9 +533,7 @@ pub(crate) mod test {
     pub(crate) use runtime_services;
 
     pub const DUMMY_FIRST_NAME: [u16; 3] = [0x1000, 0x1020, 0x0000];
-    pub const DUMMY_NON_NULL_TERMINATED_NAME: [u16; 3] = [0x1000, 0x1020, 0x1040];
     pub const DUMMY_EMPTY_NAME: [u16; 1] = [0x0000];
-    pub const DUMMY_ZERO_LENGTH_NAME: [u16; 0] = [];
     pub const DUMMY_SECOND_NAME: [u16; 5] = [0x1001, 0x1022, 0x1043, 0x1064, 0x0000];
     pub const DUMMY_UNKNOWN_NAME: [u16; 3] = [0x2000, 0x2020, 0x0000];
 
@@ -775,7 +772,8 @@ pub(crate) mod test {
     fn test_get_variable() {
         let rs = runtime_services!(get_variable = mock_efi_get_variable);
 
-        let status = rs.get_variable::<DummyVariableType>(&DUMMY_FIRST_NAME, &DUMMY_FIRST_NAMESPACE, None);
+        let name = Char16Str::from_units_with_nul(&DUMMY_FIRST_NAME).unwrap();
+        let status = rs.get_variable::<DummyVariableType>(name, &DUMMY_FIRST_NAMESPACE, None);
 
         assert!(status.is_ok());
         let (data, attributes) = status.unwrap();
@@ -784,21 +782,11 @@ pub(crate) mod test {
     }
 
     #[test]
-    fn test_get_variable_non_terminated() {
-        let rs = runtime_services!(get_variable = mock_efi_get_variable);
-
-        let status =
-            rs.get_variable::<DummyVariableType>(&DUMMY_NON_NULL_TERMINATED_NAME, &DUMMY_FIRST_NAMESPACE, None);
-
-        assert!(status.is_err());
-        assert_eq!(status.unwrap_err(), efi::Status::INVALID_PARAMETER);
-    }
-
-    #[test]
     fn test_get_variable_low_size_hint() {
         let rs = runtime_services!(get_variable = mock_efi_get_variable);
 
-        let status = rs.get_variable::<DummyVariableType>(&DUMMY_FIRST_NAME, &DUMMY_FIRST_NAMESPACE, Some(1));
+        let name = Char16Str::from_units_with_nul(&DUMMY_FIRST_NAME).unwrap();
+        let status = rs.get_variable::<DummyVariableType>(name, &DUMMY_FIRST_NAMESPACE, Some(1));
 
         assert!(status.is_ok());
         let (data, attributes) = status.unwrap();
@@ -810,7 +798,8 @@ pub(crate) mod test {
     fn test_get_variable_not_found() {
         let rs = runtime_services!(get_variable = mock_efi_get_variable);
 
-        let status = rs.get_variable::<DummyVariableType>(&DUMMY_UNKNOWN_NAME, &DUMMY_FIRST_NAMESPACE, Some(1));
+        let name = Char16Str::from_units_with_nul(&DUMMY_UNKNOWN_NAME).unwrap();
+        let status = rs.get_variable::<DummyVariableType>(name, &DUMMY_FIRST_NAMESPACE, Some(1));
 
         assert!(status.is_err());
         assert_eq!(status.unwrap_err(), efi::Status::NOT_FOUND);
@@ -820,7 +809,8 @@ pub(crate) mod test {
     fn test_get_variable_size_and_attributes() {
         let rs = runtime_services!(get_variable = mock_efi_get_variable);
 
-        let status = rs.get_variable_size_and_attributes(&DUMMY_FIRST_NAME, &DUMMY_FIRST_NAMESPACE);
+        let name = Char16Str::from_units_with_nul(&DUMMY_FIRST_NAME).unwrap();
+        let status = rs.get_variable_size_and_attributes(name, &DUMMY_FIRST_NAMESPACE);
 
         assert!(status.is_ok());
         let (size, attributes) = status.unwrap();
@@ -834,27 +824,10 @@ pub(crate) mod test {
 
         let data = DummyVariableType { value: DUMMY_DATA };
 
-        let status =
-            rs.set_variable::<DummyVariableType>(&DUMMY_FIRST_NAME, &DUMMY_FIRST_NAMESPACE, DUMMY_ATTRIBUTES, &data);
+        let name = Char16Str::from_units_with_nul(&DUMMY_FIRST_NAME).unwrap();
+        let status = rs.set_variable::<DummyVariableType>(name, &DUMMY_FIRST_NAMESPACE, DUMMY_ATTRIBUTES, &data);
 
         assert!(status.is_ok());
-    }
-
-    #[test]
-    fn test_set_variable_non_terminated() {
-        let rs = runtime_services!(set_variable = mock_efi_set_variable);
-
-        let data = DummyVariableType { value: DUMMY_DATA };
-
-        let status = rs.set_variable::<DummyVariableType>(
-            &DUMMY_NON_NULL_TERMINATED_NAME,
-            &DUMMY_FIRST_NAMESPACE,
-            DUMMY_ATTRIBUTES,
-            &data,
-        );
-
-        assert!(status.is_err());
-        assert_eq!(status.unwrap_err(), efi::Status::INVALID_PARAMETER);
     }
 
     #[test]
@@ -863,8 +836,8 @@ pub(crate) mod test {
 
         let data = DummyVariableType { value: DUMMY_DATA };
 
-        let status =
-            rs.set_variable::<DummyVariableType>(&DUMMY_EMPTY_NAME, &DUMMY_FIRST_NAMESPACE, DUMMY_ATTRIBUTES, &data);
+        let name = Char16Str::from_units_with_nul(&DUMMY_EMPTY_NAME).unwrap();
+        let status = rs.set_variable::<DummyVariableType>(name, &DUMMY_FIRST_NAMESPACE, DUMMY_ATTRIBUTES, &data);
 
         assert!(status.is_err());
         assert_eq!(status.unwrap_err(), efi::Status::INVALID_PARAMETER);
@@ -876,8 +849,8 @@ pub(crate) mod test {
 
         let data = DummyVariableType { value: DUMMY_DATA };
 
-        let status =
-            rs.set_variable::<DummyVariableType>(&DUMMY_UNKNOWN_NAME, &DUMMY_FIRST_NAMESPACE, DUMMY_ATTRIBUTES, &data);
+        let name = Char16Str::from_units_with_nul(&DUMMY_UNKNOWN_NAME).unwrap();
+        let status = rs.set_variable::<DummyVariableType>(name, &DUMMY_FIRST_NAMESPACE, DUMMY_ATTRIBUTES, &data);
 
         assert!(status.is_err());
         assert_eq!(status.unwrap_err(), efi::Status::NOT_FOUND);
@@ -890,41 +863,23 @@ pub(crate) mod test {
 
         let rs = runtime_services!(get_next_variable_name = mock_efi_get_next_variable_name);
 
-        let status = rs.get_next_variable_name(&DUMMY_FIRST_NAME, &DUMMY_FIRST_NAMESPACE);
+        let prev_name = Char16Str::from_units_with_nul(&DUMMY_FIRST_NAME).unwrap();
+        let status = rs.get_next_variable_name(prev_name, &DUMMY_FIRST_NAMESPACE);
 
         assert!(status.is_ok());
 
         let (next_name, next_guid) = status.unwrap();
 
-        assert_eq!(next_name, DUMMY_SECOND_NAME);
+        assert_eq!(next_name.as_units_with_nul(), DUMMY_SECOND_NAME);
         assert_eq!(next_guid, DUMMY_SECOND_NAMESPACE);
-    }
-
-    #[test]
-    fn test_get_next_variable_name_non_terminated() {
-        let rs = runtime_services!(get_next_variable_name = mock_efi_get_next_variable_name);
-
-        let status = rs.get_next_variable_name(&DUMMY_NON_NULL_TERMINATED_NAME, &DUMMY_FIRST_NAMESPACE);
-
-        assert!(status.is_err());
-        assert_eq!(status.unwrap_err(), efi::Status::INVALID_PARAMETER);
-    }
-
-    #[test]
-    fn test_get_next_variable_name_zero_length_name() {
-        let rs = runtime_services!(get_next_variable_name = mock_efi_get_next_variable_name);
-
-        let status = rs.get_next_variable_name(&DUMMY_ZERO_LENGTH_NAME, &DUMMY_FIRST_NAMESPACE);
-
-        assert!(status.is_err());
-        assert_eq!(status.unwrap_err(), efi::Status::INVALID_PARAMETER);
     }
 
     #[test]
     fn test_get_next_variable_name_not_found() {
         let rs = runtime_services!(get_next_variable_name = mock_efi_get_next_variable_name);
 
-        let status = rs.get_next_variable_name(&DUMMY_UNKNOWN_NAME, &DUMMY_FIRST_NAMESPACE);
+        let prev_name = Char16Str::from_units_with_nul(&DUMMY_UNKNOWN_NAME).unwrap();
+        let status = rs.get_next_variable_name(prev_name, &DUMMY_FIRST_NAMESPACE);
 
         assert!(status.is_err());
         assert_eq!(status.unwrap_err(), efi::Status::NOT_FOUND);

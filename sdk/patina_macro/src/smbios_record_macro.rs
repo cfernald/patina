@@ -186,9 +186,7 @@ pub(crate) fn smbios_record_derive(item: TokenStream) -> TokenStream {
             quote! {
                 fn validate(&self) -> core::result::Result<(), #crate_path::error::SmbiosError> {
                     for string in &self.#pool_field {
-                        if string.len() > #crate_path::service::SMBIOS_STRING_MAX_LENGTH {
-                            return Err(#crate_path::error::SmbiosError::StringTooLong);
-                        }
+                        #crate_path::smbios_record::validate_smbios_string(string)?;
                     }
                     Ok(())
                 }
@@ -212,7 +210,7 @@ pub(crate) fn smbios_record_derive(item: TokenStream) -> TokenStream {
             } else {
                 for string in &self.#pool_field {
                     if !string.is_empty() {
-                        string_bytes.extend_from_slice(string.as_bytes());
+                        string_bytes.extend_from_slice(&#crate_path::smbios_record::encode_smbios_string(string));
                     }
                     string_bytes.push(0);
                 }
