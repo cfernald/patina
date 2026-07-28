@@ -88,7 +88,7 @@ fn add_component_abstracted(b: &mut Bencher<'_>, count: &usize) {
 }
 
 fn run_component_abstracted(b: &mut Bencher<'_>, count: &usize) {
-    let mut mock_bs = core::mem::MaybeUninit::<r_efi::efi::BootServices>::zeroed();
+    let mut mock_bs = core::mem::MaybeUninit::<patina::standard::efi::BootServices>::zeroed();
 
     let mut init = |count: usize| -> Scheduler {
         let mut core = Scheduler::new();
@@ -110,7 +110,7 @@ fn run_component_abstracted(b: &mut Bencher<'_>, count: &usize) {
 }
 
 fn add_and_run_component_abstracted(b: &mut Bencher<'_>, count: &usize) {
-    let mut mock_bs = core::mem::MaybeUninit::<r_efi::efi::BootServices>::zeroed();
+    let mut mock_bs = core::mem::MaybeUninit::<patina::standard::efi::BootServices>::zeroed();
 
     let init = || -> Scheduler {
         let mut core = Scheduler::new();

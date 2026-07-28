@@ -10,6 +10,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 use alloc::boxed::Box;
+use patina::standard::efi;
 use patina::{
     base::error::{EfiError, Result},
     component::{
@@ -19,7 +20,6 @@ use patina::{
     peripheral::serial::SerialIO,
     uefi::boot_services::{BootServices, StandardBootServices},
 };
-use r_efi::efi;
 
 use crate::{logger::AdvancedLogger, protocol::AdvancedLoggerProtocol};
 

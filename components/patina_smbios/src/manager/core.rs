@@ -14,8 +14,8 @@ extern crate alloc;
 
 use alloc::{boxed::Box, collections::BTreeSet, string::String, vec::Vec};
 use core::cell::RefCell;
+use patina::standard::efi::{Handle, PhysicalAddress};
 use patina::{base::SIZE_64KB, uefi_size_to_pages};
-use r_efi::efi::{Handle, PhysicalAddress};
 use zerocopy::{IntoBytes, Ref};
 use zerocopy_derive::*;
 
@@ -775,7 +775,7 @@ mod tests {
         error::SmbiosError,
         service::{SMBIOS_HANDLE_PI_RESERVED, SMBIOS_STRING_MAX_LENGTH, SmbiosHandle, SmbiosTableHeader},
     };
-    use r_efi::efi;
+    use patina::standard::efi;
     use zerocopy::IntoBytes;
 
     /// Test helper: Build a simple SMBIOS record with the given header and strings

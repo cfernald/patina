@@ -7,10 +7,9 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-use crate::{base::error::EfiError, pi::protocol::cpu_arch::CpuFlushType};
+use crate::{base::error::EfiError, pi::protocol::cpu_arch::CpuFlushType, standard::efi};
 use core::arch::asm;
 use core::num::NonZeroU64;
-use r_efi::efi;
 
 pub(crate) struct X64;
 

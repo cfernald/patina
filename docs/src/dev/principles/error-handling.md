@@ -119,8 +119,8 @@ For example, the following excerpt is part of an `extern "efiapi"` function that
 returns an EFI status code, where the status is specific to the error state encountered.
 
 ``` rust
-# extern crate r_efi;
-use r_efi::efi;
+# extern crate patina;
+use patina::standard::efi;
 
 extern "efiapi" fn get_memory_map(
     memory_map_size: *mut usize,

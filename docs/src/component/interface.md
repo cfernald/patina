@@ -239,7 +239,7 @@ This handle is the DXE Core's image handle, shared across all components. It sho
 conflict with protocol open/close tracking in the UEFI driver model.
 ```
 
-`Handle` implements `Deref` to the underlying `r_efi::efi::Handle`, so it can be dereferenced directly.
+`Handle` implements `Deref` to the underlying `patina::standard::efi::Handle`, so it can be dereferenced directly.
 
 This type comes with a `mock(...)` method to make unit testing simple.
 

@@ -6,7 +6,7 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 //!
-use r_efi::efi;
+use patina::standard::efi;
 use zerocopy::{IntoBytes, LittleEndian, U64};
 use zerocopy_derive::*;
 

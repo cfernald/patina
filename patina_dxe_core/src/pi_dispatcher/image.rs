@@ -15,6 +15,7 @@ use core::{
     slice,
     slice::from_raw_parts,
 };
+use patina::standard::efi::{self, protocols::device_path::Protocol};
 use patina::{
     Char16Str,
     base::error::EfiError,
@@ -31,7 +32,6 @@ use patina::{
     uefi::memory::EfiMemoryType,
     uefi_size_to_pages,
 };
-use r_efi::{efi, protocols::device_path::Protocol};
 
 use crate::{
     GCD,
@@ -309,7 +309,7 @@ impl PrivateImageData {
         // update the entry point. Transmute is required here to cast the raw function address to the ImageEntryPoint function pointer type.
         // SAFETY: Entry point is computed from a validated PE image base and entry offset.
         self.entry_point = unsafe {
-            transmute::<usize, extern "efiapi" fn(*mut c_void, *mut r_efi::system::SystemTable) -> efi::Status>(
+            transmute::<usize, extern "efiapi" fn(*mut c_void, *mut efi::SystemTable) -> efi::Status>(
                 physical_addr + self.pe_info.entry_point_offset,
             )
         };
@@ -585,7 +585,7 @@ impl ImageData {
         // The entry point in the HOB is a u64 address. transmute it to the correct function pointer type.
         // SAFETY: The module entry_point is spec defined as the below function signature.
         let entry_point = unsafe {
-            transmute::<u64, extern "efiapi" fn(*mut c_void, *mut r_efi::system::SystemTable) -> r_efi::base::Status>(
+            transmute::<u64, extern "efiapi" fn(*mut c_void, *mut efi::SystemTable) -> efi::Status>(
                 dxe_core_hob.entry_point,
             )
         };
@@ -1609,16 +1609,16 @@ mod tests {
         test_collateral, test_support,
     };
     use core::{ffi::c_void, sync::atomic::AtomicBool};
+    use patina::standard::efi::{
+        self,
+        protocols::device_path::{End, Hardware, Media, TYPE_END, TYPE_HARDWARE, TYPE_MEDIA},
+    };
     use patina::{
         base::error::EfiError,
         pi::{
             self,
             hob::{HobList, MemoryAllocationHeader, MemoryAllocationModule},
         },
-    };
-    use r_efi::{
-        efi,
-        protocols::device_path::{End, Hardware, Media, TYPE_END, TYPE_HARDWARE, TYPE_MEDIA},
     };
     use std::{fs::File, io::Read, ptr::NonNull, slice::from_raw_parts};
 
@@ -2159,7 +2159,7 @@ mod tests {
             static ENTRY_POINT_RAN: AtomicBool = AtomicBool::new(false);
             pub extern "efiapi" fn test_entry_point(
                 _image_handle: *mut core::ffi::c_void,
-                _system_table: *mut r_efi::system::SystemTable,
+                _system_table: *mut efi::SystemTable,
             ) -> efi::Status {
                 println!("test_entry_point executed.");
                 ENTRY_POINT_RAN.store(true, core::sync::atomic::Ordering::Relaxed);
@@ -2205,7 +2205,7 @@ mod tests {
             static ENTRY_POINT_RAN: AtomicBool = AtomicBool::new(false);
             extern "efiapi" fn test_entry_point(
                 _image_handle: *mut core::ffi::c_void,
-                _system_table: *mut r_efi::system::SystemTable,
+                _system_table: *mut efi::SystemTable,
             ) -> efi::Status {
                 log::info!("test_entry_point executed.");
                 ENTRY_POINT_RAN.store(true, core::sync::atomic::Ordering::Relaxed);

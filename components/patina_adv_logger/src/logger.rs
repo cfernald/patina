@@ -15,6 +15,7 @@ use crate::{
 };
 use core::{ffi::c_void, marker::Send, ptr};
 use log::Level;
+use patina::standard::efi;
 use patina::{
     base::error::EfiError,
     component::service::{Service, perf_timer::ArchTimerFunctionality},
@@ -22,7 +23,6 @@ use patina::{
     peripheral::serial::{SerialIO, shared::SharedSerial},
     pi::hob::{Hob, PhaseHandoffInformationTable},
 };
-use r_efi::efi;
 use spin::RwLock;
 
 // Exists for the debugger to find the log buffer.
@@ -354,13 +354,13 @@ mod tests {
 
     use alloc::boxed::Box;
     use log::Log;
+    use patina::standard::efi;
     use patina::{
         component::service::{IntoService, perf_timer::ArchTimerFunctionality},
         debug::log::Format,
         peripheral::serial::uart::UartNull,
         pi::hob::{GUID_EXTENSION, GuidHob, HobHeader},
     };
-    use r_efi::efi;
 
     use crate::{
         logger::{AdvancedLogger, TargetFilter},

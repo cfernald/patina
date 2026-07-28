@@ -13,7 +13,6 @@ use patina_paging::{CacheAttributeValue, MemoryAttributes, PtError};
 
 use crate::paging::PatinaPageTable;
 use patina_paging::page_allocator::PageAllocator;
-use r_efi::efi;
 
 #[derive(Default)]
 #[allow(dead_code)]

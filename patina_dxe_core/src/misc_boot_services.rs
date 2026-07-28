@@ -8,13 +8,13 @@
 //!
 use core::{ffi::c_void, slice::from_raw_parts, sync::atomic::Ordering};
 use patina::arch as interrupts;
+use patina::standard::efi;
 use patina::{
     base::guid as base_guids,
     log_debug_assert,
     pi::{protocol, status_code},
     uefi::event::EXIT_BOOT_SERVICES_FAILED_EVENT_GROUP_GUID,
 };
-use r_efi::efi;
 use spin::Once;
 
 use crate::{
@@ -321,7 +321,7 @@ mod tests {
     };
     use core::{ffi::c_void, ptr};
     use patina::pi::protocol::watchdog;
-    use r_efi::efi;
+    use patina::standard::efi;
 
     fn with_locked_state<F>(f: F)
     where

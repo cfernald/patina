@@ -16,7 +16,7 @@ use patina_test::{patina_test, u_assert};
 #[allow(unused)]
 use patina::BinaryGuid;
 #[allow(unused)]
-use r_efi::efi;
+use patina::standard::efi;
 
 // Verify that all adjacent free memory descriptors in the GCD are merged together
 #[patina_test]

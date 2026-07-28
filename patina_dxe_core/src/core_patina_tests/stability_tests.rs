@@ -12,13 +12,13 @@
 use super::test_support::*;
 use crate::{GCD, gcd::AllocateType};
 use alloc::vec::Vec;
+use patina::standard::efi;
 use patina::{
     base::{SIZE_1GB, SIZE_2MB, SIZE_4KB},
     pi::dxe_services::GcdMemoryType,
 };
 use patina_paging::MemoryAttributes;
 use patina_test::{patina_test, u_assert, u_assert_eq};
-use r_efi::efi;
 
 /// Stability Test: Split a 2MB page into 4KB pages and verify correctness
 #[patina_test]

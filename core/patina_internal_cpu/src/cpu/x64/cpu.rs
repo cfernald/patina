@@ -16,7 +16,6 @@ use patina::{
     base::error::EfiError,
     pi::protocol::cpu_arch::{CpuFlushType, CpuInitType},
 };
-use r_efi::efi;
 
 pub const CACHE_WRITEBACK_GRANULE: u32 = 4; // Using 4 bytes following precedence set by Tianocore
 

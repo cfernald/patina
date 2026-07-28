@@ -14,11 +14,11 @@ use alloc::{
     vec::Vec,
 };
 use core::mem;
-use r_efi::efi;
+use patina::standard::efi;
 use uuid::Uuid;
 
 /// The size of a GUID in bytes
-const GUID_SIZE: usize = mem::size_of::<r_efi::efi::Guid>();
+const GUID_SIZE: usize = mem::size_of::<efi::Guid>();
 
 /// The initial size of the dependency expression stack in bytes
 const DEPEX_STACK_SIZE_INCREMENT: usize = 0x100;
@@ -387,7 +387,7 @@ mod tests {
     extern crate std;
     use alloc::vec;
     use core::str::FromStr;
-    use r_efi::efi;
+    use patina::standard::efi;
     use std::println;
     use uuid::Uuid;
 

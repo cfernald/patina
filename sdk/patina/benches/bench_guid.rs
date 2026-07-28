@@ -1,7 +1,7 @@
 //! Benchmarks for GUID operations.
 //!
 //! This benchmark compares the performance of patina::Guid wrapper operations
-//! against r_efi::efi::Guid operations to measure performance delta.
+//! against patina::standard::efi::Guid operations to measure performance delta.
 //!
 //! ## Benchmark execution
 //!
@@ -38,7 +38,7 @@
 //!
 use criterion::{Bencher, Criterion, criterion_group, criterion_main};
 use patina::base::guid::{Guid, OwnedGuid};
-use r_efi::efi;
+use patina::standard::efi;
 
 const TEST_GUID_STRING: &str = "12345678-9abc-def0-1122-334455667788";
 

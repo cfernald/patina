@@ -22,8 +22,8 @@ use crate::{
     gcd::MemoryProtectionPolicy,
     systemtables,
 };
+use patina::standard::efi;
 use patina::writelncrlf;
-use r_efi::efi;
 
 // create a wrapper struct so that we can create an install method on it. That way, we can have the install function
 // be a no-op until after ReadyToBoot

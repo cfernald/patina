@@ -12,7 +12,7 @@ use core::any::TypeId;
 
 use alloc::vec::Vec;
 use patina::component::service::{IntoService, Service, memory::MemoryManager};
-use r_efi::efi;
+use patina::standard::efi;
 
 use crate::{
     acpi_table::{AcpiTable, AcpiTableHeader},

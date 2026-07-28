@@ -1,9 +1,9 @@
 use crate::tpl_mutex::TplMutex;
 use alloc::{boxed::Box, vec, vec::Vec};
+use patina::standard::efi;
 use patina_internal_cpu::interrupts::{
     ExceptionContext, InterruptHandler, InterruptManager, gic_manager::AArch64InterruptInitializer,
 };
-use r_efi::efi;
 use spin::rwlock::RwLock;
 
 use arm_gic::{InterruptGroup, Trigger, gicv3::GicCpuInterface};

@@ -9,7 +9,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-use r_efi::efi;
+use patina::standard::efi;
 
 /// Custom errors for ACPI operations
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

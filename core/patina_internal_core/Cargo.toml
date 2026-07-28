@@ -20,7 +20,7 @@ ci_features = ["alloc"]
 
 [dependencies]
 log = { workspace=true }
-r-efi = { workspace = true }
+patina = { workspace = true }
 uuid = { workspace = true }
 
 [dev-dependencies]

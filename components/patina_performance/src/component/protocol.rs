@@ -18,6 +18,7 @@ use core::{
 };
 
 use alloc::string::ToString;
+use patina::standard::efi;
 use patina::{
     BinaryGuid, Char8Str,
     base::protocol::ProtocolInterface,
@@ -28,7 +29,6 @@ use patina::{
         record::known::KnownPerfId,
     },
 };
-use r_efi::efi;
 
 /// GUID for the EDKII Performance Measurement Protocol.
 pub const EDKII_PERFORMANCE_MEASUREMENT_PROTOCOL_GUID: BinaryGuid =
