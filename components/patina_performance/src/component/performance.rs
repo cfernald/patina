@@ -17,8 +17,7 @@ use crate::{
 use alloc::{boxed::Box, string::String, vec::Vec};
 use core::ffi::c_void;
 use patina::{
-    base::UEFI_PAGE_SIZE,
-    base::error::EfiError,
+    base::{UEFI_PAGE_SIZE, error::EfiError},
     component::{
         component,
         service::{Service, perf_timer::ArchTimerFunctionality, performance::PerformanceManager},
@@ -28,14 +27,17 @@ use patina::{
         measurement::PerformanceProperty,
         record::{GenericPerformanceRecord, PerformanceRecordHeader, print_record_details, record_type_name},
     },
-    pi::status_code::{EFI_PROGRESS_CODE, EFI_SOFTWARE_DXE_BS_DRIVER},
-    uefi::boot_services::{BootServices, StandardBootServices, allocation::AllocType, tpl::Tpl},
-    uefi::event::EventType,
-    uefi::memory::EfiMemoryType,
-    uefi::protocol::{
-        performance_measurement::EdkiiPerformanceMeasurementProtocol, status_code::StatusCodeRuntimeProtocol,
+    pi::{
+        protocol::status_code,
+        status_code::{EFI_PROGRESS_CODE, EFI_SOFTWARE_DXE_BS_DRIVER},
     },
-    uefi::runtime_services::{RuntimeServices, StandardRuntimeServices},
+    uefi::{
+        boot_services::{BootServices, StandardBootServices, allocation::AllocType, tpl::Tpl},
+        event::EventType,
+        memory::EfiMemoryType,
+        protocol::performance_measurement::EdkiiPerformanceMeasurementProtocol,
+        runtime_services::{RuntimeServices, StandardRuntimeServices},
+    },
 };
 use patina_mm::component::communicator::MmCommunication;
 use r_efi::system::EVENT_GROUP_READY_TO_BOOT;
@@ -443,7 +445,7 @@ where
     }
 
     // SAFETY: `p` is the only mutable reference to the `StatusCodeRuntimeProtocol` in this scope.
-    let Ok(p) = (unsafe { boot_services.locate_protocol::<StatusCodeRuntimeProtocol>(None) }) else {
+    let Ok(p) = (unsafe { boot_services.locate_protocol::<status_code::StatusCodeProtocol>(None) }) else {
         log::error!("Performance: Fail to find status code protocol.");
         return;
     };
@@ -529,10 +531,7 @@ mod tests {
         component::service::{IntoService, Service},
         performance::{error::Error, measurement::CallerIdentifier},
         uefi::boot_services::MockBootServices,
-        uefi::protocol::{
-            performance_measurement::{EDKII_PERFORMANCE_MEASUREMENT_PROTOCOL_GUID, PerfAttribute},
-            status_code::StatusCodeRuntimeProtocol,
-        },
+        uefi::protocol::performance_measurement::{EDKII_PERFORMANCE_MEASUREMENT_PROTOCOL_GUID, PerfAttribute},
         uefi::runtime_services::MockRuntimeServices,
     };
     use patina_mm::component::communicator::{MmCommunication, Status};
@@ -751,7 +750,8 @@ mod tests {
             REPORT_STATUS_CODE_CALLED.store(true, Ordering::Relaxed);
             efi::Status::SUCCESS
         }
-        let mut status_code_runtime_protocol = Box::new(StatusCodeRuntimeProtocol::new(report_status_code));
+        let mut status_code_runtime_protocol =
+            Box::new(patina::pi::protocol::status_code::StatusCodeProtocol { report_status_code });
         let status_code_runtime_protocol_ptr = status_code_runtime_protocol.as_mut_ptr();
 
         let mut boot_services = MockBootServices::new();
