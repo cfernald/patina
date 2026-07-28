@@ -97,3 +97,121 @@ unsafe extern "efiapi" fn decompress(
         Err(_) => efi::Status::INVALID_PARAMETER,
     }
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage, coverage(off))]
+mod tests {
+    use super::*;
+    use core::ptr;
+
+    // Builds a minimal 16-byte compressed header: [compressed_size: u32][orig_size: u32] followed by padding.
+    fn compressed_header(compressed_size: u32, orig_size: u32) -> [u8; 16] {
+        let mut buf = [0u8; 16];
+        buf[0..4].copy_from_slice(&compressed_size.to_le_bytes());
+        buf[4..8].copy_from_slice(&orig_size.to_le_bytes());
+        buf
+    }
+
+    #[test]
+    fn test_decompress_get_info_rejects_invalid_parameters() {
+        let mut src = compressed_header(8, 100);
+        let mut dst_size = 0u32;
+        let mut scratch_size = 0u32;
+
+        // SAFETY: src is valid, dst_size is valid, scratch_size is valid.
+        let status = unsafe { get_info(ptr::null_mut(), ptr::null_mut(), 16, &mut dst_size, &mut scratch_size) };
+        assert_eq!(status, efi::Status::INVALID_PARAMETER);
+
+        // SAFETY: src is valid, dst_size is null under test, scratch_size is valid.
+        let status = unsafe {
+            get_info(ptr::null_mut(), src.as_mut_ptr() as *mut c_void, 16, ptr::null_mut(), &mut scratch_size)
+        };
+        assert_eq!(status, efi::Status::INVALID_PARAMETER);
+
+        // SAFETY: src and dst_size are valid, scratch_size is null under test.
+        let status =
+            unsafe { get_info(ptr::null_mut(), src.as_mut_ptr() as *mut c_void, 16, &mut dst_size, ptr::null_mut()) };
+        assert_eq!(status, efi::Status::INVALID_PARAMETER);
+
+        let mut small = [0u8; 4];
+        // SAFETY: all pointers reference valid stack values.
+        let status = unsafe {
+            get_info(ptr::null_mut(), small.as_mut_ptr() as *mut c_void, 4, &mut dst_size, &mut scratch_size)
+        };
+        assert_eq!(status, efi::Status::INVALID_PARAMETER);
+
+        let mut undersized = compressed_header(100, 50);
+        // SAFETY: all pointers reference valid stack values.
+        let status = unsafe {
+            get_info(ptr::null_mut(), undersized.as_mut_ptr() as *mut c_void, 16, &mut dst_size, &mut scratch_size)
+        };
+        assert_eq!(status, efi::Status::INVALID_PARAMETER);
+    }
+
+    #[test]
+    fn test_decompress_get_info_returns_sizes_on_valid_input() {
+        let mut src = compressed_header(8, 100);
+        let mut dst_size = 0xFFFF_FFFFu32;
+        let mut scratch_size = 0xFFFF_FFFFu32;
+
+        // SAFETY: all pointers reference valid stack values and src_size matches the buffer.
+        let status =
+            unsafe { get_info(ptr::null_mut(), src.as_mut_ptr() as *mut c_void, 16, &mut dst_size, &mut scratch_size) };
+        assert_eq!(status, efi::Status::SUCCESS);
+        assert_eq!(dst_size, 100);
+        assert_eq!(scratch_size, 0);
+    }
+
+    #[test]
+    fn test_decompress_decompress_rejects_invalid_parameters() {
+        let mut src = compressed_header(8, 0);
+        let mut dst = [0u8; 8];
+
+        // SAFETY: source_buffer is null under test.
+        let status = unsafe {
+            decompress(ptr::null_mut(), ptr::null_mut(), 16, dst.as_mut_ptr() as *mut c_void, 8, ptr::null_mut(), 0)
+        };
+        assert_eq!(status, efi::Status::INVALID_PARAMETER);
+
+        // SAFETY: destination_buffer is null under test.
+        let status = unsafe {
+            decompress(ptr::null_mut(), src.as_mut_ptr() as *mut c_void, 16, ptr::null_mut(), 8, ptr::null_mut(), 0)
+        };
+        assert_eq!(status, efi::Status::INVALID_PARAMETER);
+
+        let mut malformed = [0u8; 4];
+        // SAFETY: both buffers are valid; the source is intentionally malformed.
+        let status = unsafe {
+            decompress(
+                ptr::null_mut(),
+                malformed.as_mut_ptr() as *mut c_void,
+                4,
+                dst.as_mut_ptr() as *mut c_void,
+                8,
+                ptr::null_mut(),
+                0,
+            )
+        };
+        assert_eq!(status, efi::Status::INVALID_PARAMETER);
+    }
+
+    #[test]
+    fn test_decompress_decompress_succeeds_with_zero_original_size() {
+        let mut src = compressed_header(8, 0);
+        let mut dst = [0u8; 8];
+
+        // SAFETY: both buffers are valid; destination_size of 0 yields an empty destination slice.
+        let status = unsafe {
+            decompress(
+                ptr::null_mut(),
+                src.as_mut_ptr() as *mut c_void,
+                16,
+                dst.as_mut_ptr() as *mut c_void,
+                0,
+                ptr::null_mut(),
+                0,
+            )
+        };
+        assert_eq!(status, efi::Status::SUCCESS);
+    }
+}
