@@ -23,7 +23,7 @@ use patina::{
         Measurement,
         config::PerformanceConfig,
         error::Error,
-        measurement::CallerIdentifier,
+        measurement::{CallerIdentifier, PerfAttribute},
         record::{
             GenericPerformanceRecord, PerformanceRecord, PerformanceRecordBuffer,
             extended::{
@@ -34,7 +34,6 @@ use patina::{
         },
     },
     pi::hob::{Hob as PiHob, HobList},
-    uefi::protocol::performance_measurement::PerfAttribute,
 };
 
 use crate::{cpu::PerfTimer, protocols::PROTOCOL_DB, tpl_mutex::TplMutex};

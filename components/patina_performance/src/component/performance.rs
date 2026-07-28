@@ -10,8 +10,12 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 use crate::{
-    component::protocol::{create_performance_measurement_efiapi, set_performance_service},
-    component::table::find_previous_table_address,
+    component::{
+        protocol::{
+            EdkiiPerformanceMeasurementProtocol, create_performance_measurement_efiapi, set_performance_service,
+        },
+        table::find_previous_table_address,
+    },
     mm,
 };
 use alloc::{boxed::Box, string::String, vec::Vec};
@@ -35,7 +39,6 @@ use patina::{
         boot_services::{BootServices, StandardBootServices, allocation::AllocType, tpl::Tpl},
         event::EventType,
         memory::EfiMemoryType,
-        protocol::performance_measurement::EdkiiPerformanceMeasurementProtocol,
         runtime_services::{RuntimeServices, StandardRuntimeServices},
     },
 };
@@ -517,6 +520,8 @@ fn free_fbpt_buffer<B: BootServices>(boot_services: &B, buffer: usize, size: usi
 
 #[cfg(test)]
 mod tests {
+    use crate::component::protocol::EDKII_PERFORMANCE_MEASUREMENT_PROTOCOL_GUID;
+
     use super::*;
     use core::{
         assert_eq,
@@ -526,13 +531,16 @@ mod tests {
 
     use alloc::sync::Arc;
     use patina::{
-        base::c_ptr::{CMutPtr, CPtr},
-        base::protocol::ProtocolInterface,
+        base::{
+            c_ptr::{CMutPtr, CPtr},
+            protocol::ProtocolInterface,
+        },
         component::service::{IntoService, Service},
-        performance::{error::Error, measurement::CallerIdentifier},
-        uefi::boot_services::MockBootServices,
-        uefi::protocol::performance_measurement::{EDKII_PERFORMANCE_MEASUREMENT_PROTOCOL_GUID, PerfAttribute},
-        uefi::runtime_services::MockRuntimeServices,
+        performance::{
+            error::Error,
+            measurement::{CallerIdentifier, PerfAttribute},
+        },
+        uefi::{boot_services::MockBootServices, runtime_services::MockRuntimeServices},
     };
     use patina_mm::component::communicator::{MmCommunication, Status};
 

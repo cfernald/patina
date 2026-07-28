@@ -11,9 +11,7 @@
 use alloc::string::String;
 use core::convert::TryFrom;
 
-use crate::standard::efi;
-
-use crate::uefi::protocol::performance_measurement::PerfAttribute;
+use crate::{performance::measurement::PerfAttribute, standard::efi};
 
 /// Performance tokens for well-known performance events.
 #[derive(Debug, Eq, PartialEq)]
