@@ -12,6 +12,5 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-pub mod decompress;
 pub mod performance_measurement;
 pub mod status_code;
