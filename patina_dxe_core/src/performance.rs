@@ -58,7 +58,7 @@ pub(crate) static CORE_PERFORMANCE: Service<CorePerformance> = Service::new_unin
 /// Owns all performance measurement state (the FBPT, measurement mask, load-image count, and arch timer). It is
 /// registered as a [`Service<dyn PerformanceManager>`] for components and used directly by core internals.
 #[derive(IntoService)]
-#[service(dyn PerformanceManager)]
+#[service(dyn PerformanceManager, CorePerformance)]
 pub(crate) struct CorePerformance {
     enabled: AtomicBool,
     loaded_image_count: AtomicU32,
