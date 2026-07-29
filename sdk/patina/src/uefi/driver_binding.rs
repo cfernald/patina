@@ -314,6 +314,8 @@ impl<T: DriverBinding + 'static, U: BootServices + 'static> UefiDriverBinding<T,
 #[cfg(test)]
 #[cfg_attr(coverage, coverage(off))]
 mod tests {
+    #![allow(static_mut_refs)]
+
     use core::{
         mem::MaybeUninit,
         ptr,
