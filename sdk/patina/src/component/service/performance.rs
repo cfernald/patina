@@ -11,13 +11,10 @@ use crate::standard::efi;
 #[cfg(any(test, feature = "mockall"))]
 use mockall::automock;
 
-use crate::{
-    performance::{
-        error::Error,
-        measurement::CallerIdentifier,
-        record::{GenericPerformanceRecord, known::KnownPerfId},
-    },
-    uefi::protocol::performance_measurement::PerfAttribute,
+use crate::performance::{
+    error::Error,
+    measurement::{CallerIdentifier, PerfAttribute},
+    record::{GenericPerformanceRecord, known::KnownPerfId},
 };
 
 /// Service that records firmware performance measurements into the Firmware Basic Boot Performance Table (FBPT).

@@ -20,11 +20,44 @@ use core::{
 use alloc::string::ToString;
 use patina::standard::efi;
 use patina::{
-    Char8Str,
+    BinaryGuid, Char8Str,
     component::service::{Service, performance::PerformanceManager},
-    performance::{error::Error, measurement::CallerIdentifier, record::known::KnownPerfId},
-    uefi::protocol::performance_measurement::PerfAttribute,
+    performance::{
+        error::Error,
+        measurement::{CallerIdentifier, PerfAttribute},
+        record::known::KnownPerfId,
+    },
+    protocol::ProtocolInterface,
 };
+
+/// GUID for the EDKII Performance Measurement Protocol.
+pub const EDKII_PERFORMANCE_MEASUREMENT_PROTOCOL_GUID: BinaryGuid =
+    BinaryGuid::from_string("C85D06BE-5F75-48CE-A80F-1236BA3B87B1");
+
+/// Function to create performance record with event description and a timestamp.
+pub type CreateMeasurementUefi = unsafe extern "efiapi" fn(
+    caller_identifier: *const c_void,
+    guid: Option<&efi::Guid>,
+    string: *const c_char,
+    ticker: u64,
+    address: usize,
+    identifier: u32,
+    attribute: PerfAttribute,
+) -> efi::Status;
+
+/// EDKII defined Performance Measurement Protocol structure.
+#[repr(C)]
+pub struct EdkiiPerformanceMeasurementProtocol {
+    /// Function to create performance record with event description and a timestamp.
+    pub create_performance_measurement: CreateMeasurementUefi,
+}
+
+// SAFETY: EdkiiPerformanceMeasurementProtocol implements the EDK II Performance Measurement protocol interface.
+// The PROTOCOL_GUID matches the EDK II defined value. The protocol structure layout matches the protocol
+// interface requirements.
+unsafe impl ProtocolInterface for EdkiiPerformanceMeasurementProtocol {
+    const PROTOCOL_GUID: BinaryGuid = EDKII_PERFORMANCE_MEASUREMENT_PROTOCOL_GUID;
+}
 
 /// Global holder for the performance service so the C-ABI protocol function can reach it.
 ///

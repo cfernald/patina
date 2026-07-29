@@ -22,8 +22,6 @@ pub mod memory;
 #[cfg(any(test, feature = "alloc"))]
 pub mod memory_map;
 #[cfg(any(test, feature = "alloc"))]
-pub mod protocol;
-#[cfg(any(test, feature = "alloc"))]
 pub mod runtime_services;
 #[cfg(any(test, feature = "alloc"))]
 pub mod tpl_mutex;

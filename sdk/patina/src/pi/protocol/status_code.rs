@@ -11,6 +11,8 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
+use core::{mem, ptr, slice};
+
 use crate::standard::efi;
 
 /// Status Code Runtime Protocol GUID.
@@ -55,4 +57,57 @@ pub type ReportStatusCode =
 pub struct StatusCodeProtocol {
     /// Function to report status codes.
     pub report_status_code: ReportStatusCode,
+}
+
+// SAFETY: StatusCodeProtocol implements the UEFI Status Code protocol interface.
+unsafe impl crate::base::protocol::ProtocolInterface for StatusCodeProtocol {
+    const PROTOCOL_GUID: crate::BinaryGuid = PROTOCOL_GUID;
+}
+
+// Non-spec defined wrappers on top of the StatusCodeProtocol to make it easier to use in Rust.
+impl StatusCodeProtocol {
+    /// Reports a status code to the platform firmware with data.
+    pub fn report_status_code_with_data<T>(
+        &self,
+        status_code_type: EfiStatusCodeType,
+        status_code_value: EfiStatusCodeValue,
+        instance: u32,
+        caller_id: &efi::Guid,
+        data_type: efi::Guid,
+        data: T,
+    ) -> Result<(), efi::Status>
+    where
+        T: Sized,
+    {
+        let header = EfiStatusCodeData {
+            header_size: mem::size_of::<EfiStatusCodeData>() as u16,
+            size: mem::size_of::<T>() as u16,
+            r#type: data_type,
+        };
+
+        let mut data_buffer = [any_as_u8_slice(&header), any_as_u8_slice(&data)].concat();
+        let data_ptr: *mut EfiStatusCodeData = data_buffer.as_mut_ptr() as *mut EfiStatusCodeData;
+
+        let status = (self.report_status_code)(status_code_type, status_code_value, instance, caller_id, data_ptr);
+
+        if status.is_error() { Err(status) } else { Ok(()) }
+    }
+
+    /// Reports a status code to the platform firmware without data.
+    pub fn report_status_code(
+        &self,
+        status_code_type: EfiStatusCodeType,
+        status_code_value: EfiStatusCodeValue,
+        instance: u32,
+        caller_id: &efi::Guid,
+    ) -> Result<(), efi::Status> {
+        let status =
+            (self.report_status_code)(status_code_type, status_code_value, instance, caller_id, ptr::null_mut());
+        if status.is_error() { Err(status) } else { Ok(()) }
+    }
+}
+
+fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
+    // SAFETY: P is a ref thus a valid pointer and since the type is sized, the memory boundary of this type is known.
+    unsafe { slice::from_raw_parts((p as *const T) as *const u8, mem::size_of::<T>()) }
 }

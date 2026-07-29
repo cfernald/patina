@@ -78,7 +78,6 @@ patina::
 │   ├── event           // UEFI event types + UEFI-defined event group GUIDs
 │   ├── boot_services   // Boot Services trait, allocation, TPL, etc.
 │   ├── runtime_services // Runtime service traits
-│   ├── protocol        // UEFI protocol wrappers
 │   ├── device_path, driver_binding, memory_map, decompress, tpl_mutex
 │   └── ...
 │

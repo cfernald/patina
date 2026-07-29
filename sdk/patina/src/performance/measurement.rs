@@ -11,6 +11,18 @@ use core::{ffi::c_void, mem, ops::BitOr};
 use crate::standard::efi;
 use crate::{bit, performance::record::known::KnownPerfId};
 
+/// The attribute of the measurement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(C)]
+pub enum PerfAttribute {
+    /// A PERF_START/PERF_START_EX record.
+    PerfStartEntry,
+    /// A PERF_END/PERF_END_EX record.
+    PerfEndEntry,
+    /// A general performance record.
+    PerfEntry,
+}
+
 /// Represents the `caller_identifier` used in performance measurements.
 /// Due to legacy reasons, this can either be an handle or a pointer to a GUID.
 pub enum CallerIdentifier {

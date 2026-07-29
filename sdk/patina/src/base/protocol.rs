@@ -40,7 +40,7 @@ impl_r_efi_protocol!(block_io);
 impl_r_efi_protocol!(bus_specific_driver_override);
 impl_r_efi_protocol!(debug_support);
 impl_r_efi_protocol!(debugport);
-// impl_r_efi_protocol!(decompress);
+impl_r_efi_protocol!(decompress);
 impl_r_efi_protocol!(device_path);
 impl_r_efi_protocol!(device_path_from_text);
 impl_r_efi_protocol!(device_path_utilities);
