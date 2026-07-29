@@ -9,19 +9,18 @@
 use crate::pecoff::UefiPeInfo;
 use alloc::{boxed::Box, slice, vec, vec::Vec};
 use core::{fmt::Display, ptr};
-use patina::{base::DEFAULT_CACHE_ATTR, base::error::EfiError, log_debug_assert};
+use patina::{DEFAULT_CACHE_ATTR, error::EfiError, log_debug_assert};
 
 use patina::standard::efi;
 use patina::{
-    base::guid as base_guids,
-    base::{SIZE_4GB, UEFI_PAGE_MASK, UEFI_PAGE_SHIFT, UEFI_PAGE_SIZE, align_up},
-    function,
+    function, guid as base_guids,
     pi::{
         dxe_services::{self, GcdMemoryType, MemorySpaceDescriptor},
         guid as pi_guids, hob,
     },
     uefi::event::CACHE_ATTRIBUTE_CHANGE_EVENT_GROUP_GUID,
     uefi_pages_to_size, uefi_size_to_pages, writelncrlf,
+    {SIZE_4GB, UEFI_PAGE_MASK, UEFI_PAGE_SHIFT, UEFI_PAGE_SIZE, align_up},
 };
 use patina_internal_core::collections::{Error as SliceError, Rbt, SliceKey, node_size};
 
@@ -2331,9 +2330,7 @@ impl SpinLockedGcd {
                 Hob::MemoryAllocationModule(module) if module.module_name == base_guids::DXE_CORE_ID => Some(module),
                 _ => None,
             })
-            .expect(
-                "Did not find MemoryAllocationModule Hob for DxeCore. Use patina::base::guid::DXE_CORE_ID as FFS GUID.",
-            );
+            .expect("Did not find MemoryAllocationModule Hob for DxeCore. Use patina::guid::DXE_CORE_ID as FFS GUID.");
 
         // SAFETY: the DXE core HOB points to the loaded image buffer and size.
         let pe_info = unsafe {
@@ -3081,7 +3078,7 @@ mod tests {
     //! - The test lock prevents concurrent access during reset operations
     extern crate std;
     use core::{alloc::Layout, sync::atomic::AtomicBool};
-    use patina::base::align_up;
+    use patina::align_up;
 
     use crate::test_support::{self, MockPageTable, MockPageTableWrapper};
 

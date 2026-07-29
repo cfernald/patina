@@ -14,11 +14,11 @@ use alloc::vec::Vec;
 
 use patina::{
     BinaryGuid,
-    base::error::EfiError,
     component::{
         hob::FromHob,
         service::{IntoService, Service, perf_timer::ArchTimerFunctionality, performance::PerformanceManager},
     },
+    error::EfiError,
     performance::{
         Measurement,
         config::PerformanceConfig,

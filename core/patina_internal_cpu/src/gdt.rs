@@ -9,7 +9,7 @@
 #![cfg_attr(test, allow(dead_code))]
 #![cfg_attr(test, allow(unused_imports))]
 use core::ptr::{addr_of, addr_of_mut};
-use patina::base::SIZE_4GB;
+use patina::SIZE_4GB;
 
 struct GdtEntry {
     limit15_0: u16,

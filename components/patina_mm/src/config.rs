@@ -22,7 +22,7 @@ use alloc::vec::Vec;
 use core::{fmt, pin::Pin, ptr::NonNull};
 
 use patina::{
-    BinaryGuid, Guid, base::UEFI_PAGE_MASK, management_mode::MmCommBufferStatus,
+    BinaryGuid, Guid, UEFI_PAGE_MASK, management_mode::MmCommBufferStatus,
     pi::protocol::communication::EfiMmCommunicateHeader, writelncrlf,
 };
 
@@ -935,7 +935,7 @@ mod tests {
 
     #[test]
     fn test_from_firmware_region_success() {
-        use patina::base::UEFI_PAGE_SIZE;
+        use patina::UEFI_PAGE_SIZE;
 
         let aligned_buf = Box::new(AlignedBuffer([0u8; 64]));
         let buffer_ptr = aligned_buf.0.as_ptr();
@@ -966,7 +966,7 @@ mod tests {
 
     #[test]
     fn test_from_raw_parts_success() {
-        use patina::base::UEFI_PAGE_SIZE;
+        use patina::UEFI_PAGE_SIZE;
 
         let mut aligned_buf = Box::new(AlignedBuffer([0u8; 64]));
         let buffer = &mut aligned_buf.0;

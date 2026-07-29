@@ -17,9 +17,9 @@ use core::{ffi::c_void, marker::Send, ptr};
 use log::Level;
 use patina::standard::efi;
 use patina::{
-    base::error::EfiError,
     component::service::{Service, perf_timer::ArchTimerFunctionality},
     debug::log::Format,
+    error::EfiError,
     peripheral::serial::{SerialIO, shared::SharedSerial},
     pi::hob::{Hob, PhaseHandoffInformationTable},
 };

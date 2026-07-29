@@ -16,17 +16,17 @@ use alloc::boxed::Box;
 use core::{cell::Cell, ffi::c_void, ops::Range};
 use patina::standard::efi;
 use patina::{
-    base::error::EfiError,
-    base::{DEFAULT_CACHE_ATTR, align_down, align_up},
+    error::EfiError,
     pi::{
         dxe_services::{GcdIoType, GcdMemoryType, MemorySpaceDescriptor},
         hob::{self, Hob, HobList, MEMORY_TYPE_INFO_HOB_GUID, PhaseHandoffInformationTable},
     },
+    {DEFAULT_CACHE_ATTR, align_down, align_up},
 };
 use patina_internal_cpu::paging::{PatinaPageTable, create_cpu_paging};
 
 #[cfg(feature = "compatibility_mode_allowed")]
-use patina::base::{UEFI_PAGE_SIZE, align_range};
+use patina::{UEFI_PAGE_SIZE, align_range};
 
 use crate::{GCD, gcd::spin_locked_gcd::PagingAllocator, pecoff};
 
@@ -435,7 +435,7 @@ impl MemoryProtectionPolicy {
                 d.memory_type != GcdMemoryType::NonExistent
             })
             .map(|desc| desc.attributes & efi::CACHE_ATTRIBUTE_MASK)
-            .unwrap_or(patina::base::DEFAULT_CACHE_ATTR);
+            .unwrap_or(patina::DEFAULT_CACHE_ATTR);
         if gcd
             .set_memory_space_attributes(image_base_page, patina::uefi_pages_to_size!(image_num_pages), stripped_attrs)
             .is_err()

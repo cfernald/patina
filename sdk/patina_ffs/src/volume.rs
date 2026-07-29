@@ -18,7 +18,7 @@ use core::{
     fmt, iter, mem, ptr,
     slice::{self, from_raw_parts},
 };
-use patina::{BinaryGuid, base::align_up, log_debug_assert};
+use patina::{BinaryGuid, align_up, log_debug_assert};
 
 use patina::pi::fw_fs::{
     ffs::{self, file},
@@ -1367,7 +1367,7 @@ mod test {
                     && guid_header.section_definition_guid == fw_fs::guid::LZMA_SECTION_GUID
                 {
                     let data = section.try_content_as_slice()?;
-                    let mut reader = LzmaReader::new_mem_limit(data, patina::base::SIZE_512MB as u32, None)
+                    let mut reader = LzmaReader::new_mem_limit(data, patina::SIZE_512MB as u32, None)
                         .map_err(|_| FirmwareFileSystemError::DataCorrupt)?;
                     let mut decompressed: Vec<u8> = Vec::new();
                     let mut chunk = [0u8; 4096];
@@ -1434,7 +1434,7 @@ mod test {
                     && guid_header.section_definition_guid == fw_fs::guid::LZMA_SECTION_GUID
                 {
                     let data = section.try_content_as_slice()?;
-                    let mut reader = LzmaReader::new_mem_limit(data, patina::base::SIZE_512MB as u32, None)
+                    let mut reader = LzmaReader::new_mem_limit(data, patina::SIZE_512MB as u32, None)
                         .map_err(|_| FirmwareFileSystemError::DataCorrupt)?;
                     let mut decompressed: Vec<u8> = Vec::new();
                     let mut chunk = [0u8; 4096];

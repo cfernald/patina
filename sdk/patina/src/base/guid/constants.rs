@@ -33,7 +33,7 @@ pub const CALLER_ID: BinaryGuid = BinaryGuid::from_string(match option_env!("FIL
 ///
 /// (`23C9322F-2AF2-476A-BC4C-26BC88266C71`)
 /// ```
-/// # use patina::base::guid::DXE_CORE_ID;
+/// # use patina::guid::DXE_CORE_ID;
 /// # assert_eq!("23C9322F-2AF2-476A-BC4C-26BC88266C71", format!("{}", DXE_CORE_ID));
 /// ```
 pub const DXE_CORE_ID: BinaryGuid = BinaryGuid::from_string("23C9322F-2AF2-476A-BC4C-26BC88266C71");

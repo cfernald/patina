@@ -197,7 +197,7 @@ enum DebugError {
     /// Failure from the GDB stub initialization.
     GdbStubInit,
     /// Failure from the GDB stub.
-    GdbStubError(gdbstub::stub::GdbStubError<(), patina::base::error::EfiError>),
+    GdbStubError(gdbstub::stub::GdbStubError<(), patina::error::EfiError>),
     /// Failure to reboot the system.
     RebootFailure,
     /// Failure in the transport layer.

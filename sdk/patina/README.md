@@ -27,7 +27,7 @@ The SDK is organized into the following root-level modules.
 | Module | Description |
 | ------ | ----------- |
 | **arch** | Abstractions for architecture-specific functionality (e.g. caching) and architecture-specific functions. |
-| **base** | Foundational primitives: errors, constants, GUID structures, C-pointer helpers, etc. |
+| **base** | Foundational primitives: errors, constants, basic structures. This module gets republished from the root. |
 | **component** | Component and service definitions for the dependency-injected component model. |
 | **debug** | Macros and definitions for logging and diagnostics. |
 | **management_mode** | Definitions for Management Mode (MM/SMM) interactions. |

@@ -12,8 +12,7 @@ use crate::patina_mm_integration::common::{constants::*, framework::*};
 
 use core::pin::Pin;
 use patina::{
-    Guid,
-    base::SIZE_4KB,
+    Guid, SIZE_4KB,
     component::{Storage, service::Service},
 };
 use patina_mm::{

@@ -50,7 +50,7 @@ and `SwMmiTrigger` services for consumption by components throughout the dispatc
 
 ```rust
 use patina_dxe_core::*;
-use patina::{component::service::IntoService, base::error::Result};
+use patina::{component::service::IntoService, error::Result};
 use patina_mm::service::PlatformMmControl;
 
 /// An optional service to ensure Platform MM is initialized.
@@ -60,7 +60,7 @@ struct ExamplePlatformMmControl;
 
 impl PlatformMmControl for ExamplePlatformMmControl {
   /// Platform hardware enabling required to support MMIs
-  fn init(&self) -> patina::base::error::Result<()> {
+  fn init(&self) -> patina::error::Result<()> {
     /* platform MMI init code */
     Ok(())
   }
@@ -123,7 +123,7 @@ pub struct ExampleComponent;
 #[component]
 impl ExampleComponent {
   /// Example Entry point that just sends a single message
-  pub fn entry_point(self, mm_comm: Service<dyn MmCommunication>) -> patina::base::error::Result<()> {
+  pub fn entry_point(self, mm_comm: Service<dyn MmCommunication>) -> patina::error::Result<()> {
     let data = DataToSend {
       signature: u32::from_le_bytes([b'M', b'S', b'U', b'P']),
       buffer: [b'H', b'E', b'L', b'L', b'O', b'\0', 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0],
@@ -143,7 +143,7 @@ impl ExampleComponent {
         )
         .map_err(|_| {
           log::error!("MM Communication failed");
-          patina::base::error::EfiError::DeviceError // Todo: Map actual codes
+          patina::error::EfiError::DeviceError // Todo: Map actual codes
         })?
     };
     Ok(())

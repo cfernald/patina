@@ -1,8 +1,8 @@
 //! Test for new component attribute on impl blocks
 
 use patina::{
-    base::error::Result,
     component::{IntoComponent, component, params::Config},
+    error::Result,
 };
 
 pub struct TestComponent {

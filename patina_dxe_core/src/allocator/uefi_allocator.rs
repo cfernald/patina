@@ -9,7 +9,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 use patina::standard::efi;
-use patina::{base::error::EfiError, writelncrlf};
+use patina::{error::EfiError, writelncrlf};
 
 use super::{AllocationStatistics, AllocationStrategy, PageAllocator};
 use core::{
@@ -277,9 +277,9 @@ mod tests {
     use std::alloc::{GlobalAlloc, System};
 
     use patina::{
-        base::{SIZE_4KB, SIZE_64KB, UEFI_PAGE_SIZE, align_up, page_shift_from_alignment},
         pi::dxe_services,
         uefi_pages_to_size, uefi_size_to_pages,
+        {SIZE_4KB, SIZE_64KB, UEFI_PAGE_SIZE, align_up, page_shift_from_alignment},
     };
 
     use crate::{

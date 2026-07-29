@@ -12,7 +12,7 @@
 use alloc::slice;
 use bitfield_struct::bitfield;
 use core::arch::asm;
-use patina::base::{SIZE_1GB, SIZE_2MB, SIZE_4KB, UEFI_PAGE_SHIFT};
+use patina::{SIZE_1GB, SIZE_2MB, SIZE_4KB, UEFI_PAGE_SHIFT};
 use patina_paging::MemoryAttributes;
 
 pub(super) struct PteInfo {

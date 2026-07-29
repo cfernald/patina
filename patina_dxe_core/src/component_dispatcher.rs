@@ -312,7 +312,7 @@ mod tests {
 
         #[component]
         impl TestComponent {
-            fn entry_point(self) -> patina::base::error::Result<()> {
+            fn entry_point(self) -> patina::error::Result<()> {
                 Ok(())
             }
         }
@@ -424,7 +424,7 @@ mod tests {
                 self,
                 hob1: patina::component::hob::Hob<TestHob1>,
                 hob2: patina::component::hob::Hob<TestHob2>,
-            ) -> patina::base::error::Result<()> {
+            ) -> patina::error::Result<()> {
                 assert_eq!(hob1.value, HOB1_VALUE);
                 assert_eq!(hob2.value, HOB2_VALUE);
                 Ok(())
@@ -460,10 +460,7 @@ mod tests {
 
         #[component]
         impl TestComponent {
-            fn entry_point(
-                self,
-                _: patina::component::service::Service<dyn TestService>,
-            ) -> patina::base::error::Result<()> {
+            fn entry_point(self, _: patina::component::service::Service<dyn TestService>) -> patina::error::Result<()> {
                 Ok(())
             }
         }
@@ -480,8 +477,8 @@ mod tests {
 
         #[component]
         impl TestComponent {
-            fn entry_point(self) -> patina::base::error::Result<()> {
-                Err(patina::base::error::EfiError::Unsupported)
+            fn entry_point(self) -> patina::error::Result<()> {
+                Err(patina::error::EfiError::Unsupported)
             }
         }
 

@@ -165,7 +165,7 @@ caller.
 # extern crate patina_internal_core;
 # extern crate patina;
 use patina_internal_core::collections::Error as PicError;
-use patina::base::error::EfiError;
+use patina::error::EfiError;
 
 // An error type for working with the GCD
 pub enum Error {
@@ -191,7 +191,7 @@ impl From<PicError> for Error {
 }
 
 // The GCD eventually bubbles up to external EFIAPI functions, so lets also make it easy to convert the `Error` type
-// to `patina::base::error::EfiError`
+// to `patina::error::EfiError`
 impl From<Error> for EfiError {
     fn from(value: Error) -> EfiError {
         match value {

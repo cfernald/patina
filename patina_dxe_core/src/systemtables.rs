@@ -884,7 +884,7 @@ pub(crate) struct SystemTableChecksumInstaller;
 
 #[component]
 impl SystemTableChecksumInstaller {
-    fn entry_point(self, bs: patina::uefi::boot_services::StandardBootServices) -> patina::base::error::Result<()> {
+    fn entry_point(self, bs: patina::uefi::boot_services::StandardBootServices) -> patina::error::Result<()> {
         extern "efiapi" fn callback(_event: efi::Event, _: *mut c_void) {
             SYSTEM_TABLE.lock().as_mut().expect("System Table is initialized").checksum_all();
         }

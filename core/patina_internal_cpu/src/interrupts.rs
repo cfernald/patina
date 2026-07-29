@@ -16,7 +16,7 @@
 //!
 
 use core::ops::{Deref, DerefMut};
-use patina::{base::error::EfiError, pi::protocol::cpu_arch::EfiSystemContext, standard};
+use patina::{error::EfiError, pi::protocol::cpu_arch::EfiSystemContext, standard};
 
 mod exception_handling;
 

@@ -24,8 +24,8 @@ use core::{cmp::Ordering, ffi::c_void};
 use patina::standard::efi;
 use patina::{
     BinaryGuid, Char16Str, OwnedGuid,
-    base::error::EfiError,
     component::service::Service,
+    error::EfiError,
     pi::{
         fw_fs::ffs,
         hob::{Hob, HobList},
@@ -220,7 +220,7 @@ impl<P: PlatformInfo> PiDispatcher<P> {
             crate::gcd::AllocateType::TopDown(None),
             patina::pi::dxe_services::GcdMemoryType::SystemMemory,
             ALIGNMENT_SHIFT_4MB,
-            patina::base::UEFI_PAGE_SIZE,
+            patina::UEFI_PAGE_SIZE,
             crate::protocol_db::EFI_BOOT_SERVICES_DATA_ALLOCATOR_HANDLE,
             None,
         ) else {

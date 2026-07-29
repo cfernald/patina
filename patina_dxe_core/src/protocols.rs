@@ -12,7 +12,7 @@ use alloc::{slice, vec, vec::Vec};
 use patina::standard::efi::{self, protocols::device_path::Protocol};
 use patina::{
     OwnedGuid,
-    base::error::EfiError,
+    error::EfiError,
     uefi::device_path::walker::{is_device_path_end, remaining_device_path},
 };
 use tpl_mutex::TplMutex;

@@ -10,8 +10,7 @@ use core::{ffi::c_void, slice::from_raw_parts, sync::atomic::Ordering};
 use patina::arch as interrupts;
 use patina::standard::efi;
 use patina::{
-    base::guid as base_guids,
-    log_debug_assert,
+    guid as base_guids, log_debug_assert,
     pi::{protocol, status_code},
     uefi::event::EXIT_BOOT_SERVICES_FAILED_EVENT_GROUP_GUID,
 };

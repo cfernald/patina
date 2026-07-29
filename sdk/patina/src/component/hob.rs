@@ -10,7 +10,7 @@
 //!
 //! ```rust
 //! use patina::{
-//!    base::error::Result,
+//!    error::Result,
 //!    component::hob::{Hob, FromHob},
 //!    BinaryGuid
 //! };

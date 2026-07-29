@@ -168,7 +168,7 @@ mocking of the underlying functionality, but provides an easy to use interface a
 ```rust
 # extern crate patina;
 use patina::{
-    base::error::Result,
+    error::Result,
     component::service::Service,
 };
 
@@ -205,7 +205,7 @@ component execution, the changes are queued and applied after the component fini
 ```rust
 # extern crate patina;
 use patina::{
-    base::error::Result,
+    error::Result,
     component::{component, params::Commands},
 };
 
@@ -251,7 +251,7 @@ have been initialized. Each component receives its own cloned instance.
 ```rust
 # extern crate patina;
 use patina::{
-    base::error::Result,
+    error::Result,
     component::component,
     uefi::boot_services::StandardBootServices,
 };
@@ -316,7 +316,7 @@ usage models for components and their parameters.
 ```rust
 # extern crate patina;
 use patina::{
-    base::error::{EfiError, Result},
+    error::{EfiError, Result},
     component::{
         component,
         params::{Config, ConfigMut},

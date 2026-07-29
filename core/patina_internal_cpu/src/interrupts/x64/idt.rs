@@ -8,7 +8,7 @@
 //!
 
 use core::{arch::global_asm, cell::UnsafeCell};
-use patina::base::SIZE_4GB;
+use patina::SIZE_4GB;
 
 global_asm!(include_str!("interrupt_handler.asm"));
 // Use efiapi for the consistent calling convention.

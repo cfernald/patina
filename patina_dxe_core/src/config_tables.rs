@@ -14,7 +14,7 @@ use core::{
     ptr::{NonNull, slice_from_raw_parts_mut},
     slice::{from_raw_parts, from_raw_parts_mut},
 };
-use patina::base::error::EfiError;
+use patina::error::EfiError;
 use patina::standard::efi;
 
 use crate::{
@@ -165,7 +165,7 @@ pub fn init_config_tables_support(st: &mut EfiSystemTable) {
 
 #[cfg(test)]
 mod tests {
-    use patina::base::guid;
+    use patina::guid;
 
     use crate::{systemtables::init_system_table, test_support};
 

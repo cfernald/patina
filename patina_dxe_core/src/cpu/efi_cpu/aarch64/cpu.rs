@@ -6,7 +6,7 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 //!
-use patina::base::error::EfiError;
+use patina::error::EfiError;
 
 /// Struct to implement AArch64 Cpu Init.
 ///

@@ -45,12 +45,11 @@ use patina::standard::efi::{self, TPL_HIGH_LEVEL};
 pub use uefi_allocator::UefiAllocator;
 
 #[cfg(test)]
-use patina::base::guid as base_guids;
+use patina::guid as base_guids;
 use patina::{
-    base::error::EfiError,
-    base::{SIZE_4KB, UEFI_PAGE_MASK, UEFI_PAGE_SIZE},
+    error::EfiError,
     uefi::memory::EFI_MAX_MEMORY_TYPE,
-    uefi_size_to_pages, writelncrlf,
+    uefi_size_to_pages, writelncrlf, {SIZE_4KB, UEFI_PAGE_MASK, UEFI_PAGE_SIZE},
 };
 
 // Type alias for a UefiAllocator with a SpinLockedFixedSizeBlockAllocator
@@ -100,7 +99,7 @@ pub(crate) const DEFAULT_PAGE_ALLOCATION_GRANULARITY: usize = SIZE_4KB;
 // granularity requirements for them.
 cfg_if::cfg_if! {
     if #[cfg(target_arch = "aarch64")] {
-        pub(crate) const RUNTIME_PAGE_ALLOCATION_GRANULARITY: usize = patina::base::SIZE_64KB;
+        pub(crate) const RUNTIME_PAGE_ALLOCATION_GRANULARITY: usize = patina::SIZE_64KB;
     } else {
         pub(crate) const RUNTIME_PAGE_ALLOCATION_GRANULARITY: usize = DEFAULT_PAGE_ALLOCATION_GRANULARITY;
     }
@@ -2066,7 +2065,7 @@ mod tests {
                 .allocate_memory_space(
                     DEFAULT_ALLOCATION_STRATEGY,
                     GcdMemoryType::SystemMemory,
-                    patina::base::UEFI_PAGE_SHIFT,
+                    patina::UEFI_PAGE_SHIFT,
                     fv_len,
                     protocol_db::DXE_CORE_HANDLE,
                     None,
@@ -2170,7 +2169,7 @@ mod tests {
 
                 let expected_pages = match *memory_type {
                     efi::BOOT_SERVICES_DATA => 3, // Stack + build_test_hob_list allocation
-                    _ => granularity / patina::base::SIZE_4KB,
+                    _ => granularity / patina::SIZE_4KB,
                 };
 
                 let claimed = allocator.stats().claimed_pages;

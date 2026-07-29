@@ -20,7 +20,7 @@ use core::{
 };
 
 use patina::{
-    base::SIZE_4GB,
+    SIZE_4GB,
     component::{
         hob::Hob,
         service::{IntoService, Service, memory::MemoryManager},

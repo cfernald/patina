@@ -8,7 +8,7 @@
 //!
 use alloc::{vec, vec::Vec};
 use core::{ffi::c_void, mem::size_of};
-use patina::base::error::EfiError;
+use patina::error::EfiError;
 use patina::standard::efi;
 
 use crate::protocols::PROTOCOL_DB;

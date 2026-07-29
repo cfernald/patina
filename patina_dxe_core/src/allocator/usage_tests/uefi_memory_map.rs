@@ -149,12 +149,12 @@ mod tests {
     use patina::standard::efi;
     use patina::{
         BinaryGuid,
-        base::*,
         pi::{
             BootMode,
             hob::{self, HobHeader, HobList, PhaseHandoffInformationTable, ResourceDescriptor},
         },
         uefi::memory_map,
+        *,
     };
     use serial_test::serial;
     use std::panic::RefUnwindSafe;

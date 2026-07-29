@@ -12,7 +12,7 @@ use core::{
     mem,
     slice::{self, from_raw_parts},
 };
-use patina::base::error::EfiError;
+use patina::error::EfiError;
 use patina_ffs::volume::VolumeRef;
 
 use patina::pi::dxe_services;

@@ -260,7 +260,7 @@ mod tests {
         systemtables::init_system_table,
         test_support,
     };
-    use patina::{base::UEFI_PAGE_SIZE, uefi_size_to_pages};
+    use patina::{UEFI_PAGE_SIZE, uefi_size_to_pages};
 
     fn with_locked_state<F: Fn() + std::panic::RefUnwindSafe>(f: F) {
         test_support::with_clean_global_lock(|| {

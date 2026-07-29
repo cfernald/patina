@@ -12,7 +12,7 @@
 
 use crate::config::CommunicateBuffer;
 use patina::{
-    base::UEFI_PAGE_SIZE,
+    UEFI_PAGE_SIZE,
     management_mode::protocol::mm_comm_buffer_update::{self, MmCommBufferUpdateProtocol},
     standard::efi,
     uefi::{
@@ -52,14 +52,14 @@ pub(super) struct ProtocolNotifyContext {
 ///
 /// # Returns
 /// - `Ok(&'static ProtocolNotifyContext)`: Context that should be stored for later use
-/// - `Err(patina::base::error::Error)`: If event creation or protocol notify registration fails
+/// - `Err(patina::error::Error)`: If event creation or protocol notify registration fails
 ///
 /// # Safety
 /// - The returned context is leaked and will live for a static lifetime
 pub(super) fn register_buffer_update_notify(
     boot_services: StandardBootServices,
     updatable_buffer_id: u8,
-) -> patina::base::error::Result<&'static ProtocolNotifyContext> {
+) -> patina::error::Result<&'static ProtocolNotifyContext> {
     log::trace!(target: "mm_comm", "Setting up protocol notify callback for buffer ID {}", updatable_buffer_id);
 
     let context = Box::leak(Box::new(ProtocolNotifyContext {

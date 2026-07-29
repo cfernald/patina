@@ -18,11 +18,9 @@ use core::{
 use patina::standard::efi::{self, protocols::device_path::Protocol};
 use patina::{
     Char16Str,
-    base::error::EfiError,
-    base::guid as base_guids,
-    base::{DEFAULT_CACHE_ATTR, UEFI_PAGE_SIZE, align_up},
     component::service::memory::{AllocationOptions, MemoryManager, PageFree},
-    log_debug_assert,
+    error::EfiError,
+    guid as base_guids, log_debug_assert,
     pi::{
         self,
         fw_fs::FfsSectionRawType::PE32,
@@ -30,7 +28,7 @@ use patina::{
     },
     uefi::device_path::walker::{DevicePathWalker, copy_device_path_to_boxed_slice, device_path_node_count},
     uefi::memory::EfiMemoryType,
-    uefi_size_to_pages,
+    uefi_size_to_pages, {DEFAULT_CACHE_ATTR, UEFI_PAGE_SIZE, align_up},
 };
 
 use crate::{
@@ -573,9 +571,7 @@ impl ImageData {
                     None
                 }
             })
-            .expect(
-                "Did not find MemoryAllocationModule Hob for DxeCore. Use patina::base::guid::DXE_CORE_ID as FFS GUID.",
-            );
+            .expect("Did not find MemoryAllocationModule Hob for DxeCore. Use patina::guid::DXE_CORE_ID as FFS GUID.");
 
         let mut image_info = empty_image_info();
         image_info.system_table = system_table as *mut _ as *mut efi::SystemTable;
@@ -1614,7 +1610,7 @@ mod tests {
         protocols::device_path::{End, Hardware, Media, TYPE_END, TYPE_HARDWARE, TYPE_MEDIA},
     };
     use patina::{
-        base::error::EfiError,
+        error::EfiError,
         pi::{
             self,
             hob::{HobList, MemoryAllocationHeader, MemoryAllocationModule},

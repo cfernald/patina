@@ -12,7 +12,7 @@ use alloc::{
 };
 use core::ptr::NonNull;
 use patina::{
-    base::error::EfiError,
+    error::EfiError,
     uefi::device_path::walker::{concat_device_path_to_boxed_slice, copy_device_path_to_boxed_slice},
 };
 

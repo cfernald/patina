@@ -9,7 +9,7 @@
 #[cfg(not(test))]
 use core::arch::asm;
 use patina::arch as interrupts;
-use patina::base::error::EfiError;
+use patina::error::EfiError;
 
 /// Struct to implement X64 Cpu Init.
 ///

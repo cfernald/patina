@@ -21,13 +21,13 @@ use alloc::string::ToString;
 use patina::standard::efi;
 use patina::{
     BinaryGuid, Char8Str,
-    base::protocol::ProtocolInterface,
     component::service::{Service, performance::PerformanceManager},
     performance::{
         error::Error,
         measurement::{CallerIdentifier, PerfAttribute},
         record::known::KnownPerfId,
     },
+    protocol::ProtocolInterface,
 };
 
 /// GUID for the EDKII Performance Measurement Protocol.

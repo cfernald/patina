@@ -42,7 +42,7 @@ use mockall::automock;
 #[cfg_attr(any(test, feature = "mockall"), automock)]
 pub unsafe trait SwMmiTrigger {
     /// Triggers a software Management Mode Interrupt (MMI).
-    fn trigger_sw_mmi(&self, cmd_port_value: u8, data_port_value: u8) -> patina::base::error::Result<()>;
+    fn trigger_sw_mmi(&self, cmd_port_value: u8, data_port_value: u8) -> patina::error::Result<()>;
 }
 
 /// A component that provides the `SwMmiTrigger` service.
@@ -70,7 +70,7 @@ impl SwMmiManager {
         config: Config<MmCommunicationConfiguration>,
         platform_mm_control: Option<Service<dyn PlatformMmControl>>,
         mut commands: Commands,
-    ) -> patina::base::error::Result<()> {
+    ) -> patina::error::Result<()> {
         log::info!(target: "sw_mmi", "Initializing SwMmiManager...");
         log::debug!(target: "sw_mmi", "MM config - cmd_port: {:?}, data_port: {:?}, acpi_base: {:?}",
             config.cmd_port, config.data_port, config.acpi_base);
@@ -102,7 +102,7 @@ unsafe impl SwMmiTrigger for SwMmiManager {
     // This is tested in integration tests, but it is difficult to unit test with little value returned due to
     // the nature of hardware I/O port operations.
     #[cfg_attr(coverage, coverage(off))]
-    fn trigger_sw_mmi(&self, _cmd_port_value: u8, _data_port_value: u8) -> patina::base::error::Result<()> {
+    fn trigger_sw_mmi(&self, _cmd_port_value: u8, _data_port_value: u8) -> patina::error::Result<()> {
         log::debug!(target: "sw_mmi", "Triggering SW MMI with cmd_port_value=0x{:02X}, data_port_value=0x{:02X}", _cmd_port_value, _data_port_value);
 
         log::trace!(target: "sw_mmi", "Writing to MMI command port...");

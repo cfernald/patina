@@ -1,11 +1,11 @@
 //! Test that Config<T> and ConfigMut<T> for the same type are rejected at compile time.
 
 use patina::{
-    base::error::Result,
     component::{
         component,
         params::{Config, ConfigMut},
     },
+    error::Result,
 };
 
 pub struct TestComponent;

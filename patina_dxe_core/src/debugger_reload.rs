@@ -15,8 +15,8 @@ use core::ffi::c_void;
 
 use alloc::vec::Vec;
 use patina::{
-    base::guid as base_guids,
     component::service::memory::{AllocationOptions, MemoryManager, PageAllocationStrategy},
+    guid as base_guids,
     pi::{
         guid as pi_guids,
         hob::{self},

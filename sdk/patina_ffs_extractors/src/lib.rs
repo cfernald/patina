@@ -46,7 +46,7 @@ pub use null::NullSectionExtractor;
 
 #[cfg(any(feature = "brotli", feature = "lzma"))]
 /// Maximum memory limit for compressed section decompression. This is set to 512MB as a reasonable upper limit.
-const DECOMPRESSION_MAX_MEMORY_LIMIT: u32 = patina::base::SIZE_512MB as u32;
+const DECOMPRESSION_MAX_MEMORY_LIMIT: u32 = patina::SIZE_512MB as u32;
 
 #[cfg(test)]
 #[cfg_attr(coverage, coverage(off))]

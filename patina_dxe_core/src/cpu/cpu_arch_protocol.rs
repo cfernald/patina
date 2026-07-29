@@ -14,12 +14,12 @@ use core::ffi::c_void;
 use patina::standard::efi;
 use patina::{
     arch,
-    base::error::{EfiError, Result},
-    base::protocol::ProtocolInterface,
     component::{
         Storage, component,
         service::{IntoService, Service},
     },
+    error::{EfiError, Result},
+    protocol::ProtocolInterface,
     uefi::boot_services::{BootServices, StandardBootServices},
 };
 use patina_internal_cpu::interrupts::{self, ExceptionType, HandlerType, InterruptManager, Interrupts};

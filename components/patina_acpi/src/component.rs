@@ -23,11 +23,11 @@ use patina::{
 };
 
 use patina::{
-    base::error::EfiError,
     component::{
         hob::Hob,
         service::{Service, memory::MemoryManager},
     },
+    error::EfiError,
     uefi::memory::EfiMemoryType,
 };
 
@@ -77,7 +77,7 @@ impl AcpiComponent {
         boot_services: StandardBootServices,
         acpi_hob: Option<Hob<AcpiMemoryHob>>,
         memory_manager: Service<dyn MemoryManager>,
-    ) -> patina::base::error::Result<()> {
+    ) -> patina::error::Result<()> {
         // Produce the EDKII ACPI protocol interfaces.
         boot_services.install_protocol_interface(None, Box::new(AcpiTableProtocol::new()))?;
         boot_services.install_protocol_interface(None, Box::new(AcpiGetProtocol::new()))?;

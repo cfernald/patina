@@ -19,8 +19,8 @@ use core::{
 };
 use patina::standard::efi;
 use patina::{
-    base::align_up,
-    base::error::{EfiError, Result},
+    align_up,
+    error::{EfiError, Result},
 };
 use zerocopy_derive::*;
 

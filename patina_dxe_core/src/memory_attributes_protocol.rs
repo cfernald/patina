@@ -15,7 +15,7 @@ use core::{
     sync::atomic::{AtomicPtr, AtomicUsize, Ordering},
 };
 use patina::standard::efi;
-use patina::{base::UEFI_PAGE_MASK, base::error::EfiError, function};
+use patina::{UEFI_PAGE_MASK, error::EfiError, function};
 
 #[repr(C)]
 pub struct EfiMemoryAttributesProtocolImpl {
@@ -317,8 +317,8 @@ mod tests {
     };
 
     use patina::{
-        base::{UEFI_PAGE_SHIFT, align_up},
         pi::dxe_services::GcdMemoryType,
+        {UEFI_PAGE_SHIFT, align_up},
     };
     use std::{cell::RefCell, ptr, rc::Rc};
 

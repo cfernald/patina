@@ -666,7 +666,7 @@ pub(crate) fn build_test_hob_list(mem_size: u64) -> *const c_void {
             } as u64;
 
             // Make sure the memory region is aligned as needed.
-            address = patina::base::align_up(address, granularity).unwrap();
+            address = patina::align_up(address, granularity).unwrap();
             allocation_hob_template.alloc_descriptor.memory_base_address = address;
             allocation_hob_template.alloc_descriptor.memory_type = *memory_type;
             allocation_hob_template.alloc_descriptor.memory_length = granularity;
@@ -752,7 +752,7 @@ mod tests {
         test_support::{BootMode, HobHeader, MemoryAllocationHeader, get_memory, hob},
     };
     use patina::{
-        base::guid as base_guids,
+        guid as base_guids,
         pi::hob::{Hob::MemoryAllocationModule, ResourceDescriptorV2},
     };
 

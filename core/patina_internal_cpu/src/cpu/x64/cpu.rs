@@ -13,7 +13,7 @@ use crate::interrupts;
 use core::arch::asm;
 use patina::{
     arch as interrupts,
-    base::error::EfiError,
+    error::EfiError,
     pi::protocol::cpu_arch::{CpuFlushType, CpuInitType},
 };
 

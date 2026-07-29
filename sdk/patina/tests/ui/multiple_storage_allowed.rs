@@ -2,8 +2,8 @@
 //! Note: This should compile successfully.
 
 use patina::{
-    base::error::Result,
     component::{Storage, component},
+    error::Result,
 };
 
 pub struct TestComponent;

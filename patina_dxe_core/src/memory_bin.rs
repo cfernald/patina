@@ -27,10 +27,9 @@
 use crate::allocator::{DEFAULT_PAGE_ALLOCATION_GRANULARITY, RUNTIME_PAGE_ALLOCATION_GRANULARITY};
 use patina::standard::efi;
 use patina::{
-    base::{UEFI_PAGE_SHIFT, align_up},
     pi::hob::{self, EFiMemoryTypeInformation, Hob, HobList, MEMORY_TYPE_INFO_HOB_GUID},
     uefi::memory::{EFI_MAX_MEMORY_TYPE, INVALID_INFORMATION_INDEX},
-    uefi_pages_to_size, uefi_size_to_pages,
+    uefi_pages_to_size, uefi_size_to_pages, {UEFI_PAGE_SHIFT, align_up},
 };
 
 use alloc::vec::Vec;
@@ -939,7 +938,7 @@ pub(crate) fn extract_memory_type_info_from_hob(hob_list: &HobList) -> Option<Ve
 #[cfg_attr(coverage, coverage(off))]
 mod tests {
     use super::*;
-    use patina::base::{SIZE_64KB, UEFI_PAGE_SIZE};
+    use patina::{SIZE_64KB, UEFI_PAGE_SIZE};
 
     const RT_GRAN_PAGES: u64 =
         (MemoryBinManager::granularity_for_type(efi::RUNTIME_SERVICES_DATA) / UEFI_PAGE_SIZE) as u64;

@@ -29,10 +29,9 @@ use core::{
 use linked_list_allocator::{align_down_size, align_up_size};
 use patina::standard::efi;
 use patina::{
-    base::error::EfiError,
-    base::{UEFI_PAGE_SIZE, align_up, page_shift_from_alignment},
+    error::EfiError,
     pi::dxe_services::GcdMemoryType,
-    uefi_pages_to_size, uefi_size_to_pages, writelncrlf,
+    uefi_pages_to_size, uefi_size_to_pages, writelncrlf, {UEFI_PAGE_SIZE, align_up, page_shift_from_alignment},
 };
 
 /// Type for describing errors that this implementation can produce.
@@ -859,8 +858,7 @@ mod tests {
     use std::alloc::System;
 
     use patina::{
-        base::{SIZE_64KB, UEFI_PAGE_SHIFT, UEFI_PAGE_SIZE},
-        uefi_pages_to_size,
+        uefi_pages_to_size, {SIZE_64KB, UEFI_PAGE_SHIFT, UEFI_PAGE_SIZE},
     };
 
     use super::*;

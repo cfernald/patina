@@ -12,11 +12,11 @@
 use alloc::boxed::Box;
 use patina::standard::efi;
 use patina::{
-    base::error::{EfiError, Result},
     component::{
         component,
         service::{Service, perf_timer::ArchTimerFunctionality},
     },
+    error::{EfiError, Result},
     peripheral::serial::SerialIO,
     uefi::boot_services::{BootServices, StandardBootServices},
 };

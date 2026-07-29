@@ -161,19 +161,19 @@ Patina compiles all components into a single binary:
 # #[component]
 # impl MemoryManagerExampleComponent {
 #     fn new() -> Self { MemoryManagerExampleComponent }
-#    fn entry_point(self) -> patina::base::error::Result<()> { Ok(()) }
+#    fn entry_point(self) -> patina::error::Result<()> { Ok(()) }
 # }
 # pub struct SecurityPolicyExampleComponent;
 # #[component]
 # impl SecurityPolicyExampleComponent {
 #    fn new() -> Self { SecurityPolicyExampleComponent }
-#    fn entry_point(self) -> patina::base::error::Result<()> { Ok(()) }
+#    fn entry_point(self) -> patina::error::Result<()> { Ok(()) }
 # }
 # pub struct DeviceDriverExampleComponent;
 # #[component]
 # impl DeviceDriverExampleComponent {
 #    fn new() -> Self { DeviceDriverExampleComponent }
-#    fn entry_point(self) -> patina::base::error::Result<()> { Ok(()) }
+#    fn entry_point(self) -> patina::error::Result<()> { Ok(()) }
 # }
 # // Note: End mock types for compilation
 

@@ -24,10 +24,9 @@
 //! The implementation avoids heap allocations, using stack-allocated buffers for formatting.
 
 use patina::{
-    BinaryGuid, Guid, GuidError, OwnedGuid, base::guid::DXE_CORE_ID,
-    management_mode::guid::SMM_COMMUNICATION_PROTOCOL_GUID, performance::guid::PERFORMANCE_PROTOCOL_GUID,
-    pi::event::END_OF_DXE_EVENT_GROUP_GUID, pi::hob::MEMORY_TYPE_INFO_HOB_GUID,
-    uefi::event::EXIT_BOOT_SERVICES_FAILED_EVENT_GROUP_GUID,
+    BinaryGuid, Guid, GuidError, OwnedGuid, guid::DXE_CORE_ID, management_mode::guid::SMM_COMMUNICATION_PROTOCOL_GUID,
+    performance::guid::PERFORMANCE_PROTOCOL_GUID, pi::event::END_OF_DXE_EVENT_GROUP_GUID,
+    pi::hob::MEMORY_TYPE_INFO_HOB_GUID, uefi::event::EXIT_BOOT_SERVICES_FAILED_EVENT_GROUP_GUID,
 };
 
 /// The zero GUID (00000000-0000-0000-0000-000000000000).

@@ -14,7 +14,7 @@
 
 extern crate alloc;
 
-use patina::base::protocol::ProtocolInterface;
+use patina::protocol::ProtocolInterface;
 
 mod core;
 mod protocol;
