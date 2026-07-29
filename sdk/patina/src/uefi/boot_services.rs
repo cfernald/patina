@@ -6,7 +6,6 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 //!
-
 #[cfg(feature = "global_allocator")]
 pub mod global_allocator;
 
@@ -2061,6 +2060,8 @@ impl BootServices for StandardBootServices {
 #[cfg(test)]
 #[cfg_attr(coverage, coverage(off))]
 mod tests {
+    #![allow(static_mut_refs)]
+
     use crate::BinaryGuid;
     use c_ptr::CPtr;
     use efi::{Boolean, Char16, OpenProtocolInformationEntry, protocols::device_path};
