@@ -20,6 +20,8 @@ pub enum SmbiosError {
     StringTooLong,
     /// String contains null terminator (not allowed - terminators are added during serialization)
     StringContainsNull,
+    /// String contains a character that cannot be represented in Latin-1 (CHAR8)
+    StringNotLatin1,
     /// Empty string in string pool (consecutive null bytes)
     EmptyStringInPool,
 
@@ -90,6 +92,7 @@ impl From<SmbiosError> for patina::error::EfiError {
             // Invalid parameters map to INVALID_PARAMETER
             SmbiosError::StringTooLong
             | SmbiosError::StringContainsNull
+            | SmbiosError::StringNotLatin1
             | SmbiosError::EmptyStringInPool
             | SmbiosError::MalformedRecordHeader
             | SmbiosError::InvalidStringPoolTermination
@@ -125,6 +128,7 @@ mod tests {
         let errors = vec![
             SmbiosError::StringTooLong,
             SmbiosError::StringContainsNull,
+            SmbiosError::StringNotLatin1,
             SmbiosError::EmptyStringInPool,
             SmbiosError::RecordTooSmall,
             SmbiosError::MalformedRecordHeader,

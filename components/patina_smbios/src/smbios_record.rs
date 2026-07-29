@@ -237,10 +237,11 @@
 extern crate alloc;
 use crate::{
     error::SmbiosError,
-    service::{SMBIOS_HANDLE_PI_RESERVED, SmbiosTableHeader},
+    service::{SMBIOS_HANDLE_PI_RESERVED, SMBIOS_STRING_MAX_LENGTH, SmbiosTableHeader},
     smbios_types::*,
 };
 use alloc::{string::String, vec::Vec};
+use patina::{Char8String, StringError};
 
 /// Base trait for SMBIOS record structures
 ///
@@ -269,6 +270,44 @@ pub trait SmbiosRecordStructure {
 
     /// Get mutable access to the string pool
     fn string_pool_mut(&mut self) -> &mut Vec<String>;
+}
+
+/// Validates a string for use in an SMBIOS string pool.
+///
+/// # Errors
+///
+/// Returns [`SmbiosError::StringContainsNull`] if `s` contains a NUL character,
+/// [`SmbiosError::StringNotLatin1`] if `s` contains a code point above `U+00FF`, or
+/// [`SmbiosError::StringTooLong`] if the encoded string exceeds [`SMBIOS_STRING_MAX_LENGTH`].
+pub fn validate_smbios_string(s: &str) -> Result<(), SmbiosError> {
+    let char8_str = Char8String::try_from_str(s).map_err(|error| match error {
+        StringError::InteriorNul { .. } => SmbiosError::StringContainsNull,
+        _ => SmbiosError::StringNotLatin1,
+    })?;
+
+    if char8_str.len() > SMBIOS_STRING_MAX_LENGTH {
+        return Err(SmbiosError::StringTooLong);
+    }
+
+    Ok(())
+}
+
+/// Encodes `s` as SMBIOS string-pool bytes (`CHAR8` without a NUL terminator).
+///
+/// Each character is encoded as a single byte via [`Char8String::try_from_str`]. Because
+/// [`SmbiosRecordStructure::to_bytes`] cannot fail, a character that can't be represented (a NUL, or a
+/// code point above `U+00FF`) is replaced with `?` instead of rejecting the whole string.
+pub fn encode_smbios_string(s: &str) -> Vec<u8> {
+    match Char8String::try_from_str(s) {
+        Ok(char8_str) => char8_str.as_bytes().to_vec(),
+        Err(_) => s
+            .chars()
+            .map(|c| {
+                let value = c as u32;
+                if value == 0 || value > 0xFF { b'?' } else { value as u8 }
+            })
+            .collect(),
+    }
 }
 
 /// Type 0: Platform Firmware Information (BIOS Information)

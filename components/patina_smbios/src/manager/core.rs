@@ -172,7 +172,7 @@ impl SmbiosManager {
     /// Validate a string for use in SMBIOS records
     ///
     /// Ensures the string meets SMBIOS specification requirements:
-    /// - Does not exceed SMBIOS_STRING_MAX_LENGTH (64 bytes)
+    /// - Can be encoded as Latin-1 (CHAR8) and does not exceed SMBIOS_STRING_MAX_LENGTH (64 bytes)
     /// - Does not contain null terminators (they are added during serialization)
     ///
     /// # Arguments
@@ -183,14 +183,7 @@ impl SmbiosManager {
     ///
     /// Returns `Ok(())` if valid, or an appropriate error if validation fails
     pub(super) fn validate_string(s: &str) -> Result<(), SmbiosError> {
-        if s.len() > SMBIOS_STRING_MAX_LENGTH {
-            return Err(SmbiosError::StringTooLong);
-        }
-        // Strings must NOT contain null terminators - they are added during serialization
-        if s.bytes().any(|b| b == 0) {
-            return Err(SmbiosError::StringContainsNull);
-        }
-        Ok(())
+        crate::smbios_record::validate_smbios_string(s)
     }
 
     /// Efficiently validate string pool format and count strings in a single pass
@@ -261,7 +254,7 @@ impl SmbiosManager {
     /// # Errors
     ///
     /// Returns the same errors as `validate_and_count_strings` if the pool format is invalid.
-    pub(super) fn parse_strings_from_pool(string_pool_area: &[u8]) -> Result<Vec<&str>, SmbiosError> {
+    pub(super) fn parse_strings_from_pool(string_pool_area: &[u8]) -> Result<Vec<String>, SmbiosError> {
         // First validate the pool
         Self::validate_and_count_strings(string_pool_area)?;
 
@@ -275,13 +268,14 @@ impl SmbiosManager {
         // Remove the final double-null terminator and split by null bytes
         let data_without_terminator = &string_pool_area[..len - 2];
 
-        // Split by null bytes and convert to &str slices
-        let strings: Result<Vec<&str>, _> = data_without_terminator
+        // Split by null bytes and decode each segment so every byte maps directly onto its
+        // Unicode scalar value.
+        let strings = data_without_terminator
             .split(|&b| b == 0)
-            .map(|bytes| core::str::from_utf8(bytes).map_err(|_| SmbiosError::MalformedRecordHeader))
+            .map(|bytes| bytes.iter().map(|&b| b as char).collect())
             .collect();
 
-        strings
+        Ok(strings)
     }
 
     /// This function is called when the request handle is NOT FFFE.
@@ -661,10 +655,7 @@ impl SmbiosManager {
         // Extract existing strings from the string pool using the helper function
         let string_pool_start = header_length;
         let string_pool = &record.data[string_pool_start..];
-        let existing_strings_refs = Self::parse_strings_from_pool(string_pool)?;
-
-        // Convert to owned strings so we can modify them
-        let mut existing_strings: Vec<String> = existing_strings_refs.iter().map(|s| String::from(*s)).collect();
+        let mut existing_strings = Self::parse_strings_from_pool(string_pool)?;
 
         // Validate that we have enough strings
         if string_number > existing_strings.len() {
@@ -683,7 +674,7 @@ impl SmbiosManager {
 
         // Rebuild the string pool
         for s in &existing_strings {
-            new_data.extend_from_slice(s.as_bytes());
+            new_data.extend_from_slice(&crate::smbios_record::encode_smbios_string(s));
             new_data.push(0); // Null terminator
         }
 
@@ -868,12 +859,15 @@ mod tests {
         assert!(SmbiosManager::validate_string("Valid-String_With.Symbols").is_ok());
         let max_string = "a".repeat(SMBIOS_STRING_MAX_LENGTH);
         assert!(SmbiosManager::validate_string(&max_string).is_ok());
+        let max_latin1_string = "é".repeat(SMBIOS_STRING_MAX_LENGTH);
+        assert!(SmbiosManager::validate_string(&max_latin1_string).is_ok());
 
         // Error cases
         let long_string = "a".repeat(SMBIOS_STRING_MAX_LENGTH + 1);
         assert_eq!(SmbiosManager::validate_string(&long_string), Err(SmbiosError::StringTooLong));
         assert_eq!(SmbiosManager::validate_string("test\0string"), Err(SmbiosError::StringContainsNull));
         assert_eq!(SmbiosManager::validate_string("before\0after"), Err(SmbiosError::StringContainsNull));
+        assert_eq!(SmbiosManager::validate_string("emoji \u{1F600}"), Err(SmbiosError::StringNotLatin1));
     }
 
     #[test]
@@ -1117,6 +1111,32 @@ mod tests {
         manager.update_string(handle, 2, "new_second_string").expect("update failed");
         assert!(manager.update_string(handle, 1, "new_first").is_ok());
         assert!(manager.update_string(handle, 3, "new_third").is_ok());
+    }
+
+    #[test]
+    fn test_update_string_latin1_from_string_pool() {
+        // Strings containing Latin-1 supplement characters (U+0080..=U+00FF) must be encoded as
+        // a single byte each (not multi-byte UTF-8), and must be readable back from the string pool.
+        let manager = SmbiosManager::new(3, 9).expect("failed to create manager");
+        let mut record_data = vec![1u8, 4, 0, 0];
+        record_data.extend_from_slice(b"placeholder\0\0");
+        let handle = manager.add_from_bytes(None, &record_data).expect("add failed");
+
+        manager.update_string(handle, 1, "café").expect("update failed");
+
+        let pos = manager.records.borrow().iter().position(|r| r.header.handle == handle).unwrap();
+        let records = manager.records.borrow();
+        let header_length = records[pos].header.length as usize;
+        let string_pool = &records[pos].data[header_length..];
+
+        assert_eq!(string_pool, [b'c', b'a', b'f', 0xE9, 0, 0]);
+
+        // Reading the string backmust decode the extended character correctly.
+        let parsed = SmbiosManager::parse_strings_from_pool(string_pool).expect("parse failed");
+        assert_eq!(parsed, vec!["café"]);
+        drop(records);
+
+        assert!(manager.update_string(handle, 1, "resume").is_ok());
     }
 
     #[test]

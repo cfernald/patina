@@ -10,13 +10,13 @@
 use alloc::vec::Vec;
 use core::{mem, ptr};
 
-use patina::{BinaryGuid, uefi::runtime_services::RuntimeServices};
+use patina::{BinaryGuid, Char16Str, uefi::runtime_services::RuntimeServices};
 
 /// Return the address where the FBPT has been allocated during the previous boot.
 pub(crate) fn find_previous_table_address(runtime_services: &impl RuntimeServices) -> Option<usize> {
     runtime_services
         .get_variable::<FirmwarePerformanceVariable>(
-            &[0],
+            Char16Str::EMPTY,
             &FirmwarePerformanceVariable::ADDRESS_VARIABLE_GUID,
             Some(mem::size_of::<FirmwarePerformanceVariable>()),
         )
@@ -61,7 +61,7 @@ mod tests {
             .expect_get_variable::<FirmwarePerformanceVariable>()
             .once()
             .withf(|name, namespace, size_hint| {
-                assert_eq!(&[0], name);
+                assert_eq!(Char16Str::EMPTY, name);
                 assert_eq!(&FirmwarePerformanceVariable::ADDRESS_VARIABLE_GUID, namespace);
                 assert_eq!(&Some(16), size_hint);
                 true
