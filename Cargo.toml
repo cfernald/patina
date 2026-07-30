@@ -6,10 +6,13 @@ members = ["components/*", "core/*", "sdk/*", "patina_dxe_core"]
 version = "22.2.4"
 license = "Apache-2.0"
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.90"
 repository = "https://github.com/OpenDevicePartnership/patina"
 
 [workspace.dependencies]
+# alloc-no-stdlib is pinned to the 2.x because brotli-decompressor 5.0.3 (the latest release)
+# requires `alloc-no-stdlib = ">=2.0.4, <3"`. Bumping to 3.x causes two incompatible copies of
+# alloc-no-stdlib to appear in the dependency graph. Revisit once brotli-decompressor supports 3.x.
 alloc-no-stdlib = { version = "2.0" }
 arm-gic = { version = "0.8.1" }
 safe-mmio = { version = "0.3.0" }
@@ -50,7 +53,7 @@ quote = { version = "1" }
 r-efi = { version = "7", default-features = false }
 scroll = { version = "0.13", default-features = false, features = ["derive"]}
 spin = { version = "0.12" }
-syn = { version = "2" }
+syn = { version = "3" }
 uart_16550 = { version = "0.3.2" }
 corosensei = { version = "0.3.4", default-features = false }
 uuid = { version = "1.23", default-features = false }
@@ -60,11 +63,9 @@ zerocopy-derive = { version = "0.8" }
 # dev dependencies
 criterion = { version = "0.8" }
 env_logger = "0.11"
-mockall = { version = "0.14.0" }
+mockall = { version = "0.15.0" }
 rand = { version = "0.10" }
-# ruint ~1.17 is used right now because 1.18.0 has a MSRV of Rust 1.90.
-# This can be updated when the Patina MSRV is updated to 1.90+.
-ruint = { version = "~1.17" }
+ruint = { version = "1.20" }
 serial_test = { version = "3.5" }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_yaml = { version = "0.9" }

@@ -9,7 +9,7 @@
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{FnArg, ImplItem, ItemFn, ItemImpl, Pat, Type, TypePath, parse2, spanned::Spanned};
+use syn::{FnArg, FnModifiers, ImplItem, ItemFn, ItemImpl, Pat, Type, TypePath, parse2, spanned::Spanned};
 
 /// Validates component impl blocks with a unified `#[component]` attribute.
 ///
@@ -105,6 +105,7 @@ fn validate_component_impl_block(impl_block: ItemImpl) -> TokenStream {
     let item_fn = ItemFn {
         attrs: entry_point.attrs.clone(),
         vis: entry_point.vis.clone(),
+        modifiers: FnModifiers::default(),
         sig: entry_point.sig.clone(),
         block: Box::new(entry_point.block.clone()),
     };
