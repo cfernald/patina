@@ -21,7 +21,10 @@ extern crate alloc;
 mod base;
 pub use base::*;
 pub use guid::{BinaryGuid, Guid, GuidError, OwnedGuid};
-pub use string::{Char8Array, Char8Str, Char8String, Char16Array, Char16Str, Char16String, StringError};
+pub use string::{Char8Array, Char8Str, Char16Array, Char16Str, StringError};
+
+#[cfg(any(test, feature = "alloc"))]
+pub use base::string::{Char8String, Char16String};
 
 pub mod arch;
 #[cfg(any(test, feature = "alloc"))]
