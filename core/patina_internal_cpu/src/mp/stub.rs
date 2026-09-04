@@ -12,35 +12,55 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-use patina::{
-    component::service::{memory::MemoryManager, perf_timer::ArchTimerFunctionality},
-    error::EfiError,
-};
+use core::num::NonZeroUsize;
 
-use super::{ApWorkItem, MpDispatcher, MpHandOffInfo, ProcessorState};
+use patina::{component::service::perf_timer::ArchTimerFunctionality, error::EfiError};
+
+use super::{ApWorkItem, MpDispatcher, MpHandOffInfo, Processor, ProcessorState};
 
 /// An MP manager placeholder for architectures without AP startup support. It's construction
 /// will always fail so its functions are not reachable. It is a empty enum so it can't be instantiated.
 pub enum MpSupport {}
 
-impl MpDispatcher for MpSupport {
-    fn initialize(
-        _mm: &dyn MemoryManager,
+/// Placeholder processor context for architectures without MP support.
+#[derive(Default)]
+pub struct ApContext;
+
+impl ApContext {
+    /// No AP stack is required because this implementation cannot start APs.
+    pub const STACK_SIZE: usize = 0;
+
+    /// Records an AP stack for a future architecture implementation.
+    ///
+    /// # Safety
+    ///
+    /// The stack must remain valid for the lifetime of the MP subsystem.
+    pub unsafe fn set_stack_top(&mut self, _stack_top: NonZeroUsize) -> Result<(), EfiError> {
+        Ok(())
+    }
+}
+
+impl MpSupport {
+    /// Reports that MP startup is not implemented for this architecture.
+    pub fn initialize(
+        _contexts: &'static [ApContext],
         _timer: &'static dyn ArchTimerFunctionality,
         _handoff: Option<MpHandOffInfo<'_>>,
     ) -> Result<Self, EfiError> {
         Err(EfiError::Unsupported)
     }
+}
 
-    fn processor_count(&self) -> usize {
+impl MpDispatcher for MpSupport {
+    fn ap_count(&self) -> usize {
         unreachable!();
     }
 
-    fn started_processor_count(&self) -> usize {
+    fn started_ap_count(&self) -> usize {
         unreachable!()
     }
 
-    fn enabled_processor_count(&self) -> usize {
+    fn enabled_ap_count(&self) -> usize {
         unreachable!()
     }
 
@@ -52,11 +72,15 @@ impl MpDispatcher for MpSupport {
         unreachable!()
     }
 
-    fn who_am_i(&self) -> Option<usize> {
+    fn who_am_i(&self) -> Option<Processor> {
         unreachable!();
     }
 
-    fn processor_id(&self, _index: usize) -> Option<u32> {
+    fn bsp_processor_id(&self) -> u32 {
+        unreachable!();
+    }
+
+    fn ap_processor_id(&self, _index: usize) -> Option<u32> {
         unreachable!();
     }
 

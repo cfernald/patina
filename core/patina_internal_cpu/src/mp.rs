@@ -11,11 +11,7 @@
 
 use core::ffi::c_void;
 
-use patina::{
-    component::service::{memory::MemoryManager, perf_timer::ArchTimerFunctionality},
-    error::EfiError,
-    standard::efi::protocols::mp_services::ApProcedure,
-};
+use patina::standard::efi::protocols::mp_services::ApProcedure;
 
 #[cfg(target_arch = "x86_64")] // Will use for aarch64 too.
 mod control;
@@ -25,10 +21,10 @@ mod x64;
 
 cfg_if::cfg_if! {
     if #[cfg(target_arch = "x86_64")] {
-        pub use x64::MpSupport;
+        pub use x64::{ApContext, MpSupport};
     } else {
         mod stub;
-        pub use stub::MpSupport;
+        pub use stub::{ApContext, MpSupport};
     }
 }
 
@@ -44,6 +40,15 @@ pub enum ProcessorState {
     /// Excluded from dispatch, either by request or after failing to complete a
     /// prior dispatch within its timeout.
     Disabled,
+}
+
+/// Identity of a processor known to the MP dispatcher.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Processor {
+    /// The bootstrap processor.
+    Bsp,
+    /// An application processor identified by its zero-based AP index.
+    Ap(usize),
 }
 
 /// PEI-to-DXE handoff record for a single logical processor.
@@ -75,50 +80,35 @@ pub struct MpHandOffInfo<'a> {
     pub processors: &'a [ProcessorHandOff],
 }
 
-/// Architecture abstraction interface for the multiprocessor management.
-///
-/// An implementation owns all per-processor state and the architecture-specific
-/// startup mechanism.
+/// Architecture abstraction interface for multiprocessor management.
 pub trait MpDispatcher: Sized {
-    /// Index of the Bootstrap Processor (BSP) in the processor array.
-    const BSP_INDEX: usize = 0;
+    /// Number of application processors known to the dispatcher.
+    fn ap_count(&self) -> usize;
 
-    /// Creates a new instance of the MP manager, bringing the Application
-    /// Processors online.
-    ///
-    /// `handoff` optionally provides information about live processors for
-    /// the dispatcher to wake.
-    ///
-    fn initialize(
-        mm: &dyn MemoryManager,
-        timer: &'static dyn ArchTimerFunctionality,
-        handoff: Option<MpHandOffInfo<'_>>,
-    ) -> Result<Self, EfiError>;
+    /// Number of application processors that have reported as started.
+    fn started_ap_count(&self) -> usize;
 
-    /// Total number of processors (BSP + APs).
-    fn processor_count(&self) -> usize;
-
-    /// Number of processors (including the BSP) that have reported as started.
-    fn started_processor_count(&self) -> usize;
-
-    /// Number of processors (including the BSP) that are started and not disabled.
-    fn enabled_processor_count(&self) -> usize;
+    /// Number of application processors that are started and not disabled.
+    fn enabled_ap_count(&self) -> usize;
 
     /// Enables or disables the AP at `index` for dispatch, optionally recording a
-    /// new health status. Returns `false` for an out-of-range index or the BSP.
+    /// new health status. Returns `false` for an out-of-range AP index.
     ///
     /// Disabling an AP that is still running a dispatch fences it off immediately;
     /// it becomes eligible again only if it is re-enabled *and* its work completes.
     fn set_ap_enabled(&self, index: usize, enabled: bool, healthy: Option<bool>) -> bool;
 
-    /// Whether the processor at `index` is currently considered healthy.
+    /// Whether the AP at `index` is currently considered healthy.
     fn ap_healthy(&self, index: usize) -> bool;
 
-    /// Processor index of the calling processor.
-    fn who_am_i(&self) -> Option<usize>;
+    /// Identity of the calling processor.
+    fn who_am_i(&self) -> Option<Processor>;
 
-    /// Architectural processor ID recorded for `index`.
-    fn processor_id(&self, index: usize) -> Option<u32>;
+    /// Architectural processor ID of the BSP.
+    fn bsp_processor_id(&self) -> u32;
+
+    /// Architectural processor ID recorded for the AP at `index`.
+    fn ap_processor_id(&self, index: usize) -> Option<u32>;
 
     /// Whether the AP at `index` has completed the dispatch identified by `work_id`
     /// (as returned by [`MpDispatcher::signal_ap`]).

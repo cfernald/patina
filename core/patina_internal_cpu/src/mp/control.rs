@@ -162,11 +162,6 @@ impl ApStateMachine {
         self.transition(RunState::NotStarted, RunState::Idle, Ordering::Release).then_some(ApConsumer { sm: self })
     }
 
-    /// Marks the BSP's own context as started.
-    pub(crate) fn claim_as_bsp(&self) -> bool {
-        self.start().is_some()
-    }
-
     /// Publishes `work` to this processor, returning the id identifying the dispatch.
     ///
     /// Callers must serialize dispatches against one another: the work slot is
@@ -307,16 +302,6 @@ mod tests {
         let sm = ApStateMachine::new();
         let _ap = sm.start().expect("a fresh machine can be started");
         // A second processor reaching the same context gets nothing to drive it with.
-        assert!(sm.start().is_none());
-    }
-
-    #[test]
-    fn claim_as_bsp_takes_the_context_once() {
-        let sm = ApStateMachine::new();
-        assert!(sm.claim_as_bsp());
-        assert_eq!(sm.state(), ProcessorState::Ready);
-        // Nothing else can then join and start driving the BSP's context.
-        assert!(!sm.claim_as_bsp());
         assert!(sm.start().is_none());
     }
 
