@@ -130,7 +130,7 @@ struct MpHandOffHeader {
     cpu_count: u32,
 }
 
-/// Parsed EDK II `MP_HAND_OFF` (`gMpHandOffGuid`): the per-processor PEI-to-DXE
+/// Parsed EDK2 `MP_HAND_OFF` (`gMpHandOffGuid`): the per-processor PEI-to-DXE
 /// handoff records for the processor range this HOB instance describes.
 pub(super) struct MpHandOff {
     processor_index: usize,

@@ -10,6 +10,6 @@
 
 ap_exception_halt:
     cli
-.Lhalt:
+halt_loop:
     hlt
-    jmp .Lhalt
+    jmp halt_loop

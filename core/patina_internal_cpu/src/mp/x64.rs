@@ -165,7 +165,7 @@ impl MpSupport {
         Some(Self { processor_count, contexts, timer, perf_frequency, shutting_down: AtomicBool::new(false) })
     }
 
-    /// Resturns an iterator of AP contexts, skipping the BSP.
+    /// Returns an iterator of AP contexts, skipping the BSP.
     fn ap_iter(&self) -> impl Iterator<Item = &ApContext> {
         self.contexts.iter().skip(1)
     }
@@ -204,7 +204,7 @@ impl MpSupport {
 
     /// Spins until `done` returns true or `timeout_us` microseconds elapse.
     #[inline(never)]
-    fn spin_for(&self, timeout_us: u64, mut done: impl FnMut() -> bool) -> bool {
+    fn try_for(&self, timeout_us: u64, mut done: impl FnMut() -> bool) -> bool {
         let ticks = timeout_us.saturating_mul(self.perf_frequency.get()) / 1_000_000;
         let start = self.timer.cpu_count();
         while self.timer.cpu_count().wrapping_sub(start) < ticks {
@@ -216,12 +216,8 @@ impl MpSupport {
         done()
     }
 
-    fn spin_delay(&self, delay_us: u64) {
-        let ticks = delay_us.saturating_mul(self.perf_frequency.get()) / 1_000_000;
-        let start = self.timer.cpu_count();
-        while self.timer.cpu_count().wrapping_sub(start) < ticks {
-            core::hint::spin_loop();
-        }
+    fn delay(&self, delay_us: u64) {
+        self.try_for(delay_us, || false);
     }
 
     /// Halts the calling AP permanently. Only reached before ExitBootServices, when
@@ -257,7 +253,7 @@ impl MpSupport {
             }
             return true;
         }
-        if self.spin_for(timeout_us as u64, || ctx.sm.is_finished(work_id)) {
+        if self.try_for(timeout_us as u64, || ctx.sm.is_finished(work_id)) {
             return true;
         }
         // On timeout the AP is still working (unavailable); report success only if it
@@ -426,7 +422,7 @@ impl MpDispatcher for MpSupport {
         }
 
         // Wait for all APs to migrate into the dispatch loop.
-        mp.spin_for(AP_STARTUP_TIMEOUT_US, || mp.started_processor_count().saturating_sub(1) >= ap_count);
+        mp.try_for(AP_STARTUP_TIMEOUT_US, || mp.started_processor_count().saturating_sub(1) >= ap_count);
         let started_count = mp.started_processor_count().saturating_sub(1);
         let ap_start_time = (timer.cpu_count().saturating_sub(start_timestamp) * 1_000_000) / perf_frequency.get();
 
@@ -506,10 +502,10 @@ impl MpDispatcher for MpSupport {
         // it is exactly where the OS's INIT-SIPI-SIPI bring-up expects it.
         self.begin_shutdown();
         apic::send_init_all_excluding_self();
-        if !self.spin_for(INIT_DELIVERY_TIMEOUT_US, apic::init_delivery_complete) {
+        if !self.try_for(INIT_DELIVERY_TIMEOUT_US, apic::init_delivery_complete) {
             log::warn!("Timed out waiting for the local APIC to send terminal INIT");
         }
-        self.spin_delay(INIT_SETTLE_US);
+        self.delay(INIT_SETTLE_US);
     }
 
     fn sync_ap(&self, index: usize) -> Option<u64> {

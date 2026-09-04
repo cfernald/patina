@@ -28,23 +28,23 @@ ap_entry_64:
     mov ecx, 0x1B
     rdmsr
     test eax, (1 << 10)
-    jnz .Lx2apic_id
+    jnz x2apic_id
 
     # xAPIC mode
     mov eax, 1
     cpuid
     shr ebx, 24
     mov eax, ebx
-    jmp .Lgot_apic_id
+    jmp got_apic_id
 
-.Lx2apic_id:
+x2apic_id:
     # x2APIC mode.
     mov eax, 0xB
     xor ecx, ecx
     cpuid
     mov eax, edx
 
-.Lgot_apic_id:
+got_apic_id:
     # EAX = APIC ID. Save in EDX.
     mov edx, eax
 
@@ -59,19 +59,19 @@ ap_entry_64:
     # EDX = APIC ID
     # RSI = AP_CONTEXTS pointer
     # R8D = AP_CONTEXT_COUNT
-.Lsearch_loop:
+search_loop:
     cmp ecx, r8d
-    jae .Lbounds_halt
+    jae bounds_halt
 
     # Calculate entry address: AP_CONTEXTS + AP_CONTEXT_COUNT * AP_CONTEXT_SIZE
     mov rdi, rcx
     imul rdi, {ap_context_size}
     cmp dword ptr [rsi + rdi + {ap_ctx_apic_off}], edx
-    je .Lfound_id
+    je found_id
     inc ecx
-    jmp .Lsearch_loop
+    jmp search_loop
 
-.Lfound_id:
+found_id:
     # ECX = processor number (index)
     # EDX = APIC ID
     # RSI = AP_CONTEXTS pointer
@@ -84,12 +84,12 @@ ap_entry_64:
     lgdt [rip + AP_BSP_GDTR]
 
     # Reload CS via far return.
-    lea rax, [rip + .Lbsp_gdt_loaded]
+    lea rax, [rip + bsp_gdt_loaded]
     push {bsp_code64_sel}
     push rax
     retfq
 
-.Lbsp_gdt_loaded:
+bsp_gdt_loaded:
     # Reload data segments with BSP's data64 selector.
     mov ax, {bsp_data64_sel}
     mov ds, ax
@@ -110,7 +110,7 @@ ap_entry_64:
 
     # If the AP entry point ever returns, halt permanently.
 
-.Lbounds_halt:
+bounds_halt:
     cli
     hlt
-    jmp .Lbounds_halt
+    jmp bounds_halt

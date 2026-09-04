@@ -4,7 +4,7 @@
 //! Processors online via the CPU crate's MP subsystem, parks them at
 //! ExitBootServices, and installs the EFI_MP_SERVICES_PROTOCOL. The rusty backing
 //! state lives in the `services` submodule, the ABI wrapper in `protocol`, and
-//! the `MpInformation2` HOB parser in `hob`.
+//! the HOB parsers in `hob`.
 //!
 //! ## License
 //!
@@ -163,6 +163,7 @@ impl MpServicesProtocolInstaller {
             )
             .inspect_err(|e| log::error!("Failed to create MP notification timer event: {e:?}"))?;
 
+        // Set a timer callback to poll for non-blocking dispatches.
         bs.set_timer(timer_event, EventTimerType::Periodic, NOTIFICATION_POLL_PERIOD)
             .inspect_err(|e| log::error!("Failed to arm MP notification timer: {e:?}"))?;
 
@@ -175,7 +176,6 @@ impl MpServicesProtocolInstaller {
     }
 }
 
-/// Periodic timer callback used to process non-blocking dispatches.
 extern "efiapi" fn poll_mp_notifications(_event: efi::Event, services: &'static MpServices) {
     services.poll_notifications();
 }
@@ -183,13 +183,11 @@ extern "efiapi" fn poll_mp_notifications(_event: efi::Event, services: &'static 
 extern "efiapi" fn mark_mp_ready_to_boot(_event: efi::Event, services: &'static MpServices) {
     services.mark_ready_to_boot();
 }
-/// ExitBootServices callback to park all APs.
 extern "efiapi" fn park_aps_on_exit(_event: efi::Event, services: &'static MpServices) {
     services.park();
     log::info!("MP Services: APs parked for ExitBootServices");
 }
 
-/// Cache-attribute-change callback that re-synchronizes AP MTRRs to the BSP.
 extern "efiapi" fn sync_mtrrs_on_cache_change(_event: efi::Event, services: &'static MpServices) {
     services.synchronize();
 }
