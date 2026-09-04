@@ -225,7 +225,7 @@ created and the protocol is installed on the new handle. The behavior of this fu
 [EFI_BOOT_SERVICES.InstallProtocolInterface()](https://uefi.org/specs/UEFI/2.10_A/07_Services_Boot_Services.html#efi-boot-services-installprotocolinterface).
 
 If the installation succeeds, a vector of `ProtocolNotify` objects is returned, and these objects contain the `events`
-that should be signalled to notify registered listeners that a new protocol has arrived (see:
+that should be signaled to notify registered listeners that a new protocol has arrived (see:
 [Signaling an Event](events.md#signaling-an-event)). The protocol database manages the set of registered listeners and
 constructs the vector so that only those events that match a registered notification listener matching the installed
 `guid` are returned.
@@ -329,7 +329,7 @@ To register for notification on protocol installation, call the `register_protoc
 `protocol` GUID and an `event` to be signaled. The protocol database will track registered listeners, and when a new
 protocol is installed that matches the `protocol` GUID that was registered is installed via
 [`install_protocol`](protocol_database.md#protocol-installation),  `install_protocol` will return the corresponding
-event that can be signalled to indicate that the protocol has been installed. Any number of separate registrations may
+event that can be signaled to indicate that the protocol has been installed. Any number of separate registrations may
 be added to the protocol database, and all events matching a given installation event will be returned whenever an
 installation occurs. `register_protocol_notify` will return a `registration key` which can be used to identify the
 registration. [^register_protocol_notify]
@@ -465,7 +465,7 @@ are re-connected to the controller.
 
 ### Protocol Notification
 
-The `register_protocol_notify` function registers an event to be signalled on installation of a new protocol. This
+The `register_protocol_notify` function registers an event to be signaled on installation of a new protocol. This
 function implements the
 [EFI_BOOT_SERVICES.RegisterProtocolNotify()](https://uefi.org/specs/UEFI/2.10_A/07_Services_Boot_Services.html#efi-boot-services-registerprotocolnotify)
 API. It is a simple wrapper around the protocol database

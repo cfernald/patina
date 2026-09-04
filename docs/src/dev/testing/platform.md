@@ -71,7 +71,7 @@ is the default trigger.
 
 #### Event
 
-These tests are triggered when a given event group GUID is signalled. A separate `on` attribute is used to indicate
+These tests are triggered when a given event group GUID is signaled. A separate `on` attribute is used to indicate
 this, e.g.:
 
 ```rust
@@ -84,7 +84,7 @@ use patina_test::{error::Result, patina_test};
 fn my_test() -> Result { todo!() }
 ```
 
-These tests will be executed every time the event group is signalled.
+These tests will be executed every time the event group is signaled.
 
 #### Timer
 
