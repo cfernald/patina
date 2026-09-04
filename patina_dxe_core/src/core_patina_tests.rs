@@ -10,5 +10,7 @@
 //!
 
 mod audit_tests;
+#[cfg(feature = "mp_services")]
+mod mp_services_tests;
 mod stability_tests;
 mod test_support;

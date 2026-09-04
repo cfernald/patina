@@ -12,11 +12,15 @@ mod cpu_arch_protocol;
 mod efi_cpu;
 #[cfg(all(target_os = "uefi", target_arch = "aarch64"))]
 mod hw_interrupt_protocol;
+#[cfg(feature = "mp_services")]
+mod mp_services;
 mod perf_timer;
 
 pub(crate) use cpu_arch_protocol::{CpuArchProtocolInstaller, DxeInterruptManager};
 #[cfg(all(target_os = "uefi", target_arch = "aarch64"))]
 pub(crate) use hw_interrupt_protocol::HwInterruptProtocolInstaller;
+#[cfg(feature = "mp_services")]
+pub(crate) use mp_services::MpServicesProtocolInstaller;
 pub(crate) use perf_timer::PerfTimer;
 
 use efi_cpu::EfiCpu;
