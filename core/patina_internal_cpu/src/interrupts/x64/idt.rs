@@ -74,6 +74,12 @@ fn get_vector_address(index: usize) -> u64 {
 
 static IDT: StaticIdt = StaticIdt(UnsafeCell::new(Idt { entries: [IdtEntry::empty(); 256] }));
 
+/// Base address and limit of the IDT this module owns, for callers that need to
+/// load it on another processor.
+pub(crate) fn descriptor() -> (u64, u16) {
+    (IDT.0.get() as u64, (core::mem::size_of::<Idt>() - 1) as u16)
+}
+
 pub fn initialize_idt() {
     let cs = crate::gdt::CODE_SELECTOR;
     // SAFETY: There is only path to access the IDT and it is not possible to have concurrent access.
@@ -93,7 +99,8 @@ pub fn initialize_idt() {
     assert!((IDT.0.get() as usize) < SIZE_4GB, "IDT above 4GB, MP services will fail");
     #[cfg(target_os = "uefi")]
     {
-        let idtr = Idtr { limit: (core::mem::size_of::<Idt>() - 1) as u16, base: IDT.0.get() as u64 };
+        let (base, limit) = descriptor();
+        let idtr = Idtr { limit, base };
         // SAFETY: Loading our fully initialized IDT.
         unsafe { core::arch::asm!("lidt [{}]", in(reg) core::ptr::addr_of!(idtr), options(nostack)) };
     }
