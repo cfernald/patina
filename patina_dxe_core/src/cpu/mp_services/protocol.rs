@@ -168,8 +168,10 @@ impl MpProtocolWrapper {
         let Some(svc) = (unsafe { Self::services(this) }) else {
             return efi::Status::INVALID_PARAMETER;
         };
-        let total = svc.total_processors();
-        let enabled = svc.enabled_processors();
+        let (total, enabled) = match svc.processor_counts() {
+            Ok(counts) => counts,
+            Err(e) => return e.into(),
+        };
         // SAFETY: Caller guarantees both pointers are valid and writable.
         unsafe {
             number_of_processors.write(total);

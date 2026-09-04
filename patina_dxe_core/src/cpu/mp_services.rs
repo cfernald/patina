@@ -170,14 +170,17 @@ impl MpServicesProtocolInstaller {
         services.synchronize();
 
         // Create park event for EBS so that APs are parked before the OS takes over.
-        bs.create_event_ex(
+        if let Err(e) = bs.create_event_ex(
             EventType::NOTIFY_SIGNAL,
             Tpl::CALLBACK,
             Some(park_aps_on_exit),
             services,
             &efi::EVENT_GROUP_EXIT_BOOT_SERVICES,
-        )
-        .inspect_err(|e| log::error!("Failed to register MP AP-park event: {e:?}"))?;
+        ) {
+            log::error!("Failed to register MP AP-park event: {e:?}");
+            services.park();
+            return Err(e.into());
+        }
 
         bs.create_event_ex(
             EventType::NOTIFY_SIGNAL,

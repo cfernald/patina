@@ -11,7 +11,7 @@
 //!
 
 use core::ffi::c_void;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use patina::standard::efi;
 use patina::standard::efi::protocols::mp_services;
@@ -24,6 +24,27 @@ extern "efiapi" fn increment_counter(arg: *mut c_void) {
     // SAFETY: The test passes the address of a live `AtomicUsize` as the argument.
     let counter = unsafe { &*(arg as *const AtomicUsize) };
     counter.fetch_add(1, Ordering::SeqCst);
+}
+
+struct BspOnlyQueryProbe {
+    protocol: *mut mp_services::Protocol,
+    count_rejected: AtomicBool,
+    info_rejected: AtomicBool,
+}
+
+extern "efiapi" fn call_bsp_only_queries(arg: *mut c_void) {
+    // SAFETY: The blocking test passes a live `BspOnlyQueryProbe` as the argument.
+    let probe = unsafe { &*(arg as *const BspOnlyQueryProbe) };
+    let mut total = 0;
+    let mut enabled = 0;
+    // SAFETY: The protocol and output pointers remain valid until the blocking dispatch returns.
+    let status = unsafe { ((*probe.protocol).get_number_of_processors)(probe.protocol, &mut total, &mut enabled) };
+    probe.count_rejected.store(status == efi::Status::DEVICE_ERROR, Ordering::SeqCst);
+
+    let mut info = core::mem::MaybeUninit::<mp_services::ProcessorInformation>::zeroed();
+    // SAFETY: The protocol and output pointers remain valid until the blocking dispatch returns.
+    let status = unsafe { ((*probe.protocol).get_processor_info)(probe.protocol, 0, info.as_mut_ptr()) };
+    probe.info_rejected.store(status == efi::Status::DEVICE_ERROR, Ordering::SeqCst);
 }
 
 // No-op notify for the waitable event used by the non-blocking dispatch test.
@@ -64,6 +85,36 @@ fn mp_services_bsp_who_am_i(bs: StandardBootServices) -> patina_test::error::Res
     let status = unsafe { (protocol.who_am_i)(protocol_ptr, &mut index) };
     u_assert_eq!(status, efi::Status::SUCCESS, "who_am_i failed");
     u_assert_eq!(index, 0, "who_am_i did not return BSP index 0");
+
+    Ok(())
+}
+
+#[patina_test]
+fn mp_services_bsp_only_queries_reject_ap_callers(bs: StandardBootServices) -> patina_test::error::Result {
+    let protocol = locate_protocol(&bs)?;
+    let protocol_ptr: *mut mp_services::Protocol = protocol;
+    let probe = BspOnlyQueryProbe {
+        protocol: protocol_ptr,
+        count_rejected: AtomicBool::new(false),
+        info_rejected: AtomicBool::new(false),
+    };
+
+    // SAFETY: `protocol_ptr` is valid and this blocking call keeps `probe` alive
+    // until the AP procedure returns.
+    let status = unsafe {
+        (protocol.startup_this_ap)(
+            protocol_ptr,
+            call_bsp_only_queries,
+            1,
+            core::ptr::null_mut(),
+            1_000_000,
+            &probe as *const BspOnlyQueryProbe as *mut c_void,
+            core::ptr::null_mut(),
+        )
+    };
+    u_assert_eq!(status, efi::Status::SUCCESS, "failed to dispatch BSP-only query test");
+    u_assert!(probe.count_rejected.load(Ordering::SeqCst), "GetNumberOfProcessors accepted an AP caller");
+    u_assert!(probe.info_rejected.load(Ordering::SeqCst), "GetProcessorInfo accepted an AP caller");
 
     Ok(())
 }

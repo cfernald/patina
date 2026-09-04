@@ -69,14 +69,11 @@ impl MpServices {
         }
     }
 
-    /// Returns the total number of logical processors in the system. (Including the BSP)
-    pub(super) fn total_processors(&self) -> usize {
-        self.mp.ap_count() + 1
-    }
-
-    /// Returns the number of processors available for dispatch. (Including the BSP)
-    pub(super) fn enabled_processors(&self) -> usize {
-        self.mp.enabled_ap_count() + 1
+    /// Returns the total and enabled logical processor counts, including the BSP.
+    /// Only callable from the BSP.
+    pub(super) fn processor_counts(&self) -> Result<(usize, usize), MpError> {
+        self.bsp_check()?;
+        Ok((self.mp.ap_count() + 1, self.mp.enabled_ap_count() + 1))
     }
 
     /// Enables or disables the AP at `processor_index`, optionally recording a new
@@ -102,14 +99,14 @@ impl MpServices {
 
     /// Signals all APs to park in a defined state for OS handoff.
     pub(super) fn park(&self) {
-        self.notifications.shutdown(&self.mp);
         self.mp.park();
     }
 
-    /// Prevents new non-blocking requests once their timer-driven completion
-    /// mechanism is no longer guaranteed to run.
+    /// Prevents new non-blocking requests and resolves existing requests while
+    /// allocation and event signaling are still available.
     pub(super) fn mark_ready_to_boot(&self) {
         self.ready_to_boot.store(true, Ordering::Release);
+        self.notifications.drain(&self.mp);
     }
 
     /// Replicates the BSP's caching (MTRR) state to every AP that can accept it.
@@ -151,6 +148,7 @@ impl MpServices {
 
     /// Returns the [`mp_services::ProcessorInformation`] for `index`.
     pub(super) fn processor_info(&self, index: usize) -> Result<mp_services::ProcessorInformation, MpError> {
+        self.bsp_check()?;
         let processor_id = if index == BSP_PROCESSOR_INDEX {
             self.mp.bsp_processor_id()
         } else {

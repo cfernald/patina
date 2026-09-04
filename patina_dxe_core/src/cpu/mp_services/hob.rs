@@ -115,7 +115,7 @@ impl FromHob for MpInformation2 {
 #[repr(C)]
 struct RawProcessorHandOff {
     apic_id: u32,
-    _health: u32,
+    health: u32,
     startup_signal_address: u64,
     startup_procedure_address: u64,
 }
@@ -163,6 +163,7 @@ impl FromHob for MpHandOff {
             let Ok((raw, _)) = RawProcessorHandOff::read_from_prefix(entry) else { break };
             processors.push(ProcessorHandOff {
                 processor_id: raw.apic_id,
+                healthy: raw.health == 0,
                 startup_signal_address: raw.startup_signal_address,
                 startup_procedure_address: raw.startup_procedure_address,
             });
@@ -192,5 +193,28 @@ impl FromHob for MpHandOffConfig {
         Self::read_from_prefix(bytes)
             .map(|(config, _)| config)
             .unwrap_or(Self { wait_loop_execution_mode: 0, startup_signal_value: 0 })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mp_handoff_converts_bist_health() {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&0u32.to_ne_bytes());
+        bytes.extend_from_slice(&2u32.to_ne_bytes());
+        for (apic_id, health) in [(1u32, 0u32), (2, 1)] {
+            bytes.extend_from_slice(&apic_id.to_ne_bytes());
+            bytes.extend_from_slice(&health.to_ne_bytes());
+            bytes.extend_from_slice(&0x1000u64.to_ne_bytes());
+            bytes.extend_from_slice(&0x2000u64.to_ne_bytes());
+        }
+
+        let handoff = MpHandOff::parse(&bytes);
+
+        assert!(handoff.processors[0].healthy);
+        assert!(!handoff.processors[1].healthy);
     }
 }

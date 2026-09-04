@@ -119,12 +119,13 @@ impl NotificationRegistry {
         dispatch(&mut self.pending.lock())
     }
 
-    /// Atomically closes dispatch and takes every outstanding notification, then
-    /// resolves each request as failed before APs are reset for OS handoff.
-    pub(super) fn shutdown(&self, mp: &MpSupport) {
+    /// Takes every outstanding notification and resolves each request as failed.
+    ///
+    /// This must run before ExitBootServices because resolving requests can allocate
+    /// a failed-CPU list and drops heap-backed dispatch state.
+    pub(super) fn drain(&self, mp: &MpSupport) {
         let pending = {
             let mut pending = self.pending.lock();
-            mp.begin_shutdown();
             core::mem::take(&mut *pending)
         };
         for dispatch in pending {
