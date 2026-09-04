@@ -14,7 +14,7 @@ use patina_internal_cpu::mp::{ApWorkItem, MpDispatcher, MpSupport};
 
 use crate::tpl_mutex::TplMutex;
 
-use super::services::DispatchCompletion;
+use super::services::{DispatchCompletion, ap_to_processor_index};
 
 /// A non-blocking dispatch awaiting completion, resolved by the periodic poll.
 pub(super) struct PendingDispatch {
@@ -83,7 +83,8 @@ impl PendingDispatch {
     /// are fenced off so they cannot block later work.
     fn resolve(self, mp: &MpSupport) {
         for &(i, _) in &self.active {
-            log::warn!("Processor {i} did not finish its dispatch in time; disabling it");
+            let processor_index = ap_to_processor_index(i);
+            log::warn!("Processor {processor_index} did not finish its dispatch in time; disabling it");
             mp.set_ap_enabled(i, false, Some(false));
         }
         let failed: Vec<usize> = self
@@ -92,6 +93,7 @@ impl PendingDispatch {
             .copied()
             .chain(self.queued.iter().copied())
             .chain(self.active.iter().map(|&(i, _)| i))
+            .map(ap_to_processor_index)
             .collect();
         (self.completion)(&failed);
     }

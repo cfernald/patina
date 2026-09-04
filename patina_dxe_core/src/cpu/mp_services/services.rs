@@ -15,12 +15,23 @@ use patina::{
     component::service::perf_timer::ArchTimerFunctionality,
     standard::efi::{self, protocols::mp_services},
 };
-use patina_internal_cpu::mp::{ApWorkItem, MpDispatcher, MpSupport, ProcessorState};
+use patina_internal_cpu::mp::{ApWorkItem, MpDispatcher, MpSupport, Processor, ProcessorState};
 
 use super::notification::{NotificationRegistry, PendingDispatch, deadline_for};
 
 /// Window for an AP to apply a state synchronization dispatch.
 const AP_SYNC_TIMEOUT_US: usize = 100_000;
+
+/// UEFI MP Services processor number assigned to the BSP.
+const BSP_PROCESSOR_INDEX: usize = 0;
+
+pub(super) const fn ap_to_processor_index(ap_index: usize) -> usize {
+    ap_index + 1
+}
+
+fn processor_to_ap_index(processor_index: usize) -> Option<usize> {
+    processor_index.checked_sub(1)
+}
 
 /// Reports the outcome of a non-blocking dispatch once the periodic poll resolves
 /// it, taking the processors the procedure did not complete on.
@@ -60,12 +71,12 @@ impl MpServices {
 
     /// Returns the total number of logical processors in the system. (Including the BSP)
     pub(super) fn total_processors(&self) -> usize {
-        self.mp.processor_count()
+        self.mp.ap_count() + 1
     }
 
     /// Returns the number of processors available for dispatch. (Including the BSP)
     pub(super) fn enabled_processors(&self) -> usize {
-        self.mp.enabled_processor_count()
+        self.mp.enabled_ap_count() + 1
     }
 
     /// Enables or disables the AP at `processor_index`, optionally recording a new
@@ -77,18 +88,16 @@ impl MpServices {
         healthy: Option<bool>,
     ) -> Result<(), MpError> {
         self.bsp_check()?;
-        if processor_index == MpSupport::BSP_INDEX {
-            return Err(MpError::NotSupported);
-        }
-        if processor_index >= self.mp.processor_count() {
-            return Err(MpError::NotFound);
-        }
-        if self.mp.set_ap_enabled(processor_index, enable, healthy) { Ok(()) } else { Err(MpError::NotFound) }
+        let ap_index = processor_to_ap_index(processor_index).ok_or(MpError::NotSupported)?;
+        if self.mp.set_ap_enabled(ap_index, enable, healthy) { Ok(()) } else { Err(MpError::NotFound) }
     }
 
     /// Returns the processor index for the calling processor.
     pub(super) fn who_am_i(&self) -> Option<usize> {
-        self.mp.who_am_i()
+        self.mp.who_am_i().map(|processor| match processor {
+            Processor::Bsp => BSP_PROCESSOR_INDEX,
+            Processor::Ap(index) => ap_to_processor_index(index),
+        })
     }
 
     /// Signals all APs to park in a defined state for OS handoff.
@@ -106,7 +115,7 @@ impl MpServices {
     /// Replicates the BSP's caching (MTRR) state to every AP that can accept it.
     pub(super) fn synchronize(&self) {
         let deadline = deadline_for(self.timer, AP_SYNC_TIMEOUT_US);
-        for index in MpSupport::BSP_INDEX + 1..self.mp.processor_count() {
+        for index in 0..self.mp.ap_count() {
             if !self.mp.ap_healthy(index) {
                 continue;
             }
@@ -142,7 +151,11 @@ impl MpServices {
 
     /// Returns the [`mp_services::ProcessorInformation`] for `index`.
     pub(super) fn processor_info(&self, index: usize) -> Result<mp_services::ProcessorInformation, MpError> {
-        let processor_id = self.mp.processor_id(index).ok_or(MpError::NotFound)?;
+        let processor_id = if index == BSP_PROCESSOR_INDEX {
+            self.mp.bsp_processor_id()
+        } else {
+            self.mp.ap_processor_id(processor_to_ap_index(index).ok_or(MpError::NotFound)?).ok_or(MpError::NotFound)?
+        };
         let mut info = self
             .processor_infos
             .iter()
@@ -155,13 +168,18 @@ impl MpServices {
 
     fn status_flag(&self, index: usize) -> u32 {
         let mut flags = 0;
-        if index == MpSupport::BSP_INDEX {
+        if index == BSP_PROCESSOR_INDEX {
             flags |= mp_services::PROCESSOR_AS_BSP_BIT;
+            flags |= mp_services::PROCESSOR_ENABLED_BIT | mp_services::PROCESSOR_HEALTH_STATUS_BIT;
+            return flags;
         }
-        if !matches!(self.mp.ap_availability(index), ProcessorState::NotStarted | ProcessorState::Disabled) {
+        let Some(ap_index) = processor_to_ap_index(index) else {
+            return flags;
+        };
+        if !matches!(self.mp.ap_availability(ap_index), ProcessorState::NotStarted | ProcessorState::Disabled) {
             flags |= mp_services::PROCESSOR_ENABLED_BIT;
         }
-        if self.mp.ap_healthy(index) {
+        if self.mp.ap_healthy(ap_index) {
             flags |= mp_services::PROCESSOR_HEALTH_STATUS_BIT;
         }
         flags
@@ -258,7 +276,11 @@ impl MpServices {
                 None => failed.push(i),
             }
         }
-        if failed.is_empty() { Ok(()) } else { Err(MpError::Timeout(failed)) }
+        if failed.is_empty() {
+            Ok(())
+        } else {
+            Err(MpError::Timeout(failed.into_iter().map(ap_to_processor_index).collect()))
+        }
     }
 
     /// Resolves the processors a dispatch will target.
@@ -270,10 +292,7 @@ impl MpServices {
         let claimed = |index: usize| pending.iter().any(|dispatch| dispatch.claims(index));
         match *targets {
             Targets::One(index) => {
-                if index == MpSupport::BSP_INDEX {
-                    return Err(MpError::InvalidProcessor);
-                }
-                if index >= self.mp.processor_count() {
+                if index >= self.mp.ap_count() {
                     return Err(MpError::NotFound);
                 }
                 if claimed(index) {
@@ -288,7 +307,7 @@ impl MpServices {
             }
             Targets::AllEligible => {
                 let mut aps = Vec::new();
-                for i in MpSupport::BSP_INDEX + 1..self.mp.processor_count() {
+                for i in 0..self.mp.ap_count() {
                     if claimed(i) {
                         return Err(MpError::Busy);
                     }
@@ -307,7 +326,8 @@ impl MpServices {
     /// the AP stays busy forever and blocks every later request. Re-enabling it
     /// through `EnableDisableAP` restores it once its work actually completes.
     fn fence_off(&self, index: usize) {
-        log::warn!("Processor {index} did not finish its dispatch in time; disabling it");
+        let processor_index = ap_to_processor_index(index);
+        log::warn!("Processor {processor_index} did not finish its dispatch in time; disabling it");
         self.mp.set_ap_enabled(index, false, Some(false));
     }
 
@@ -361,7 +381,8 @@ impl MpServices {
         completion: Option<DispatchCompletion>,
     ) -> Result<(), MpError> {
         self.bsp_check()?;
-        self.dispatch(Targets::One(processor_index), false, work, timeout_us, completion)
+        let ap_index = processor_to_ap_index(processor_index).ok_or(MpError::InvalidProcessor)?;
+        self.dispatch(Targets::One(ap_index), false, work, timeout_us, completion)
     }
 
     /// Resolves any pending non-blocking dispatches. Invoked by the component's
@@ -371,7 +392,7 @@ impl MpServices {
     }
 
     fn bsp_check(&self) -> Result<(), MpError> {
-        if self.mp.who_am_i() != Some(MpSupport::BSP_INDEX) { Err(MpError::NotBsp) } else { Ok(()) }
+        if self.mp.who_am_i() != Some(Processor::Bsp) { Err(MpError::NotBsp) } else { Ok(()) }
     }
 }
 

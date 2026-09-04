@@ -14,12 +14,18 @@
 //!
 
 use alloc::{boxed::Box, vec::Vec};
+use core::num::NonZeroUsize;
 
 use patina::{
+    UEFI_PAGE_SIZE,
     component::{
         component,
         hob::Hob,
-        service::{Service, memory::MemoryManager, perf_timer::ArchTimerFunctionality},
+        service::{
+            Service,
+            memory::{AccessType, AllocationOptions, MemoryManager},
+            perf_timer::ArchTimerFunctionality,
+        },
     },
     error::EfiError,
     standard::efi::{self, protocols::mp_services},
@@ -27,6 +33,7 @@ use patina::{
         boot_services::{BootServices, StandardBootServices, tpl::Tpl},
         event::{CACHE_ATTRIBUTE_CHANGE_EVENT_GROUP_GUID, EventTimerType, EventType},
     },
+    uefi_size_to_pages,
 };
 
 mod hob;
@@ -35,7 +42,7 @@ mod protocol;
 mod services;
 
 use hob::{MpHandOff, MpHandOffConfig, MpInformation2};
-use patina_internal_cpu::mp::{MpDispatcher, MpHandOffInfo, MpSupport, ProcessorHandOff};
+use patina_internal_cpu::mp::{ApContext, MpHandOffInfo, MpSupport, ProcessorHandOff};
 use protocol::MpProtocolWrapper;
 use services::MpServices;
 
@@ -115,7 +122,45 @@ impl MpServicesProtocolInstaller {
                 true
             });
 
-        let mp = MpSupport::initialize(*mm, *timer, handoff)
+        let ap_count = handoff.as_ref().map_or(0, |handoff| handoff.processors.len().saturating_sub(1));
+        let mut contexts = Vec::new();
+        contexts.try_reserve_exact(ap_count).map_err(|e| {
+            log::error!("Failed to reserve MP context array: {e:?}");
+            EfiError::OutOfResources
+        })?;
+
+        // Initialize the data and leak to a static slice.
+        contexts.resize_with(ap_count, ApContext::default);
+        let contexts = Box::leak(contexts.into_boxed_slice());
+
+        // Setup the AP data needed from the core.
+        let stack_pages = uefi_size_to_pages!(ApContext::STACK_SIZE);
+        let total_stack_pages = stack_pages + 1;
+        for context in contexts.iter_mut() {
+            let stack_allocation = mm.allocate_pages(total_stack_pages, AllocationOptions::new()).map_err(|e| {
+                log::error!("Failed to allocate AP stack: {e:?}");
+                EfiError::OutOfResources
+            })?;
+
+            let stack_base = stack_allocation.into_raw_ptr::<u8>().ok_or(EfiError::OutOfResources)? as usize;
+
+            // SAFETY: The first page belongs to this AP stack allocation and is
+            // intentionally made inaccessible as its stack-overflow guard.
+            unsafe {
+                mm.set_page_attributes(stack_base, 1, AccessType::NoAccess, None).map_err(|e| {
+                    log::error!("Failed to set AP stack guard page attributes: {e:?}");
+                    EfiError::DeviceError
+                })?;
+            }
+
+            let stack_top =
+                NonZeroUsize::new(stack_base + total_stack_pages * UEFI_PAGE_SIZE).ok_or(EfiError::OutOfResources)?;
+            // SAFETY: The stack is page-aligned, writable above its guard page,
+            // exclusively assigned to this context, and intentionally leaked.
+            unsafe { context.set_stack_top(stack_top)? };
+        }
+
+        let mp = MpSupport::initialize(contexts, *timer, handoff)
             .inspect_err(|e| log::error!("Failed to initialize MP architecture support: {e:?}"))?;
 
         let services: &'static MpServices = Box::leak(Box::new(MpServices::new(mp, processor_infos, *timer)));
