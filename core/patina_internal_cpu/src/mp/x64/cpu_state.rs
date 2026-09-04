@@ -181,7 +181,7 @@ pub(super) fn capture_bsp_state() -> CpuStartupState {
     let cr0: u64;
     let cr3: u64;
     let cr4: u64;
-    // SAFETY: Reading control registers and IA32_EFER has no side effects.
+    // SAFETY: Reading control registers has no side effects.
     unsafe {
         core::arch::asm!(
             "mov {0}, cr0",
@@ -193,6 +193,7 @@ pub(super) fn capture_bsp_state() -> CpuStartupState {
             options(nomem, nostack, preserves_flags),
         );
     }
+    // SAFETY: Reading IA32_EFER has no side effects.
     let efer = unsafe { read_msr(IA32_EFER) };
 
     spin::LazyLock::force(&AP_IDT);

@@ -70,6 +70,11 @@ impl ApContext {
         }
     }
 
+    fn assign_processor(&self, processor: &super::ProcessorHandOff) {
+        self.apic_id.store(processor.processor_id, Ordering::Relaxed);
+        self.sm.set_healthy(processor.healthy);
+    }
+
     /// Records the top of the stack provisioned for this AP.
     ///
     /// # Safety
@@ -209,7 +214,7 @@ impl MpSupport {
         let ap_handoffs = || processors.iter().filter(|p| p.processor_id != bsp_processor_id);
         let assigned = mp.contexts.iter().zip(ap_handoffs()).count();
         for (ctx, p) in mp.contexts.iter().zip(ap_handoffs()) {
-            ctx.apic_id.store(p.processor_id, Ordering::Relaxed);
+            ctx.assign_processor(p);
         }
 
         if assigned < mp.contexts.len() {
@@ -493,5 +498,19 @@ mod tests {
         // SAFETY: This test only exercises validation and never starts an AP.
         assert_eq!(unsafe { context.set_stack_top(stack_top) }, Err(EfiError::InvalidParameter));
         assert_eq!(context.stack_top.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn ap_context_preserves_handoff_health() {
+        let context = ApContext::new();
+        context.assign_processor(&crate::mp::ProcessorHandOff {
+            processor_id: 7,
+            healthy: false,
+            startup_signal_address: 0,
+            startup_procedure_address: 0,
+        });
+
+        assert_eq!(context.apic_id.load(Ordering::Relaxed), 7);
+        assert!(!context.sm.is_healthy());
     }
 }

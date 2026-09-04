@@ -61,6 +61,8 @@ pub enum Processor {
 pub struct ProcessorHandOff {
     /// Architecture specific ID of the processor.
     pub processor_id: u32,
+    /// Whether the processor passed its built-in self-test in PEI.
+    pub healthy: bool,
     /// Address of the word the AP monitors for the wake-up signal value.
     pub startup_signal_address: u64,
     /// Address of the slot into which the BSP writes the AP entry-point address.
