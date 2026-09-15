@@ -4,12 +4,12 @@
 # This assembly stub is intended to take a long-mode enabled AP from another execution
 # context (PEI handoff) and bring it into the Patina environment. To do this, it does the
 # the fllowing:
-#   1. Adopts the BSP's descriptor tables and page tables
+#   1. Adopts the AP descriptor tables and BSP page tables
 #   2. Reads the APIC ID (xAPIC or x2APIC)
 #   3. Searches the published ApContext array for the matching APIC ID to determine
 #      this processor's context
 #   4. Loads the per-processor stack from ApContext[n].stack_top
-#   5. Reloads segment registers for the BSP's GDT
+#   5. Reloads segment registers and the AP-specific task register
 #   6. Calls the AP entry point (`ap_entry`, passed as the {ap_entry} operand)
 #      with the ApContext pointer in RCX (EFI ABI), then parks when it returns.
 #
@@ -23,24 +23,18 @@
 .globl ap_park
 
 ap_entry_64:
-    # R9D = Indicator to skip started count
+    # R9D = Indicator this is a AP reset.
     xor r9d, r9d
     jmp setup_processor
 
-ap_recover_64:
-    # Skip incrementing started counter for recovery
+ap_reset_64:
+    # Mark a AP reset entry.
     mov r9d, 1
 
 setup_processor:
     # APs are not expecting to handle interrupts, and the EFI ABI requires DF clear.
     cli
     cld
-
-    # Install descriptor tables whose storage and handlers are mapped by both
-    # the PEI and DXE page tables. Existing segment descriptors remain cached
-    # until they are explicitly reloaded below.
-    lgdt [rip + AP_SETUP + {setup_gdtr_off}]
-    lidt [rip + AP_SETUP + {setup_idtr_off}]
 
     # Apply EFER before CR3 because the BSP page tables may contain NX entries.
     mov rax, qword ptr [rip + AP_SETUP + {setup_efer_off}]
@@ -64,7 +58,7 @@ setup_processor:
     mov rax, qword ptr [rip + AP_SETUP + {setup_cr3_off}]
     mov cr3, rax
 
-    # Recovery reuses startup setup but does not count the AP a second time.
+    # Skip incrementing the started count if this is a reset.
     test r9d, r9d
     jnz identify_processor
     lock inc dword ptr [rip + AP_SETUP + {setup_started_count_off}]
@@ -128,6 +122,12 @@ found_id:
     # Load per-processor stack from ApContext[processor_number].stack_top.
     mov rsp, [rsi + rdi + {ap_ctx_stack_off}]
 
+    # Install this AP's GDT and the shared AP IDT after the BSP page tables map
+    # the context storage. Existing segment descriptors remain cached until
+    # they are explicitly reloaded below.
+    lgdt [rsi + rdi + {ap_ctx_gdtr_off}]
+    lidt [rip + AP_SETUP + {setup_idtr_off}]
+
     # Reload CS via far return.
     lea rax, [rip + gdt_loaded]
     push {code64_sel}
@@ -135,7 +135,7 @@ found_id:
     retfq
 
 gdt_loaded:
-    # Reload data segments with BSP's data64 selector.
+    # Reload data segments with the AP GDT's data64 selector.
     mov ax, {data64_sel}
     mov ds, ax
     mov es, ax
@@ -143,6 +143,15 @@ gdt_loaded:
     xor ax, ax
     mov fs, ax
     mov gs, ax
+
+    # Skip loading the task register if this is in recovery, as it is already set
+    # and setting it again would be cause GP fault.
+    test r9d, r9d
+    jnz task_register_loaded
+    mov ax, {tss_selector}
+    ltr ax
+
+task_register_loaded:
 
     # Pass the selected ApContext as the first argument (RCX for efiapi).
     lea rcx, [rsi + rdi]
@@ -160,9 +169,9 @@ gdt_loaded:
 # blocking is cleared before the processor re-enters architectural setup.
 ap_nmi_abort:
     # Vector 2 has no error code, so RSP points at the hardware-frame RIP.
-    lea rax, [rip + ap_recover_64]
+    lea rax, [rip + ap_reset_64]
     mov qword ptr [rsp], rax
-    # Clear TF and IF so no debug or maskable interrupt can preempt recovery
+    # Clear TF and IF so no debug or maskable interrupt can preempt reset
     # between IRETQ and the CLI at the recovery entry.
     and qword ptr [rsp + 16], {rflags_clear_tf_if_mask}
     iretq

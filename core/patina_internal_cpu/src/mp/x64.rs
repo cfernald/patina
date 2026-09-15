@@ -59,6 +59,12 @@ pub struct ApContext {
     sm: ApStateMachine,
     /// Architectural state and persistent synchronization storage for this AP.
     cpu_state: cpu_state::ApCpuState,
+    /// Task state used to reset the stack before terminal double-fault handling.
+    tss: crate::gdt::TaskStateSegment,
+    /// GDT containing this AP's unique TSS descriptor.
+    gdt: crate::gdt::ApGdt,
+    /// Descriptor-table operand used by the assembly entry path.
+    gdtr: crate::gdt::DescriptorTablePointer,
 }
 
 impl ApContext {
@@ -71,7 +77,17 @@ impl ApContext {
             apic_id: AtomicU32::new(APIC_ID_INVALID),
             sm: ApStateMachine::new(),
             cpu_state: cpu_state::ApCpuState::new(),
+            tss: crate::gdt::TaskStateSegment::new(0),
+            gdt: crate::gdt::ApGdt::new(),
+            gdtr: crate::gdt::DescriptorTablePointer { limit: 0, base: 0 },
         }
+    }
+
+    fn initialize_descriptor_tables(&mut self) {
+        let stack_top = self.stack_top.load(Ordering::Relaxed);
+        self.tss = crate::gdt::TaskStateSegment::new(stack_top);
+        self.gdt.initialize(core::ptr::addr_of!(self.tss) as u64);
+        self.gdtr = self.gdt.descriptor();
     }
 
     fn assign_processor(&mut self, processor: &super::ProcessorHandOff) {
@@ -264,6 +280,10 @@ impl MpDispatcher for MpSupport {
         if contexts.iter().any(|ctx| ctx.stack_top.load(Ordering::Relaxed) == 0) {
             log::error!("Every AP context must have a provisioned stack");
             return Err(EfiError::InvalidParameter);
+        }
+
+        for context in contexts.iter_mut() {
+            context.initialize_descriptor_tables();
         }
 
         let bsp_processor_id = Self::get_current_apic_id();
@@ -490,5 +510,24 @@ mod tests {
 
         assert_eq!(context.apic_id.load(Ordering::Relaxed), 7);
         assert!(!context.sm.is_healthy());
+    }
+
+    #[test]
+    fn ap_contexts_reuse_their_ap_stacks_for_double_faults() {
+        let mut contexts = [ApContext::new(), ApContext::new()];
+        let stack_tops = [NonZeroUsize::new(0x20_000).unwrap(), NonZeroUsize::new(0x40_000).unwrap()];
+
+        for (context, stack_top) in contexts.iter_mut().zip(stack_tops) {
+            // SAFETY: This test only records aligned addresses and never starts an AP.
+            unsafe { context.set_stack_top(stack_top) }.unwrap();
+            context.initialize_descriptor_tables();
+        }
+
+        assert_eq!(contexts[0].tss.ist1(), stack_tops[0].get() as u64);
+        assert_eq!(contexts[1].tss.ist1(), stack_tops[1].get() as u64);
+        assert_ne!(contexts[0].tss.ist1(), contexts[1].tss.ist1());
+        let gdtr0_base = contexts[0].gdtr.base;
+        let gdtr1_base = contexts[1].gdtr.base;
+        assert_ne!(gdtr0_base, gdtr1_base);
     }
 }

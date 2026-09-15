@@ -18,11 +18,13 @@ use crate::gdt::{CODE_SELECTOR, DATA_SELECTOR, DescriptorTablePointer};
 use crate::interrupts::x64::idt::{Idt, IdtEntry};
 
 #[unsafe(no_mangle)]
+static AP_EXCEPTION_COUNT: AtomicU32 = AtomicU32::new(0);
+
+#[unsafe(no_mangle)]
 static AP_SETUP: ApSetupHolder = ApSetupHolder(UnsafeCell::new(ApSetup {
     contexts: 0,
     context_count: 0,
     started_count: AtomicU32::new(0),
-    gdtr: DescriptorTablePointer { limit: 0, base: 0 },
     idtr: DescriptorTablePointer { limit: 0, base: 0 },
     cr3: 0,
     cr0: 0,
@@ -36,6 +38,8 @@ static AP_IDT: spin::LazyLock<Idt> = spin::LazyLock::new(|| {
     let mut idt = Idt::filled(park);
     *idt.entry_mut(2).expect("NMI vector must be in range") =
         IdtEntry::interrupt_gate(ap_nmi_abort as *const () as u64, CODE_SELECTOR, 0);
+    *idt.entry_mut(8).expect("double-fault vector must be in range") =
+        IdtEntry::interrupt_gate(super::park::ap_park as *const () as u64, CODE_SELECTOR, 1);
     idt
 });
 
@@ -45,7 +49,6 @@ struct ApSetup {
     contexts: u64,
     context_count: u32,
     started_count: AtomicU32,
-    gdtr: DescriptorTablePointer,
     idtr: DescriptorTablePointer,
     cr3: u64,
     cr0: u64,
@@ -62,6 +65,7 @@ unsafe impl Sync for ApSetupHolder {}
 const AP_CONTEXT_SIZE: usize = core::mem::size_of::<ApContext>();
 const AP_CONTEXT_STACK_OFFSET: usize = core::mem::offset_of!(ApContext, stack_top);
 const AP_CONTEXT_APIC_ID_OFFSET: usize = core::mem::offset_of!(ApContext, apic_id);
+const AP_CONTEXT_GDTR_OFFSET: usize = core::mem::offset_of!(ApContext, gdtr);
 const RFLAGS_CLEAR_TF_IF_MASK: i32 = !((1 << 8) | (1 << 9));
 
 global_asm!(
@@ -69,7 +73,6 @@ global_asm!(
     setup_contexts_off = const core::mem::offset_of!(ApSetup, contexts),
     setup_context_count_off = const core::mem::offset_of!(ApSetup, context_count),
     setup_started_count_off = const core::mem::offset_of!(ApSetup, started_count),
-    setup_gdtr_off = const core::mem::offset_of!(ApSetup, gdtr),
     setup_idtr_off = const core::mem::offset_of!(ApSetup, idtr),
     setup_cr3_off = const core::mem::offset_of!(ApSetup, cr3),
     setup_cr0_off = const core::mem::offset_of!(ApSetup, cr0),
@@ -78,9 +81,11 @@ global_asm!(
     ap_context_size = const AP_CONTEXT_SIZE,
     ap_ctx_stack_off = const AP_CONTEXT_STACK_OFFSET,
     ap_ctx_apic_off = const AP_CONTEXT_APIC_ID_OFFSET,
+    ap_ctx_gdtr_off = const AP_CONTEXT_GDTR_OFFSET,
     rflags_clear_tf_if_mask = const RFLAGS_CLEAR_TF_IF_MASK,
     code64_sel = const CODE_SELECTOR,
     data64_sel = const DATA_SELECTOR,
+    tss_selector = const crate::gdt::TSS_SELECTOR,
     ap_entry = sym ap_entry,
 );
 
@@ -117,7 +122,6 @@ pub(super) fn setup(aps: &'static [ApContext]) {
         contexts: aps.as_ptr() as u64,
         context_count: aps.len() as u32,
         started_count: AtomicU32::new(0),
-        gdtr: crate::gdt::descriptor(),
         idtr,
         cr3,
         cr0,
@@ -158,7 +162,7 @@ pub(super) unsafe fn wake_ap(procedure_address: u64, signal_address: u64, signal
 }
 
 /// AP entry point. Called by each AP after it has configured its stack and
-/// switched to the BSP's GDT.
+/// switched to its per-processor GDT.
 extern "efiapi" fn ap_entry(context: *const ApContext) {
     // SAFETY: `ap_entry_64` selected this pointer from the published context array,
     // which remains allocated for the lifetime of the MP subsystem.
