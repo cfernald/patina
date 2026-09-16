@@ -810,6 +810,15 @@ impl DispatcherContext {
                                 Box::into_raw(full_path) as *mut efi::protocols::device_path::Protocol
                             });
 
+                            const GUID_MP_DXE: BinaryGuid =
+                                BinaryGuid::from_string("94598893-936a-481e-998e-1b0880916ae4");
+
+                            // HACK: if mp_services is enabled, skip dispatching MpDxe
+                            if file_name == GUID_MP_DXE {
+                                log::info!("CF: Skipping dispatching MpDxe because MP services are enabled.");
+                                continue;
+                            }
+
                             self.pending_drivers.push(PendingDriver {
                                 file_name,
                                 name,
