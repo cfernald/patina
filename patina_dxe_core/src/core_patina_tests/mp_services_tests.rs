@@ -26,7 +26,7 @@ extern "efiapi" fn increment_counter(arg: *mut c_void) {
     counter.fetch_add(1, Ordering::SeqCst);
 }
 
-// Procedure used to force the MP timeout and NMI recovery path.
+// Procedure used to force the MP timeout and INIT-SIPI-SIPI recovery path.
 extern "efiapi" fn never_returns(_arg: *mut c_void) {
     loop {
         core::hint::spin_loop();
@@ -276,7 +276,7 @@ fn mp_services_startup_this_ap_reports_missing_processor(bs: StandardBootService
 }
 
 // Verify that timing out an executing AP terminates the procedure through the
-// NMI recovery entry and leaves the same processor available for later work.
+// INIT-SIPI-SIPI recovery entry and leaves the same processor available for later work.
 #[patina_test]
 fn mp_services_timeout_recovers_ap(bs: StandardBootServices) -> patina_test::error::Result {
     let Some(protocol) = locate_protocol(&bs)? else { return Ok(()) };

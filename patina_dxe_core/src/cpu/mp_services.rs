@@ -20,7 +20,7 @@ use patina::{
         hob::Hob,
         service::{
             Service,
-            memory::{AccessType, AllocationOptions, MemoryManager},
+            memory::{AccessType, AllocationOptions, MemoryManager, PageAllocationStrategy},
             perf_timer::ArchTimerFunctionality,
         },
     },
@@ -75,19 +75,19 @@ impl MpServicesComponent {
 
         // Build the context for each AP.
         let contexts = self.allocate_ap_contexts(&mm, ap_count)?;
+        let bootstrap_page = self.allocate_bootstrap_page(&mm)?;
+        MpSupport::prepare_bootstrap_page(bootstrap_page)?;
+        self.protect_bootstrap_page(&mm, bootstrap_page)?;
         let park_pages = self.allocate_park_pages(&mm)?;
         MpSupport::prepare_park_pages(park_pages)?;
         self.protect_park_pages(&mm, park_pages)?;
 
         // Initialize the MP architecture support.
-        let mp = MpSupport::initialize(contexts, *timer, handoff, park_pages)
+        let mp = MpSupport::initialize(contexts, *timer, handoff, bootstrap_page, park_pages)
             .inspect_err(|e| log::error!("Failed to initialize MP architecture support: {e:?}"))?;
 
         // Build the rust service.
         let services: &'static MpServices = Box::leak(Box::new(MpServices::new(mp, parsed_hobs.processors, *timer)));
-
-        // Synchronize APs to match initial BSP config.
-        services.synchronize();
 
         self.register_events(&bs, services)?;
         let protocol = Box::leak(Box::new(MpProtocolWrapper::new(services, bs.clone())));
@@ -159,6 +159,48 @@ impl MpServicesComponent {
         // SAFETY: `base` identifies the complete reserved page allocation, which is
         // intentionally retained for the runtime lifetime of the parked APs.
         Ok(unsafe { core::slice::from_raw_parts_mut(base, MpSupport::PARK_PAGES * UEFI_PAGE_SIZE) })
+    }
+
+    fn allocate_bootstrap_page(&self, mm: &Service<dyn MemoryManager>) -> Result<&'static mut [u8], EfiError> {
+        if MpSupport::BOOTSTRAP_PAGES == 0 {
+            return Ok(&mut []);
+        }
+
+        let allocation = mm
+            .allocate_zero_pages(
+                MpSupport::BOOTSTRAP_PAGES,
+                AllocationOptions::new().with_strategy(PageAllocationStrategy::MaxAddress(0xF_FFFF)),
+            )
+            .map_err(|e| {
+                log::error!("Failed to allocate the AP bootstrap page below 1MB: {e:?}");
+                EfiError::OutOfResources
+            })?;
+        let base = allocation.into_raw_ptr::<u8>().ok_or(EfiError::OutOfResources)?;
+
+        // SAFETY: `base` identifies the complete allocation, which is retained for
+        // the lifetime of MP Services so INIT-SIPI-SIPI can reuse it.
+        Ok(unsafe { core::slice::from_raw_parts_mut(base, MpSupport::BOOTSTRAP_PAGES * UEFI_PAGE_SIZE) })
+    }
+
+    fn protect_bootstrap_page(&self, mm: &Service<dyn MemoryManager>, bootstrap_page: &[u8]) -> Result<(), EfiError> {
+        if bootstrap_page.is_empty() {
+            return Ok(());
+        }
+
+        // SAFETY: The complete range is the low-memory allocation created above.
+        unsafe {
+            mm.set_page_attributes(
+                bootstrap_page.as_ptr() as usize,
+                MpSupport::BOOTSTRAP_PAGES,
+                AccessType::ReadExecute,
+                None,
+            )
+            .map_err(|e| {
+                log::error!("Failed to make the AP bootstrap executable: {e:?}");
+                EfiError::DeviceError
+            })?;
+        }
+        Ok(())
     }
 
     fn protect_park_pages(&self, mm: &Service<dyn MemoryManager>, park_pages: &[u8]) -> Result<(), EfiError> {

@@ -80,6 +80,9 @@ pub struct MpHandOffInfo<'a> {
 /// This trait explicitly only operates on the APs, and not the BSP. The BSP
 /// is not included in dispatching, counts, indexes, etc.
 pub trait MpDispatcher: Sized {
+    /// Number of pages required for the real-mode AP bootstrap.
+    const BOOTSTRAP_PAGES: usize = 0;
+
     /// The number of pages required for runtime parking of the APs.
     /// This must be provided during instantiation of the dispatcher.
     const PARK_PAGES: usize = 0;
@@ -96,12 +99,18 @@ pub trait MpDispatcher: Sized {
     /// Builds architecture-specific runtime parking state while the allocation is writable.
     fn prepare_park_pages(park_pages: &mut [u8]) -> Result<(), EfiError>;
 
+    /// Builds the architecture-specific AP bootstrap while its low-memory page is writable.
+    fn prepare_bootstrap_page(bootstrap_page: &mut [u8]) -> Result<(), EfiError> {
+        if bootstrap_page.is_empty() { Ok(()) } else { Err(EfiError::InvalidParameter) }
+    }
+
     /// Creates and starts multiprocessor support, migrating each AP out of its
     /// handoff loop into the Rust dispatch loop.
     fn initialize(
         contexts: &'static mut [ApContext],
         timer: &'static dyn ArchTimerFunctionality,
         handoff: Option<MpHandOffInfo<'_>>,
+        bootstrap_page: &'static [u8],
         park_pages: &'static [u8],
     ) -> Result<Self, EfiError>;
 

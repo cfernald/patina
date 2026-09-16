@@ -32,12 +32,10 @@ static AP_SETUP: ApSetupHolder = ApSetupHolder(UnsafeCell::new(ApSetup {
     efer: 0,
 }));
 
-/// The AP park IDT, used to handle exceptions before terminal parking.
+/// The AP IDT, used to handle exceptions before terminal parking.
 static AP_IDT: spin::LazyLock<Idt> = spin::LazyLock::new(|| {
     let park = IdtEntry::interrupt_gate(super::park::ap_park as *const () as u64, CODE_SELECTOR, 0);
     let mut idt = Idt::filled(park);
-    *idt.entry_mut(2).expect("NMI vector must be in range") =
-        IdtEntry::interrupt_gate(ap_nmi_abort as *const () as u64, CODE_SELECTOR, 0);
     *idt.entry_mut(8).expect("double-fault vector must be in range") =
         IdtEntry::interrupt_gate(super::park::ap_park as *const () as u64, CODE_SELECTOR, 1);
     idt
@@ -66,8 +64,6 @@ const AP_CONTEXT_SIZE: usize = core::mem::size_of::<ApContext>();
 const AP_CONTEXT_STACK_OFFSET: usize = core::mem::offset_of!(ApContext, stack_top);
 const AP_CONTEXT_APIC_ID_OFFSET: usize = core::mem::offset_of!(ApContext, apic_id);
 const AP_CONTEXT_GDTR_OFFSET: usize = core::mem::offset_of!(ApContext, gdtr);
-const RFLAGS_CLEAR_TF_IF_MASK: i32 = !((1 << 8) | (1 << 9));
-
 global_asm!(
     include_str!("ap_entry.asm"),
     setup_contexts_off = const core::mem::offset_of!(ApSetup, contexts),
@@ -82,7 +78,6 @@ global_asm!(
     ap_ctx_stack_off = const AP_CONTEXT_STACK_OFFSET,
     ap_ctx_apic_off = const AP_CONTEXT_APIC_ID_OFFSET,
     ap_ctx_gdtr_off = const AP_CONTEXT_GDTR_OFFSET,
-    rflags_clear_tf_if_mask = const RFLAGS_CLEAR_TF_IF_MASK,
     code64_sel = const CODE_SELECTOR,
     data64_sel = const DATA_SELECTOR,
     tss_selector = const crate::gdt::TSS_SELECTOR,
@@ -91,7 +86,6 @@ global_asm!(
 
 unsafe extern "C" {
     fn ap_entry_64();
-    fn ap_nmi_abort();
 }
 
 pub(super) fn setup(aps: &'static [ApContext]) {
@@ -139,8 +133,14 @@ pub(super) fn started_count() -> u32 {
     unsafe { (*AP_SETUP.0.get()).started_count.load(Ordering::Acquire) }
 }
 
-fn ap_entry_addr() -> usize {
+pub(super) fn ap_entry_addr() -> usize {
     ap_entry_64 as *const () as usize
+}
+
+pub(super) fn decrement_started_count() -> bool {
+    // SAFETY: `started_count` remains initialized and atomic for the firmware lifetime.
+    let started_count = unsafe { &(*AP_SETUP.0.get()).started_count };
+    started_count.fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| count.checked_sub(1)).is_ok()
 }
 
 /// Wakes the AP who is monitoring `signal_address` by writing the
@@ -170,5 +170,6 @@ extern "efiapi" fn ap_entry(context: *const ApContext) {
         // SAFETY: The AP park routine disables interrupts and does not return.
         unsafe { super::park::ap_park() }
     };
+    context.cpu_state.apply();
     super::MpSupport::ap_run_dispatch_loop(context);
 }

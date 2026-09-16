@@ -49,6 +49,7 @@ impl MpDispatcher for MpSupport {
         _contexts: &'static mut [ApContext],
         _timer: &'static dyn ArchTimerFunctionality,
         _handoff: Option<MpHandOffInfo<'_>>,
+        _bootstrap_page: &'static [u8],
         _park_pages: &'static [u8],
     ) -> Result<Self, EfiError> {
         Err(EfiError::Unsupported)

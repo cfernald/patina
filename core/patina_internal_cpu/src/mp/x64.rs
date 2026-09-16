@@ -25,6 +25,7 @@ use patina::{bit, component::service::perf_timer::ArchTimerFunctionality, error:
 use super::control::{ApAction, ApConsumer, ApStateMachine};
 use super::{ApWorkItem, MpDispatcher, MpHandOffInfo, Processor, ProcessorState};
 
+mod ap_bootstrap;
 mod ap_setup;
 mod apic;
 mod cpu_state;
@@ -39,8 +40,10 @@ const X_APIC_ID_MAX: u32 = 0xFF;
 /// Window for APs to migrate into the DXE dispatch loop after being signaled.
 const AP_STARTUP_TIMEOUT_US: u64 = 100_000;
 
-/// Maximum time to wait for an NMI-aborted AP to re-enter its dispatch loop.
+/// Maximum time to wait for an INIT-aborted AP to re-enter its dispatch loop.
 const AP_ABORT_TIMEOUT_US: u64 = 100_000;
+const INIT_TO_SIPI_DELAY_US: u64 = 10_000;
+const SIPI_DELAY_US: u64 = 200;
 
 /// Maximum time to wait for started APs to enter the reserved park loop.
 const AP_PARK_TIMEOUT_US: u64 = 100_000;
@@ -123,6 +126,7 @@ pub struct MpSupport {
     bsp_processor_id: u32,
     timer: &'static dyn ArchTimerFunctionality,
     perf_frequency: NonZeroU64,
+    startup_vector: u8,
     shutting_down: AtomicBool,
 }
 
@@ -172,7 +176,7 @@ impl MpSupport {
     /// Spins until `done` returns true or `timeout_us` microseconds elapse.
     #[inline(never)]
     fn try_for(&self, timeout_us: u64, mut done: impl FnMut() -> bool) -> bool {
-        let ticks = timeout_us.saturating_mul(self.perf_frequency.get()) / 1_000_000;
+        let ticks = timeout_us.saturating_mul(self.perf_frequency.get()).div_ceil(1_000_000);
         let start = self.timer.cpu_count();
         while self.timer.cpu_count().wrapping_sub(start) < ticks {
             if done() {
@@ -219,7 +223,12 @@ impl MpSupport {
 }
 
 impl MpDispatcher for MpSupport {
+    const BOOTSTRAP_PAGES: usize = 1;
     const PARK_PAGES: usize = park::PAGE_COUNT;
+    fn prepare_bootstrap_page(bootstrap_page: &mut [u8]) -> Result<(), EfiError> {
+        ap_bootstrap::prepare(bootstrap_page)
+    }
+
     const PARK_ALIGNMENT: usize = park::ALIGNMENT;
     const PARK_CODE_PAGE: usize = park::CODE_PAGE_INDEX;
     const PARK_DATA_PAGE: usize = park::DATA_PAGE_INDEX;
@@ -234,9 +243,11 @@ impl MpDispatcher for MpSupport {
         contexts: &'static mut [ApContext],
         timer: &'static dyn ArchTimerFunctionality,
         handoff: Option<MpHandOffInfo<'_>>,
+        bootstrap_page: &'static [u8],
         park_pages: &'static [u8],
     ) -> Result<Self, EfiError> {
         park::install(park_pages)?;
+        let startup_vector = ap_bootstrap::startup_vector(bootstrap_page)?;
         let perf_frequency = NonZeroU64::new(timer.perf_frequency()).ok_or_else(|| {
             log::error!("MP Services requires a calibrated timer.");
             EfiError::Unsupported
@@ -302,8 +313,20 @@ impl MpDispatcher for MpSupport {
         }
 
         let contexts: &'static [ApContext] = contexts;
-        let mp = Self { contexts, bsp_processor_id, timer, perf_frequency, shutting_down: AtomicBool::new(false) };
+        let mp = Self {
+            contexts,
+            bsp_processor_id,
+            timer,
+            perf_frequency,
+            startup_vector,
+            shutting_down: AtomicBool::new(false),
+        };
         ap_setup::setup(mp.contexts);
+
+        if mp.contexts.iter().any(|ctx| !ctx.cpu_state.prepare_entry()) {
+            log::error!("Failed to prepare BSP MTRRs for AP startup");
+            return Err(EfiError::DeviceError);
+        }
 
         // Wake each AP by writing the entry point into its handoff procedure
         // slot and raising its startup signal.
@@ -403,8 +426,25 @@ impl MpDispatcher for MpSupport {
             return true;
         }
 
+        let apic_id = ctx.apic_id.load(Ordering::Relaxed);
+        apic::send_init(apic_id);
+        self.try_for(INIT_TO_SIPI_DELAY_US, || false);
+        if !ap_setup::decrement_started_count() {
+            ctx.sm.set_healthy(false);
+            return false;
+        }
         ctx.sm.reset();
-        apic::send_nmi(ctx.apic_id.load(Ordering::Relaxed));
+        // SAFETY: INIT delivery has completed and the architectural settle time
+        // has elapsed, so this AP is in wait-for-SIPI and cannot reload TR.
+        unsafe { ctx.gdt.reset_tss_descriptor(core::ptr::addr_of!(ctx.tss) as u64) };
+        if !ctx.cpu_state.prepare_entry() {
+            ctx.sm.set_healthy(false);
+            return false;
+        }
+        apic::send_startup(apic_id, self.startup_vector);
+        self.try_for(SIPI_DELAY_US, || false);
+        apic::send_startup(apic_id, self.startup_vector);
+        self.try_for(SIPI_DELAY_US, || false);
         let recovered = self.try_for(AP_ABORT_TIMEOUT_US, || ctx.sm.state() == ProcessorState::Ready);
         if !recovered {
             ctx.sm.set_healthy(false);

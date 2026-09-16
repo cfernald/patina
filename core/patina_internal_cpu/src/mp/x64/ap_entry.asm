@@ -19,19 +19,9 @@
 
 .code64
 .globl ap_entry_64
-.globl ap_nmi_abort
 .globl ap_park
 
 ap_entry_64:
-    # R9D = Indicator this is a AP reset.
-    xor r9d, r9d
-    jmp setup_processor
-
-ap_reset_64:
-    # Mark a AP reset entry.
-    mov r9d, 1
-
-setup_processor:
     # APs are not expecting to handle interrupts, and the EFI ABI requires DF clear.
     cli
     cld
@@ -58,13 +48,10 @@ setup_processor:
     mov rax, qword ptr [rip + AP_SETUP + {setup_cr3_off}]
     mov cr3, rax
 
-    # Skip incrementing the started count if this is a reset.
-    test r9d, r9d
-    jnz identify_processor
+    # Inform the core that an AP has started.
     lock inc dword ptr [rip + AP_SETUP + {setup_started_count_off}]
 
 identify_processor:
-
     # Check if x2APIC is enabled via IA32_APIC_BASE MSR (0x1B), bit 10.
     mov ecx, 0x1B
     rdmsr
@@ -144,14 +131,8 @@ gdt_loaded:
     mov fs, ax
     mov gs, ax
 
-    # Skip loading the task register if this is in recovery, as it is already set
-    # and setting it again would be cause GP fault.
-    test r9d, r9d
-    jnz task_register_loaded
     mov ax, {tss_selector}
     ltr ax
-
-task_register_loaded:
 
     # Pass the selected ApContext as the first argument (RCX for efiapi).
     lea rcx, [rsi + rdi]
@@ -164,17 +145,6 @@ task_register_loaded:
 
     # Returning from the dispatch loop is a terminal park request.
     jmp ap_park
-
-# Vector 2 is dedicated to AP reset. Every NMI redirects through IRETQ so NMI
-# blocking is cleared before the processor re-enters architectural setup.
-ap_nmi_abort:
-    # Vector 2 has no error code, so RSP points at the hardware-frame RIP.
-    lea rax, [rip + ap_reset_64]
-    mov qword ptr [rsp], rax
-    # Clear TF and IF so no debug or maskable interrupt can preempt reset
-    # between IRETQ and the CLI at the recovery entry.
-    and qword ptr [rsp + 16], {rflags_clear_tf_if_mask}
-    iretq
 
 # Assembly routine for jumping to the park stub. This routine does not
 # use the caller's stack, so it is safe as an exception target or a direct

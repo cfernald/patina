@@ -1,4 +1,4 @@
-//! APIC code for the BSP to quiesce APs.
+//! APIC code for the BSP to start and quiesce APs.
 //!
 //! ## License
 //!
@@ -34,8 +34,11 @@ const X2APIC_ICR_MSR: u32 = 0x830;
 /// Byte offsets of the xAPIC interrupt-command register halves.
 const XAPIC_ICR_LOW_OFFSET: usize = 0x300;
 const XAPIC_ICR_HIGH_OFFSET: usize = 0x310;
-/// Interrupt-command delivery mode for a non-maskable interrupt.
-const ICR_DELIVERY_MODE_NMI: u32 = 0b100 << 8;
+/// Interrupt-command delivery modes used by the universal startup algorithm.
+const ICR_DELIVERY_MODE_INIT: u32 = 0b101 << 8;
+const ICR_DELIVERY_MODE_STARTUP: u32 = 0b110 << 8;
+const ICR_LEVEL_ASSERT: u32 = bit!(14);
+const ICR_TRIGGER_LEVEL: u32 = bit!(15);
 /// Set while the xAPIC is still sending the previous interrupt command.
 const ICR_DELIVERY_STATUS: u32 = bit!(12);
 
@@ -53,10 +56,9 @@ pub(super) fn is_x2apic_enabled() -> bool {
     (base & X2APIC_ENABLE_BIT) != 0
 }
 
-/// Sends a non-maskable interrupt to one processor by APIC ID.
-pub(super) fn send_nmi(apic_id: u32) {
+fn send_icr(apic_id: u32, command: u32) {
     if is_x2apic_enabled() {
-        let icr = (u64::from(apic_id) << 32) | u64::from(ICR_DELIVERY_MODE_NMI);
+        let icr = (u64::from(apic_id) << 32) | u64::from(command);
         // SAFETY: IA32_X2APIC_ICR is the architectural x2APIC interrupt-command MSR.
         unsafe { write_msr(X2APIC_ICR_MSR, icr) };
     } else {
@@ -76,8 +78,21 @@ pub(super) fn send_nmi(apic_id: u32) {
             core::hint::spin_loop();
         }
         high.write(apic_id << 24);
-        low.write(ICR_DELIVERY_MODE_NMI);
+        low.write(command);
+        while low.read() & ICR_DELIVERY_STATUS != 0 {
+            core::hint::spin_loop();
+        }
     }
+}
+
+/// Sends an INIT IPI to one processor by APIC ID.
+pub(super) fn send_init(apic_id: u32) {
+    send_icr(apic_id, ICR_DELIVERY_MODE_INIT | ICR_LEVEL_ASSERT | ICR_TRIGGER_LEVEL);
+}
+
+/// Sends a STARTUP IPI to one processor by APIC ID.
+pub(super) fn send_startup(apic_id: u32, startup_vector: u8) {
+    send_icr(apic_id, ICR_DELIVERY_MODE_STARTUP | u32::from(startup_vector));
 }
 
 pub(super) fn mask_local_interrupts() {
