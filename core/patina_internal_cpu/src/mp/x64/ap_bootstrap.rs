@@ -14,6 +14,9 @@ use core::arch::global_asm;
 
 use patina::{SIZE_1MB, UEFI_PAGE_SHIFT, UEFI_PAGE_SIZE, arch::x64::read_msr, bit, error::EfiError};
 
+pub(super) const PAGE_COUNT: usize = 1;
+pub(super) const MAX_ADDRESS: usize = SIZE_1MB - 1;
+
 const CODE32_SELECTOR: u16 = 0x08;
 const DATA32_SELECTOR: u16 = 0x10;
 const CODE64_SELECTOR: u16 = 0x18;
@@ -113,7 +116,7 @@ fn patch_template<T: Copy>(page: &mut [u8], at: usize, value: T) -> Result<(), E
 
 pub(super) fn prepare(page: &mut [u8]) -> Result<(), EfiError> {
     let base = page.as_ptr() as usize;
-    if page.len() != UEFI_PAGE_SIZE || !base.is_multiple_of(UEFI_PAGE_SIZE) || base >= SIZE_1MB {
+    if page.len() != UEFI_PAGE_SIZE || !base.is_multiple_of(UEFI_PAGE_SIZE) || base > MAX_ADDRESS {
         log::error!("AP bootstrap requires one page below 1MB. Got {:#x} bytes at {base:#x}.", page.len());
         return Err(EfiError::InvalidParameter);
     }

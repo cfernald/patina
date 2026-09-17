@@ -17,7 +17,10 @@ mod x64;
 
 mod work;
 
-use patina::{component::service::perf_timer::ArchTimerFunctionality, error::EfiError};
+use patina::{
+    component::service::{memory::MemoryManager, perf_timer::ArchTimerFunctionality},
+    error::EfiError,
+};
 pub use work::ApWorkItem;
 
 cfg_if::cfg_if! {
@@ -80,39 +83,18 @@ pub struct MpHandOffInfo<'a> {
 /// This trait explicitly only operates on the APs, and not the BSP. The BSP
 /// is not included in dispatching, counts, indexes, etc.
 pub trait MpDispatcher: Sized {
-    /// Number of pages required for the real-mode AP bootstrap.
-    const BOOTSTRAP_PAGES: usize = 0;
-
-    /// The number of pages required for runtime parking of the APs.
-    /// This must be provided during instantiation of the dispatcher.
-    const PARK_PAGES: usize = 0;
-
-    /// Required alignment of the runtime park allocation.
-    const PARK_ALIGNMENT: usize = 1;
-
-    /// Index of the executable page within the park allocation.
-    const PARK_CODE_PAGE: usize = 0;
-
-    /// Index of the writable data and emergency-stack page within the park allocation.
-    const PARK_DATA_PAGE: usize = 0;
-
-    /// Builds architecture-specific runtime parking state while the allocation is writable.
-    fn prepare_park_pages(park_pages: &mut [u8]) -> Result<(), EfiError>;
-
-    /// Builds the architecture-specific AP bootstrap while its low-memory page is writable.
-    fn prepare_bootstrap_page(bootstrap_page: &mut [u8]) -> Result<(), EfiError> {
-        if bootstrap_page.is_empty() { Ok(()) } else { Err(EfiError::InvalidParameter) }
-    }
-
-    /// Creates and starts multiprocessor support, migrating each AP out of its
-    /// handoff loop into the Rust dispatch loop.
+    /// Creates multiprocessor support and its architecture-specific memory.
     fn initialize(
-        contexts: &'static mut [ApContext],
+        memory_manager: &dyn MemoryManager,
         timer: &'static dyn ArchTimerFunctionality,
-        handoff: Option<MpHandOffInfo<'_>>,
-        bootstrap_page: &'static [u8],
-        park_pages: &'static [u8],
     ) -> Result<Self, EfiError>;
+
+    /// Migrates each AP from its handoff loop into the dispatcher.
+    fn setup_aps(
+        &mut self,
+        contexts: &'static mut [ApContext],
+        handoff: Option<MpHandOffInfo<'_>>,
+    ) -> Result<(), EfiError>;
 
     /// Number of application processors known to the dispatcher.
     fn ap_count(&self) -> usize;

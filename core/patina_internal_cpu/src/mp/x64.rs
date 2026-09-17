@@ -20,7 +20,15 @@ use core::{
     sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
 };
 
-use patina::{bit, component::service::perf_timer::ArchTimerFunctionality, error::EfiError};
+use patina::{
+    UEFI_PAGE_SIZE, bit,
+    component::service::{
+        memory::{AccessType, AllocationOptions, MemoryManager, PageAllocationStrategy},
+        perf_timer::ArchTimerFunctionality,
+    },
+    error::EfiError,
+    uefi::memory::EfiMemoryType,
+};
 
 use super::control::{ApAction, ApConsumer, ApStateMachine};
 use super::{ApWorkItem, MpDispatcher, MpHandOffInfo, Processor, ProcessorState};
@@ -244,36 +252,101 @@ impl MpSupport {
 }
 
 impl MpDispatcher for MpSupport {
-    const BOOTSTRAP_PAGES: usize = 1;
-    const PARK_PAGES: usize = park::PAGE_COUNT;
-    fn prepare_bootstrap_page(bootstrap_page: &mut [u8]) -> Result<(), EfiError> {
-        ap_bootstrap::prepare(bootstrap_page)
-    }
-
-    const PARK_ALIGNMENT: usize = park::ALIGNMENT;
-    const PARK_CODE_PAGE: usize = park::CODE_PAGE_INDEX;
-    const PARK_DATA_PAGE: usize = park::DATA_PAGE_INDEX;
-
-    fn prepare_park_pages(park_pages: &mut [u8]) -> Result<(), EfiError> {
-        park::prepare(park_pages)
-    }
-
-    /// Creates and starts multiprocessor support, migrating each AP out of its
-    /// handoff loop into the Rust dispatch loop.
     fn initialize(
-        contexts: &'static mut [ApContext],
+        memory_manager: &dyn MemoryManager,
         timer: &'static dyn ArchTimerFunctionality,
-        handoff: Option<MpHandOffInfo<'_>>,
-        bootstrap_page: &'static [u8],
-        park_pages: &'static [u8],
     ) -> Result<Self, EfiError> {
-        park::install(park_pages)?;
+        let bootstrap_allocation = memory_manager
+            .allocate_zero_pages(
+                ap_bootstrap::PAGE_COUNT,
+                AllocationOptions::new().with_strategy(PageAllocationStrategy::MaxAddress(ap_bootstrap::MAX_ADDRESS)),
+            )
+            .map_err(|e| {
+                log::error!("Failed to allocate the AP bootstrap page below 1MB: {e:?}");
+                EfiError::OutOfResources
+            })?;
+
+        let bootstrap_page = bootstrap_allocation.leak_as_slice::<u8>();
+        let bootstrap_base = bootstrap_page.as_mut_ptr();
+        ap_bootstrap::prepare(bootstrap_page)?;
         let startup_vector = ap_bootstrap::startup_vector(bootstrap_page)?;
+        // SAFETY: The complete range is the bootstrap allocation initialized above.
+        unsafe {
+            memory_manager.set_page_attributes(bootstrap_base as usize, 1, AccessType::ReadExecute, None).map_err(
+                |e| {
+                    log::error!("Failed to make the AP bootstrap executable: {e:?}");
+                    EfiError::DeviceError
+                },
+            )?;
+        }
+
+        let park_allocation = memory_manager
+            .allocate_zero_pages(
+                park::PAGE_COUNT,
+                AllocationOptions::new()
+                    .with_alignment(park::ALIGNMENT)
+                    .with_memory_type(EfiMemoryType::ReservedMemoryType),
+            )
+            .map_err(|e| {
+                log::error!("Failed to allocate AP park pages: {e:?}");
+                EfiError::OutOfResources
+            })?;
+        let park_pages = park_allocation.leak_as_slice::<u8>();
+        let park_base = park_pages.as_mut_ptr();
+        park::prepare(park_pages)?;
+        // SAFETY: The complete range is the reserved park allocation initialized above.
+        unsafe {
+            memory_manager
+                .set_page_attributes(park_base as usize, park::PAGE_COUNT, AccessType::ReadOnly, None)
+                .map_err(|e| {
+                    log::error!("Failed to make AP park state read-only: {e:?}");
+                    EfiError::DeviceError
+                })?;
+            memory_manager
+                .set_page_attributes(
+                    park_base as usize + (park::CODE_PAGE_INDEX * UEFI_PAGE_SIZE),
+                    1,
+                    AccessType::ReadExecute,
+                    None,
+                )
+                .map_err(|e| {
+                    log::error!("Failed to make the AP park loop executable: {e:?}");
+                    EfiError::DeviceError
+                })?;
+            memory_manager
+                .set_page_attributes(
+                    park_base as usize + (park::DATA_PAGE_INDEX * UEFI_PAGE_SIZE),
+                    1,
+                    AccessType::ReadWrite,
+                    None,
+                )
+                .map_err(|e| {
+                    log::error!("Failed to make the AP park stack writable: {e:?}");
+                    EfiError::DeviceError
+                })?;
+        }
+        park::install(park_pages)?;
+
         let perf_frequency = NonZeroU64::new(timer.perf_frequency()).ok_or_else(|| {
             log::error!("MP Services requires a calibrated timer.");
             EfiError::Unsupported
         })?;
 
+        Ok(Self {
+            contexts: &[],
+            bsp_processor_id: Self::get_current_apic_id(),
+            timer,
+            perf_frequency,
+            startup_vector,
+            shutting_down: AtomicBool::new(false),
+        })
+    }
+
+    fn setup_aps(
+        &mut self,
+        contexts: &'static mut [ApContext],
+        handoff: Option<MpHandOffInfo<'_>>,
+    ) -> Result<(), EfiError> {
         let handoff = handoff.filter(|handoff| {
             if handoff.wait_loop_execution_mode != REQUIRED_WAIT_LOOP_MODE {
                 log::error!(
@@ -318,12 +391,11 @@ impl MpDispatcher for MpSupport {
             context.initialize_descriptor_tables();
         }
 
-        let bsp_processor_id = Self::get_current_apic_id();
-        log::info!("BSP APIC ID: {bsp_processor_id:#x}");
+        log::info!("BSP APIC ID: {:#x}", self.bsp_processor_id);
 
         // Assign each non-BSP handoff entry to a context slot, recording its
         // APIC ID so the AP can find itself once it wakes.
-        let ap_handoffs = || processors.iter().filter(|p| p.processor_id != bsp_processor_id);
+        let ap_handoffs = || processors.iter().filter(|p| p.processor_id != self.bsp_processor_id);
         let assigned = contexts.iter().zip(ap_handoffs()).count();
         for (ctx, p) in contexts.iter_mut().zip(ap_handoffs()) {
             ctx.assign_processor(p);
@@ -333,16 +405,8 @@ impl MpDispatcher for MpSupport {
             log::warn!("Handoff described {assigned} AP(s) but {} context slot(s) exist", contexts.len());
         }
 
-        let contexts: &'static [ApContext] = contexts;
-        let mp = Self {
-            contexts,
-            bsp_processor_id,
-            timer,
-            perf_frequency,
-            startup_vector,
-            shutting_down: AtomicBool::new(false),
-        };
-        ap_setup::setup(mp.contexts);
+        self.contexts = contexts;
+        ap_setup::setup(self.contexts);
 
         if sync::capture().is_err() {
             log::error!("Failed to prepare BSP MTRRs for AP startup");
@@ -351,14 +415,14 @@ impl MpDispatcher for MpSupport {
 
         // Wake each AP by writing the entry point into its handoff procedure
         // slot and raising its startup signal.
-        let ap_count = mp.contexts.len();
+        let ap_count = self.contexts.len();
         if ap_count == 0 {
             log::info!("MP Services initialized: uniprocessor system (BSP only)");
-            return Ok(mp);
+            return Ok(());
         }
 
         log::info!("Waking APs via handoff...");
-        let start_timestamp = timer.cpu_count();
+        let start_timestamp = self.timer.cpu_count();
         for p in ap_handoffs() {
             // SAFETY: the addresses come from the handoff for APs still parked
             // in their wait loop. `wake_ap` publishes the entry before the signal.
@@ -368,12 +432,13 @@ impl MpDispatcher for MpSupport {
         }
 
         // Wait for all APs to migrate into the dispatch loop.
-        mp.try_for(AP_STARTUP_TIMEOUT_US, || mp.started_ap_count() == ap_count);
-        let started_count = mp.started_ap_count();
-        let ap_start_time = (timer.cpu_count().saturating_sub(start_timestamp) * 1_000_000) / perf_frequency.get();
+        self.try_for(AP_STARTUP_TIMEOUT_US, || self.started_ap_count() == ap_count);
+        let started_count = self.started_ap_count();
+        let ap_start_time =
+            (self.timer.cpu_count().saturating_sub(start_timestamp) * 1_000_000) / self.perf_frequency.get();
 
         log::info!("MP Services initialized: {started_count}/{ap_count} APs started in {ap_start_time} us");
-        Ok(mp)
+        Ok(())
     }
 
     fn ap_count(&self) -> usize {

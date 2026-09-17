@@ -14,7 +14,10 @@
 
 use core::num::NonZeroUsize;
 
-use patina::{component::service::perf_timer::ArchTimerFunctionality, error::EfiError};
+use patina::{
+    component::service::{memory::MemoryManager, perf_timer::ArchTimerFunctionality},
+    error::EfiError,
+};
 
 use super::{ApWorkItem, MpDispatcher, MpHandOffInfo, Processor, ProcessorState};
 
@@ -41,18 +44,19 @@ impl ApContext {
 }
 
 impl MpDispatcher for MpSupport {
-    fn prepare_park_pages(_park_pages: &mut [u8]) -> Result<(), EfiError> {
-        Ok(())
-    }
-
     fn initialize(
-        _contexts: &'static mut [ApContext],
+        _memory_manager: &dyn MemoryManager,
         _timer: &'static dyn ArchTimerFunctionality,
-        _handoff: Option<MpHandOffInfo<'_>>,
-        _bootstrap_page: &'static [u8],
-        _park_pages: &'static [u8],
     ) -> Result<Self, EfiError> {
         Err(EfiError::Unsupported)
+    }
+
+    fn setup_aps(
+        &mut self,
+        _contexts: &'static mut [ApContext],
+        _handoff: Option<MpHandOffInfo<'_>>,
+    ) -> Result<(), EfiError> {
+        unreachable!()
     }
 
     fn ap_count(&self) -> usize {
