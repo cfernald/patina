@@ -1,11 +1,14 @@
 #
 # Real-mode to long-mode AP bootstrap used by INIT-SIPI-SIPI.
 #
+# This stub lives in a read-only non-executable section since it should
+# only be copied out before execution.
+#
 # Copyright (c) Microsoft Corporation.
 # SPDX-License-Identifier: Apache-2.0
 #
 
-.pushsection .text.ap_bootstrap, "ax"
+.pushsection .rodata.ap_bootstrap, "a"
 .balign 16
 .globl ap_bootstrap_start
 .globl ap_bootstrap_rm_page_base
@@ -14,14 +17,16 @@
 .globl ap_bootstrap_data
 .globl ap_bootstrap_end
 
+#
+# 16-bit real-mode code is emitted as bytes because the Rust toolchain does
+# not provide a supported 16-bit assembly mode and this was deemed the lesser
+# evil compared to a new toolchain dependency for this tiny stub or using
+# an opaque binary file.
+#
+# The ap_bootstrap_rm_* labels below identify operand offsets within this
+# template. The rust code patches values at those offsets after copying the template.
+#
 ap_bootstrap_start:
-    # 16-bit real-mode code is emitted as bytes because the Rust toolchain does
-    # not provide a supported 16-bit assembly mode and this was deemed the lesser
-    # evil compared to a new toolchain dependency for this tiny stub or using
-    # an opaque binary file.
-    #
-    # The ap_bootstrap_rm_* labels below identify operand offsets within this
-    # template. The rust code patches values at those offsets after copying the template.
     .byte 0xFA                         # cli
     .byte 0xFC                         # cld
     .byte 0x8C, 0xC8                   # mov ax, cs

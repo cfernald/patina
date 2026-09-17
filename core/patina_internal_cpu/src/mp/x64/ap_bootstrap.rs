@@ -146,6 +146,7 @@ pub(super) fn prepare(page: &mut [u8]) -> Result<(), EfiError> {
         EfiError::Unsupported
     })?;
 
+    // Setup the data section of the bootstrap stub.
     let data_offset = template_offset(ap_bootstrap_data);
     if data_offset != BOOTSTRAP_DATA_OFFSET {
         return Err(EfiError::BadBufferSize);
@@ -168,23 +169,21 @@ pub(super) fn prepare(page: &mut [u8]) -> Result<(), EfiError> {
         gdt: [GDT_NULL, GDT_CODE32, GDT_DATA32, GDT_CODE64],
     };
 
+    // Patch all of the address immediate values in the RM stub.
     patch_template(page, template_offset(ap_bootstrap_rm_page_base), base as u32)?;
-
     patch_template(
         page,
         template_offset(ap_bootstrap_rm_gdtr_offset),
         u16::try_from(data_offset + DATA_GDTR_OFFSET).map_err(|_| EfiError::BadBufferSize)?,
     )?;
-
     patch_template(
         page,
         template_offset(ap_bootstrap_rm_pm_entry),
         (base + template_offset(ap_bootstrap_protected_mode)) as u32,
     )?;
-
     patch_template(page, data_offset, data)?;
 
-    log::info!("AP bootstrap page setup at {base:#x}");
+    log::info!("AP bootstrap page setup at 0x{base:#x}");
     Ok(())
 }
 
