@@ -457,17 +457,18 @@ impl MpDispatcher for MpSupport {
     fn park(&self) {
         self.shutting_down.store(true, Ordering::Release);
 
-        let expected = self.contexts.len();
+        let expected = self.started_ap_count();
         for ctx in self.contexts {
             ctx.sm.signal_exit();
         }
 
-        let all_parked = self.try_for(AP_PARK_TIMEOUT_US, || park::parked_count() as usize == expected);
-        let parked = park::parked_count();
-        if all_parked {
+        self.try_for(AP_PARK_TIMEOUT_US, || park::parked_count() as usize == expected);
+        let parked = park::parked_count() as usize;
+        if parked == expected {
             log::info!("Parked application processors: {parked}/{expected} acknowledged");
         } else {
-            log::warn!("Timed out parking application processors: {parked}/{expected} acknowledged");
+            log::error!("Timed out parking application processors: {parked}/{expected} acknowledged");
+            debug_assert!(parked == expected);
         }
     }
 
