@@ -28,8 +28,8 @@ use super::{ApWorkItem, MpDispatcher, MpHandOffInfo, Processor, ProcessorState};
 mod ap_bootstrap;
 mod ap_setup;
 mod apic;
-mod cpu_state;
 mod park;
+mod sync;
 
 /// Sentinel value indicating an unused entry in [`ApContext::apic_id`].
 const APIC_ID_INVALID: u32 = 0xFFFF_FFFF;
@@ -344,7 +344,7 @@ impl MpDispatcher for MpSupport {
         };
         ap_setup::setup(mp.contexts);
 
-        if cpu_state::capture().is_err() {
+        if sync::capture().is_err() {
             log::error!("Failed to prepare BSP MTRRs for AP startup");
             return Err(EfiError::DeviceError);
         }
@@ -480,7 +480,7 @@ impl MpDispatcher for MpSupport {
             return false;
         }
 
-        let Ok(supported) = cpu_state::capture() else {
+        let Ok(supported) = sync::capture() else {
             log::error!("Failed to capture BSP MTRRs for AP synchronization");
             return false;
         };
@@ -488,7 +488,8 @@ impl MpDispatcher for MpSupport {
             return true;
         }
 
-        let work = ApWorkItem::new(|()| cpu_state::apply(), &());
+        let start_ts = self.timer.cpu_count();
+        let work = ApWorkItem::new(|()| sync::apply(), &());
         for ctx in self.contexts.iter().filter(|ctx| ctx.sm.state() == ProcessorState::Ready) {
             if ctx.sm.dispatch(work).is_err() {
                 return false;
@@ -498,6 +499,9 @@ impl MpDispatcher for MpSupport {
         while self.contexts.iter().any(|ctx| ctx.sm.state() == ProcessorState::Busy) {
             core::hint::spin_loop();
         }
+        let end_ts = self.timer.cpu_count();
+        let elapsed_us = u64::from(end_ts.wrapping_sub(start_ts)) * 1_000_000 / u64::from(self.perf_frequency.get());
+        log::info!("AP MTRR synchronization completed in {elapsed_us} us.");
         true
     }
 }

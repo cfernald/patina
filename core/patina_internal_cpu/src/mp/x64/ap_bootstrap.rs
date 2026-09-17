@@ -106,7 +106,7 @@ fn patch_template<T: Copy>(page: &mut [u8], at: usize, value: T) -> Result<(), E
     let end = at.checked_add(core::mem::size_of::<T>()).ok_or(EfiError::InvalidParameter)?;
     let destination = page.get_mut(at..end).ok_or(EfiError::InvalidParameter)?;
     // SAFETY: The destination has exactly enough writable bytes. Unaligned writes
-    // are required for immediates embedded in the real-mode instruction stream.
+    // are required for immediate values embedded in the real-mode instruction stream.
     unsafe { destination.as_mut_ptr().cast::<T>().write_unaligned(value) };
     Ok(())
 }
@@ -114,7 +114,7 @@ fn patch_template<T: Copy>(page: &mut [u8], at: usize, value: T) -> Result<(), E
 pub(super) fn prepare(page: &mut [u8]) -> Result<(), EfiError> {
     let base = page.as_ptr() as usize;
     if page.len() != UEFI_PAGE_SIZE || !base.is_multiple_of(UEFI_PAGE_SIZE) || base >= SIZE_1MB {
-        log::error!("AP bootstrap requires one page below 1MB. got {:#x} bytes at {base:#x}", page.len());
+        log::error!("AP bootstrap requires one page below 1MB. Got {:#x} bytes at {base:#x}.", page.len());
         return Err(EfiError::InvalidParameter);
     }
 
@@ -142,7 +142,7 @@ pub(super) fn prepare(page: &mut [u8]) -> Result<(), EfiError> {
     }
     let transition_cr3 = cr3 & !0xFFF;
     let transition_cr3 = u32::try_from(transition_cr3).map_err(|_| {
-        log::error!("x64 MP Services requires a 32-bit-addressable root page table; CR3 is {cr3:#x}");
+        log::error!("x64 MP Services requires a 32-bit-addressable root page table. CR3 is {cr3:#x}.");
         EfiError::Unsupported
     })?;
 
@@ -184,6 +184,7 @@ pub(super) fn prepare(page: &mut [u8]) -> Result<(), EfiError> {
 
     patch_template(page, data_offset, data)?;
 
+    log::info!("AP bootstrap page setup at {base:#x}");
     Ok(())
 }
 
