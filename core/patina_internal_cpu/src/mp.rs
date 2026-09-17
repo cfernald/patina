@@ -124,10 +124,10 @@ pub trait MpDispatcher: Sized {
     fn enabled_ap_count(&self) -> usize;
 
     /// Enables or disables the AP at `index` for dispatch, optionally recording a
-    /// new health status. Returns `false` for an out-of-range AP index.
+    /// new health status.
     ///
-    /// Disabling an AP that is still running a dispatch fences it off immediately;
-    /// it becomes eligible again only if it is re-enabled *and* its work completes.
+    /// Disabling an AP fences it off without resetting it.
+    /// Returns whether the requested state change completed synchronously.
     fn set_ap_enabled(&self, index: usize, enabled: bool, healthy: Option<bool>) -> bool;
 
     /// Whether the AP at `index` is currently considered healthy.

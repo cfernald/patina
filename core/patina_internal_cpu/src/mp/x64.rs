@@ -220,6 +220,34 @@ impl MpSupport {
     fn get_current_apic_id() -> u32 {
         if Self::is_x2apic_enabled() { Self::cpuid(0xB, 0).edx } else { Self::cpuid(1, 0).ebx >> 24 }
     }
+
+    fn reset_ap(&self, ctx: &ApContext) -> bool {
+        let was_started = ctx.sm.state() != ProcessorState::NotStarted;
+        let apic_id = ctx.apic_id.load(Ordering::Relaxed);
+        apic::send_init(apic_id);
+        self.try_for(INIT_TO_SIPI_DELAY_US, || false);
+        if was_started && !ap_setup::decrement_started_count() {
+            ctx.sm.set_healthy(false);
+            return false;
+        }
+        ctx.sm.reset();
+        // SAFETY: INIT delivery has completed and the architectural settle time
+        // has elapsed, so this AP is in wait-for-SIPI and cannot reload TR.
+        unsafe { ctx.gdt.reset_tss_descriptor(core::ptr::addr_of!(ctx.tss) as u64) };
+        if !ctx.cpu_state.prepare_entry() {
+            ctx.sm.set_healthy(false);
+            return false;
+        }
+        apic::send_startup(apic_id, self.startup_vector);
+        self.try_for(SIPI_DELAY_US, || false);
+        apic::send_startup(apic_id, self.startup_vector);
+        self.try_for(SIPI_DELAY_US, || false);
+        let recovered = self.try_for(AP_ABORT_TIMEOUT_US, || ctx.sm.state() == ProcessorState::Ready);
+        if !recovered {
+            ctx.sm.set_healthy(false);
+        }
+        recovered
+    }
 }
 
 impl MpDispatcher for MpSupport {
@@ -371,13 +399,17 @@ impl MpDispatcher for MpSupport {
     }
 
     fn set_ap_enabled(&self, index: usize, enabled: bool, healthy: Option<bool>) -> bool {
-        let Some(ctx) = self.contexts.get(index) else {
+        let Some(ctx) = self.contexts.get(index) else { return false };
+
+        ctx.sm.set_enabled(enabled);
+        if enabled && !self.reset_ap(ctx) {
+            ctx.sm.set_enabled(false);
             return false;
-        };
+        }
+
         if let Some(healthy) = healthy {
             ctx.sm.set_healthy(healthy);
         }
-        ctx.sm.set_enabled(enabled);
         true
     }
 
@@ -426,30 +458,7 @@ impl MpDispatcher for MpSupport {
             return true;
         }
 
-        let apic_id = ctx.apic_id.load(Ordering::Relaxed);
-        apic::send_init(apic_id);
-        self.try_for(INIT_TO_SIPI_DELAY_US, || false);
-        if !ap_setup::decrement_started_count() {
-            ctx.sm.set_healthy(false);
-            return false;
-        }
-        ctx.sm.reset();
-        // SAFETY: INIT delivery has completed and the architectural settle time
-        // has elapsed, so this AP is in wait-for-SIPI and cannot reload TR.
-        unsafe { ctx.gdt.reset_tss_descriptor(core::ptr::addr_of!(ctx.tss) as u64) };
-        if !ctx.cpu_state.prepare_entry() {
-            ctx.sm.set_healthy(false);
-            return false;
-        }
-        apic::send_startup(apic_id, self.startup_vector);
-        self.try_for(SIPI_DELAY_US, || false);
-        apic::send_startup(apic_id, self.startup_vector);
-        self.try_for(SIPI_DELAY_US, || false);
-        let recovered = self.try_for(AP_ABORT_TIMEOUT_US, || ctx.sm.state() == ProcessorState::Ready);
-        if !recovered {
-            ctx.sm.set_healthy(false);
-        }
-        recovered
+        self.reset_ap(ctx)
     }
 
     fn park(&self) {

@@ -278,7 +278,8 @@ impl MpProtocolWrapper {
             return efi::Status::INVALID_PARAMETER;
         };
 
-        if !finished.is_null() {
+        let wait_event = (!wait_event.is_null()).then_some(wait_event);
+        if wait_event.is_some() && !finished.is_null() {
             // SAFETY: Caller guarantees the out pointer is valid and writable.
             unsafe { finished.write(efi::Boolean::FALSE) };
         }
@@ -287,24 +288,13 @@ impl MpProtocolWrapper {
         // `EFI_AP_PROCEDURE` and a matching argument; wrapping them here confines the
         // unsafety to this ABI boundary so the dispatch path can stay safe.
         let work = unsafe { ApWorkItem::new_efi(procedure, procedure_argument) };
-        let wait_event = (!wait_event.is_null()).then_some(wait_event);
         let completion =
             wait_event.map(|event| wrapper.create_completion_callback(event, finished, core::ptr::null_mut()));
 
-        let status = match wrapper.service.startup_this_ap(work, processor_index, timeout_in_microseconds, completion) {
+        match wrapper.service.startup_this_ap(work, processor_index, timeout_in_microseconds, completion) {
             Ok(()) => efi::Status::SUCCESS,
-            // A stopped or busy AP is reported as "retry", unlike the default mapping.
-            Err(MpError::Busy | MpError::NotStarted) => efi::Status::NOT_READY,
             Err(e) => e.into(),
-        };
-
-        // Blocking mode reports completion here.
-        if wait_event.is_none() && !finished.is_null() {
-            // SAFETY: Caller guarantees the out pointer is valid and writable.
-            unsafe { finished.write(efi::Boolean::from(status == efi::Status::SUCCESS)) };
         }
-
-        status
     }
 
     unsafe extern "efiapi" fn switch_bsp(

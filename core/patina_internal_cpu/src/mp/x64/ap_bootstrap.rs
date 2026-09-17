@@ -24,9 +24,9 @@ const CR4_PAE: u64 = bit!(5);
 const CR4_LA57: u64 = bit!(12);
 
 const GDT_NULL: u64 = 0;
-const GDT_CODE32: u64 = 0x00CF_9A00_0000_FFFF;
-const GDT_DATA32: u64 = 0x00CF_9200_0000_FFFF;
-const GDT_CODE64: u64 = 0x00AF_9A00_0000_FFFF;
+const GDT_CODE32: u64 = 0x00CF_9B00_0000_FFFF;
+const GDT_DATA32: u64 = 0x00CF_9300_0000_FFFF;
+const GDT_CODE64: u64 = 0x00AF_9B00_0000_FFFF;
 
 #[derive(Clone, Copy)]
 #[repr(C, packed)]

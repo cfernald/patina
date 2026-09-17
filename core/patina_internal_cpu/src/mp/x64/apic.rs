@@ -38,7 +38,6 @@ const XAPIC_ICR_HIGH_OFFSET: usize = 0x310;
 const ICR_DELIVERY_MODE_INIT: u32 = 0b101 << 8;
 const ICR_DELIVERY_MODE_STARTUP: u32 = 0b110 << 8;
 const ICR_LEVEL_ASSERT: u32 = bit!(14);
-const ICR_TRIGGER_LEVEL: u32 = bit!(15);
 /// Set while the xAPIC is still sending the previous interrupt command.
 const ICR_DELIVERY_STATUS: u32 = bit!(12);
 
@@ -87,12 +86,12 @@ fn send_icr(apic_id: u32, command: u32) {
 
 /// Sends an INIT IPI to one processor by APIC ID.
 pub(super) fn send_init(apic_id: u32) {
-    send_icr(apic_id, ICR_DELIVERY_MODE_INIT | ICR_LEVEL_ASSERT | ICR_TRIGGER_LEVEL);
+    send_icr(apic_id, ICR_DELIVERY_MODE_INIT | ICR_LEVEL_ASSERT);
 }
 
 /// Sends a STARTUP IPI to one processor by APIC ID.
 pub(super) fn send_startup(apic_id: u32, startup_vector: u8) {
-    send_icr(apic_id, ICR_DELIVERY_MODE_STARTUP | u32::from(startup_vector));
+    send_icr(apic_id, ICR_DELIVERY_MODE_STARTUP | ICR_LEVEL_ASSERT | u32::from(startup_vector));
 }
 
 pub(super) fn mask_local_interrupts() {

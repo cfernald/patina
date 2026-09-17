@@ -91,8 +91,15 @@ impl MpServices {
         healthy: Option<bool>,
     ) -> Result<(), MpError> {
         self.bsp_check()?;
-        let ap_index = processor_to_ap_index(processor_index).ok_or(MpError::NotSupported)?;
-        if self.mp.set_ap_enabled(ap_index, enable, healthy) { Ok(()) } else { Err(MpError::NotFound) }
+        let ap_index = processor_to_ap_index(processor_index).ok_or(MpError::InvalidProcessor)?;
+        if ap_index >= self.mp.ap_count() {
+            return Err(MpError::NotFound);
+        }
+        if self.notifications.with_dispatch_lock(|_| self.mp.set_ap_enabled(ap_index, enable, healthy)) {
+            Ok(())
+        } else {
+            Err(MpError::NotSupported)
+        }
     }
 
     /// Returns the processor index for the calling processor.
@@ -259,8 +266,7 @@ impl MpServices {
                     return Err(MpError::Busy);
                 }
                 match self.mp.ap_availability(index) {
-                    ProcessorState::NotStarted => Err(MpError::NotStarted),
-                    ProcessorState::Disabled => Err(MpError::InvalidProcessor),
+                    ProcessorState::NotStarted | ProcessorState::Disabled => Err(MpError::InvalidProcessor),
                     ProcessorState::Busy => Err(MpError::Busy),
                     ProcessorState::Ready => Ok(alloc::vec![index]),
                 }

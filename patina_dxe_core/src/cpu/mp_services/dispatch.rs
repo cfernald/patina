@@ -124,7 +124,7 @@ fn abort_or_fence(mp: &MpSupport, index: usize, work_id: u64) {
 pub(super) fn fence_off(mp: &MpSupport, index: usize) {
     let processor_index = ap_to_processor_index(index);
     log::warn!("Processor {processor_index} did not finish its dispatch in time and will be fenced off.");
-    mp.set_ap_enabled(index, false, Some(false));
+    let _ = mp.set_ap_enabled(index, false, Some(false));
 }
 
 pub(super) fn wait_ap_until(

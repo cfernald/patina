@@ -164,7 +164,7 @@ fn mp_services_startup_all_aps_runs_on_every_ap(bs: StandardBootServices) -> pat
     Ok(())
 }
 
-// Verify startup_this_ap dispatches to a single AP and reports completion.
+// Verify startup_this_ap dispatches to a single AP and ignores Finished in blocking mode.
 #[patina_test]
 fn mp_services_startup_this_ap_runs_on_one_ap(bs: StandardBootServices) -> patina_test::error::Result {
     let Some(protocol) = locate_protocol(&bs)? else { return Ok(()) };
@@ -185,7 +185,7 @@ fn mp_services_startup_this_ap_runs_on_one_ap(bs: StandardBootServices) -> patin
         )
     };
     u_assert_eq!(status, efi::Status::SUCCESS, "startup_this_ap failed");
-    u_assert!(bool::from(finished), "startup_this_ap did not set the finished flag");
+    u_assert!(!bool::from(finished), "blocking startup_this_ap modified the ignored Finished value");
     u_assert_eq!(counter.load(Ordering::SeqCst), 1, "expected exactly one AP to run the procedure");
 
     Ok(())
@@ -414,7 +414,65 @@ fn mp_services_enable_disable_ap(bs: StandardBootServices) -> patina_test::error
     // The BSP cannot be enabled or disabled.
     // SAFETY: `protocol_ptr` is valid; a null health flag leaves the health unchanged.
     let status = unsafe { (protocol.enable_disable_ap)(protocol_ptr, 0, efi::Boolean::FALSE, core::ptr::null_mut()) };
-    u_assert_eq!(status, efi::Status::UNSUPPORTED, "the BSP should not be disableable");
+    u_assert_eq!(status, efi::Status::INVALID_PARAMETER, "the BSP should not be disableable");
+
+    Ok(())
+}
+
+// Verify every AP can complete the PI disable/enable lifecycle and accept work afterward.
+#[patina_test]
+fn mp_services_enable_disable_all_aps(bs: StandardBootServices) -> patina_test::error::Result {
+    let Some(protocol) = locate_protocol(&bs)? else { return Ok(()) };
+    let protocol_ptr: *mut mp_services::Protocol = protocol;
+
+    let mut total = 0usize;
+    let mut enabled = 0usize;
+    // SAFETY: `protocol_ptr` and both out-pointers are valid for the call.
+    let status = unsafe { (protocol.get_number_of_processors)(protocol_ptr, &raw mut total, &raw mut enabled) };
+    u_assert_eq!(status, efi::Status::SUCCESS, "failed to query processor counts");
+    u_assert!(total >= 2, "expected at least one AP");
+
+    for processor_index in 1..total {
+        // SAFETY: Each processor index came from GetNumberOfProcessors; a null health flag preserves health.
+        let status = unsafe {
+            (protocol.enable_disable_ap)(protocol_ptr, processor_index, efi::Boolean::FALSE, core::ptr::null_mut())
+        };
+        u_assert_eq!(status, efi::Status::SUCCESS, "failed to disable an AP");
+    }
+
+    // SAFETY: `protocol_ptr` and both out-pointers are valid for the call.
+    let status = unsafe { (protocol.get_number_of_processors)(protocol_ptr, &raw mut total, &raw mut enabled) };
+    u_assert_eq!(status, efi::Status::SUCCESS, "failed to query disabled processor counts");
+    u_assert_eq!(enabled, 1, "an AP remained enabled");
+
+    for processor_index in 1..total {
+        // SAFETY: Each processor index came from GetNumberOfProcessors; a null health flag preserves health.
+        let status = unsafe {
+            (protocol.enable_disable_ap)(protocol_ptr, processor_index, efi::Boolean::TRUE, core::ptr::null_mut())
+        };
+        u_assert_eq!(status, efi::Status::SUCCESS, "failed to enable an AP");
+    }
+
+    // SAFETY: `protocol_ptr` and both out-pointers are valid for the call.
+    let status = unsafe { (protocol.get_number_of_processors)(protocol_ptr, &raw mut total, &raw mut enabled) };
+    u_assert_eq!(status, efi::Status::SUCCESS, "failed to query restored processor counts");
+    u_assert_eq!(enabled, total, "not all APs were re-enabled");
+
+    let counter = AtomicUsize::new(0);
+    // SAFETY: The blocking call keeps `counter` alive and all protocol arguments are valid.
+    let status = unsafe {
+        (protocol.startup_all_aps)(
+            protocol_ptr,
+            increment_counter,
+            efi::Boolean::FALSE,
+            core::ptr::null_mut(),
+            1_000_000,
+            (&raw const counter).cast_mut().cast(),
+            core::ptr::null_mut(),
+        )
+    };
+    u_assert_eq!(status, efi::Status::SUCCESS, "re-enabled APs did not accept dispatch");
+    u_assert_eq!(counter.load(Ordering::SeqCst), total - 1, "work did not run on every re-enabled AP");
 
     Ok(())
 }
