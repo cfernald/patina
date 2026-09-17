@@ -18,12 +18,9 @@ use patina::{
 use patina_internal_cpu::mp::{ApWorkItem, MpDispatcher, MpSupport, Processor, ProcessorState};
 
 use super::{
-    dispatch::{Dispatch, deadline_for, fence_off, wait_ap_until},
+    dispatch::{Dispatch, deadline_for},
     notification::{NotificationRegistry, PendingDispatch},
 };
-
-/// Window for an AP to apply a state synchronization dispatch in microseconds.
-const AP_SYNC_TIMEOUT_US: usize = 100_000;
 
 /// UEFI MP Services processor number assigned to the BSP.
 const BSP_PROCESSOR_INDEX: usize = 0;
@@ -124,52 +121,14 @@ impl MpServices {
         self.notifications.finish_pending(&self.mp, self.timer);
     }
 
-    /// Replicates the BSP's dynamic state (MTRRs for x64) to every AP that can accept it.
+    /// Replicates the BSP's dynamic state (MTRRs for x64) to every enabled AP.
     pub(super) fn synchronize(&self) {
-        let deadline = deadline_for(self.timer, AP_SYNC_TIMEOUT_US);
-        let mut remaining: Vec<usize> = (0..self.mp.ap_count()).filter(|&index| self.mp.ap_healthy(index)).collect();
-        let mut active: Vec<(usize, u64)> = Vec::with_capacity(remaining.len());
-
-        // Try to dispatch all suitable APs until they have all been dispatched or we run out of time.
-        while !remaining.is_empty() {
-            self.notifications.with_dispatch_lock(|pending| {
-                remaining.retain(|&index| {
-                    if !self.mp.ap_healthy(index) {
-                        return false;
-                    }
-                    if pending.iter().any(|dispatch| dispatch.claims(index)) {
-                        return true;
-                    }
-                    match self.mp.ap_availability(index) {
-                        ProcessorState::Ready => match self.mp.sync_ap(index) {
-                            Some(work_id) => {
-                                active.push((index, work_id));
-                                false
-                            }
-                            None => true,
-                        },
-                        ProcessorState::Busy => true,
-                        ProcessorState::NotStarted | ProcessorState::Disabled => false,
-                    }
-                });
-            });
-
-            if self.deadline_passed(deadline) {
-                break;
-            }
-            core::hint::spin_loop();
-        }
-
-        // Every AP has either been dispatched or the shared deadline has elapsed.
-        // Use any time left to await the concurrent work, then fence unfinished APs.
-        for (index, work_id) in active {
-            if !wait_ap_until(&self.mp, self.timer, deadline, index, work_id) {
-                fence_off(&self.mp, index);
-            }
-        }
-        for index in remaining {
-            fence_off(&self.mp, index);
-        }
+        self.notifications.finish_pending(&self.mp, self.timer);
+        let synchronized = self.notifications.with_dispatch_lock(|pending| {
+            debug_assert!(pending.is_empty());
+            self.mp.sync_aps()
+        });
+        assert!(synchronized, "failed to synchronize BSP MTRRs to every enabled AP");
     }
 
     /// Returns the [`mp_services::ProcessorInformation`] for `index`.
@@ -286,10 +245,6 @@ impl MpServices {
                 if aps.is_empty() { Err(MpError::NotStarted) } else { Ok(aps) }
             }
         }
-    }
-
-    fn deadline_passed(&self, deadline: Option<u64>) -> bool {
-        deadline.is_some_and(|deadline| self.timer.cpu_count() >= deadline)
     }
 
     /// Runs `work` on all started APs. Only callable from the BSP.

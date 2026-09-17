@@ -170,6 +170,6 @@ extern "efiapi" fn ap_entry(context: *const ApContext) {
         // SAFETY: The AP park routine disables interrupts and does not return.
         unsafe { super::park::ap_park() }
     };
-    context.cpu_state.apply();
+    super::cpu_state::apply();
     super::MpSupport::ap_run_dispatch_loop(context);
 }

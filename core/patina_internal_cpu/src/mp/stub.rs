@@ -107,7 +107,7 @@ impl MpDispatcher for MpSupport {
         unreachable!();
     }
 
-    fn sync_ap(&self, _index: usize) -> Option<u64> {
+    fn sync_aps(&self) -> bool {
         unreachable!()
     }
 }

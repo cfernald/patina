@@ -168,11 +168,10 @@ pub trait MpDispatcher: Sized {
     /// This is terminal: the APs cannot be dispatched to again.
     fn park(&self);
 
-    /// Publishes architecture-specific state from the BSP to the AP at `index` and
-    /// dispatches it, returning the id identifying the dispatch. On x64 this
-    /// replicates the BSP's MTRR settings.
+    /// Publishes architecture-specific state from the BSP to all enabled APs and
+    /// blocks until every AP applies it. On x64 this replicates the BSP's MTRRs.
     ///
-    /// The caller owns scheduling: it selects the processor, holds the dispatch lock
-    /// across this call, and waits on the returned id.
-    fn sync_ap(&self, index: usize) -> Option<u64>;
+    /// The caller must hold the dispatch lock and ensure no AP is busy. This operation
+    /// has no timeout: success means every targeted AP completed the synchronization.
+    fn sync_aps(&self) -> bool;
 }

@@ -60,8 +60,6 @@ pub struct ApContext {
     apic_id: AtomicU32,
     /// Dispatch state machine plus the work slot it guards for this AP.
     sm: ApStateMachine,
-    /// Architectural state and persistent synchronization storage for this AP.
-    cpu_state: cpu_state::ApCpuState,
     /// Task state used to reset the stack before terminal double-fault handling.
     tss: crate::gdt::TaskStateSegment,
     /// GDT containing this AP's unique TSS descriptor.
@@ -79,7 +77,6 @@ impl ApContext {
             stack_top: AtomicU64::new(0),
             apic_id: AtomicU32::new(APIC_ID_INVALID),
             sm: ApStateMachine::new(),
-            cpu_state: cpu_state::ApCpuState::new(),
             tss: crate::gdt::TaskStateSegment::new(0),
             gdt: crate::gdt::ApGdt::new(),
             gdtr: crate::gdt::DescriptorTablePointer { limit: 0, base: 0 },
@@ -234,10 +231,6 @@ impl MpSupport {
         // SAFETY: INIT delivery has completed and the architectural settle time
         // has elapsed, so this AP is in wait-for-SIPI and cannot reload TR.
         unsafe { ctx.gdt.reset_tss_descriptor(core::ptr::addr_of!(ctx.tss) as u64) };
-        if !ctx.cpu_state.prepare_entry() {
-            ctx.sm.set_healthy(false);
-            return false;
-        }
         apic::send_startup(apic_id, self.startup_vector);
         self.try_for(SIPI_DELAY_US, || false);
         apic::send_startup(apic_id, self.startup_vector);
@@ -351,7 +344,7 @@ impl MpDispatcher for MpSupport {
         };
         ap_setup::setup(mp.contexts);
 
-        if mp.contexts.iter().any(|ctx| !ctx.cpu_state.prepare_entry()) {
+        if cpu_state::capture().is_err() {
             log::error!("Failed to prepare BSP MTRRs for AP startup");
             return Err(EfiError::DeviceError);
         }
@@ -478,18 +471,34 @@ impl MpDispatcher for MpSupport {
         }
     }
 
-    fn sync_ap(&self, index: usize) -> Option<u64> {
+    fn sync_aps(&self) -> bool {
         if self.shutting_down.load(Ordering::Acquire) {
-            return None;
-        }
-        let ctx = self.contexts.get(index)?;
-        // The snapshot is only writable while the processor is idle.
-        if ctx.sm.state() != ProcessorState::Ready {
-            return None;
+            return false;
         }
 
-        let work = ctx.cpu_state.prepare_mtrr_sync()?;
-        ctx.sm.dispatch(work).ok()
+        if self.contexts.iter().any(|ctx| ctx.sm.state() == ProcessorState::Busy) {
+            return false;
+        }
+
+        let Ok(supported) = cpu_state::capture() else {
+            log::error!("Failed to capture BSP MTRRs for AP synchronization");
+            return false;
+        };
+        if !supported {
+            return true;
+        }
+
+        let work = ApWorkItem::new(|()| cpu_state::apply(), &());
+        for ctx in self.contexts.iter().filter(|ctx| ctx.sm.state() == ProcessorState::Ready) {
+            if ctx.sm.dispatch(work).is_err() {
+                return false;
+            }
+        }
+
+        while self.contexts.iter().any(|ctx| ctx.sm.state() == ProcessorState::Busy) {
+            core::hint::spin_loop();
+        }
+        true
     }
 }
 
