@@ -184,11 +184,13 @@ impl MpSupport {
         let ticks = timeout_us.saturating_mul(self.perf_frequency.get()).div_ceil(1_000_000);
         let start = self.timer.cpu_count();
         while self.timer.cpu_count().wrapping_sub(start) < ticks {
+            ap_setup::check_for_failures();
             if done() {
                 return true;
             }
             core::hint::spin_loop();
         }
+        ap_setup::check_for_failures();
         done()
     }
 
@@ -200,18 +202,22 @@ impl MpSupport {
         (Self::cpuid(1, 0).ecx & bit!(3)) != 0
     }
 
-    fn ap_run_dispatch_loop(ctx: &'static ApContext) {
+    fn ap_run_dispatch_loop(ctx: &'static ApContext) -> ! {
         apic::mask_local_interrupts();
 
         let Some(ap) = ctx.sm.start() else {
-            return;
+            Self::fail_ap(ap_setup::FAILURE_START_REJECTED, 0);
         };
+        ap_setup::increment_started_count();
 
         let use_mwait = Self::is_monitor_supported();
         loop {
             match ap.execute_pending_work() {
                 ApAction::Executed => continue,
-                ApAction::Exit => break,
+                ApAction::Exit => {
+                    // SAFETY: The park environment was installed before APs were started.
+                    unsafe { park::ap_park() }
+                }
                 ApAction::Idle => {}
             }
             if use_mwait {
@@ -224,6 +230,17 @@ impl MpSupport {
 
     fn get_current_apic_id() -> u32 {
         if Self::is_x2apic_enabled() { Self::cpuid(0xB, 0).edx } else { Self::cpuid(1, 0).ebx >> 24 }
+    }
+
+    fn fail_ap(reason: u32, detail: u64) -> ! {
+        // SAFETY: The assembly routine follows the EFIAPI register convention and never returns.
+        unsafe { ap_setup::ap_record_failure(reason, detail, Self::get_current_apic_id()) }
+    }
+
+    fn apply_mtrrs_or_fail() {
+        if !sync::apply() {
+            Self::fail_ap(ap_setup::FAILURE_MTRR_SETUP, 0);
+        }
     }
 
     fn reset_ap(&self, ctx: &ApContext) -> bool {
@@ -433,6 +450,7 @@ impl MpDispatcher for MpSupport {
 
         // Wait for all APs to migrate into the dispatch loop.
         self.try_for(AP_STARTUP_TIMEOUT_US, || self.started_ap_count() == ap_count);
+        ap_setup::check_for_failures();
         let started_count = self.started_ap_count();
         let ap_start_time =
             (self.timer.cpu_count().saturating_sub(start_timestamp) * 1_000_000) / self.perf_frequency.get();
@@ -493,14 +511,17 @@ impl MpDispatcher for MpSupport {
     }
 
     fn ap_finished(&self, index: usize, work_id: u64) -> bool {
+        ap_setup::check_for_failures();
         self.contexts.get(index).is_some_and(|ctx| ctx.sm.is_finished(work_id))
     }
 
     fn ap_availability(&self, index: usize) -> ProcessorState {
+        ap_setup::check_for_failures();
         self.contexts.get(index).map_or(ProcessorState::NotStarted, |ctx| ctx.sm.state())
     }
 
     fn signal_ap(&self, index: usize, work: ApWorkItem) -> Option<u64> {
+        ap_setup::check_for_failures();
         if self.shutting_down.load(Ordering::Acquire) {
             return None;
         }
@@ -508,6 +529,7 @@ impl MpDispatcher for MpSupport {
     }
 
     fn abort_ap(&self, index: usize, work_id: u64) -> bool {
+        ap_setup::check_for_failures();
         let Some(ctx) = self.contexts.get(index) else {
             return false;
         };
@@ -520,6 +542,7 @@ impl MpDispatcher for MpSupport {
     }
 
     fn park(&self) {
+        ap_setup::check_for_failures();
         self.shutting_down.store(true, Ordering::Release);
 
         let expected = self.started_ap_count();
@@ -528,6 +551,7 @@ impl MpDispatcher for MpSupport {
         }
 
         self.try_for(AP_PARK_TIMEOUT_US, || park::parked_count() as usize == expected);
+        ap_setup::check_for_failures();
         let parked = park::parked_count() as usize;
         if parked == expected {
             log::info!("Parked application processors: {parked}/{expected} acknowledged");
@@ -538,6 +562,7 @@ impl MpDispatcher for MpSupport {
     }
 
     fn sync_aps(&self) -> bool {
+        ap_setup::check_for_failures();
         if self.shutting_down.load(Ordering::Acquire) {
             return false;
         }
@@ -555,7 +580,7 @@ impl MpDispatcher for MpSupport {
         }
 
         let start_ts = self.timer.cpu_count();
-        let work = ApWorkItem::new(|()| sync::apply(), &());
+        let work = ApWorkItem::new(|()| Self::apply_mtrrs_or_fail(), &());
         for ctx in self.contexts.iter().filter(|ctx| ctx.sm.state() == ProcessorState::Ready) {
             if ctx.sm.dispatch(work).is_err() {
                 return false;
@@ -563,8 +588,10 @@ impl MpDispatcher for MpSupport {
         }
 
         while self.contexts.iter().any(|ctx| ctx.sm.state() == ProcessorState::Busy) {
+            ap_setup::check_for_failures();
             core::hint::spin_loop();
         }
+        ap_setup::check_for_failures();
         let end_ts = self.timer.cpu_count();
         let elapsed_us = u64::from(end_ts.wrapping_sub(start_ts)) * 1_000_000 / u64::from(self.perf_frequency.get());
         log::info!("AP MTRR synchronization completed in {elapsed_us} us.");

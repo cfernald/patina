@@ -6,10 +6,21 @@
 #
 
 .code64
+.globl ap_park
 .globl ap_park_stub_start
 .globl ap_park_exception
 .globl ap_park_stub_end
 
+# Assembly routine for jumping to the reserved park stub. This routine does not
+# use the caller's stack, so it is safe as an exception target or a direct
+# x64/EFI ABI call from C or Rust.
+ap_park:
+    cli
+    cld
+
+    mov rcx, qword ptr [rip + AP_PARK_CONFIG]
+    mov rax, qword ptr [rip + AP_PARK_ENTRY]
+    jmp rax
 
 # Park stub entry
 #

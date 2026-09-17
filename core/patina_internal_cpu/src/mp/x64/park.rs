@@ -58,16 +58,17 @@ unsafe extern "C" {
     fn ap_park_stub_start();
     fn ap_park_exception();
     fn ap_park_stub_end();
+}
 
-    /// Parks the current processor in the reserved environment and never returns.
+unsafe extern "efiapi" {
     pub(super) fn ap_park() -> !;
 }
 
-/// Reserved entry address consumed by the handoff assembly when no AP context exists.
+/// Reserved entry address used when an AP exits its dispatch loop.
 #[unsafe(no_mangle)]
 pub(super) static AP_PARK_ENTRY: AtomicU64 = AtomicU64::new(0);
 
-/// Reserved configuration address consumed by the handoff assembly.
+/// Reserved configuration address used by AP parking.
 #[unsafe(no_mangle)]
 pub(super) static AP_PARK_CONFIG: AtomicU64 = AtomicU64::new(0);
 

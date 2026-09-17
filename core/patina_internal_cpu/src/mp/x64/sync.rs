@@ -40,19 +40,20 @@ impl MtrrState {
         Ok(true)
     }
 
-    fn apply(&self) {
+    fn apply(&self) -> bool {
         let mut mtrr = create_mtrr_lib(0);
         if !mtrr.is_supported() {
-            return;
+            return true;
         }
 
         // SAFETY: The BSP publishes the snapshot before dispatching this work
         // or starting an AP, and does not replace it until every AP is idle.
         let Some(settings) = (unsafe { &*self.mtrrs.get() }).as_ref() else {
             log::error!("AP MTRR synchronization ran without a prepared snapshot");
-            return;
+            return false;
         };
         mtrr.set_all_mtrrs(settings);
+        true
     }
 }
 
@@ -62,6 +63,6 @@ pub(super) fn capture() -> Result<bool, ()> {
 }
 
 /// Applies the current global MTRR snapshot on the calling AP.
-pub(super) fn apply() {
-    MTRR_STATE.apply();
+pub(super) fn apply() -> bool {
+    MTRR_STATE.apply()
 }

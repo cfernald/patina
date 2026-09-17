@@ -19,7 +19,6 @@
 
 .code64
 .globl ap_entry_64
-.globl ap_park
 
 ap_entry_64:
     # APs are not expecting to handle interrupts, and the EFI ABI requires DF clear.
@@ -47,9 +46,6 @@ ap_entry_64:
     # accessed through the BSP's page tables.
     mov rax, qword ptr [rip + AP_SETUP + {setup_cr3_off}]
     mov cr3, rax
-
-    # Inform the core that an AP has started.
-    lock inc dword ptr [rip + AP_SETUP + {setup_started_count_off}]
 
 identify_processor:
     # Check if x2APIC is enabled via IA32_APIC_BASE MSR (0x1B), bit 10.
@@ -89,8 +85,7 @@ got_apic_id:
     # R8D = ApContext count
 search_loop:
     cmp ecx, r8d
-    # If the entry is not found, just park the processor.
-    jae ap_park
+    jae context_not_found
 
     # Calculate the entry address from the array base and context size.
     mov rdi, rcx
@@ -143,25 +138,15 @@ gdt_loaded:
     call {ap_entry}
     add rsp, 0x20
 
-    # Returning from the dispatch loop is a terminal park request.
-    jmp ap_park
+    # Rust parks normal exits directly. Returning here means the AP entry path
+    # violated its non-returning contract.
+    xor edx, edx
+    mov ecx, {failure_entry_returned}
+    jmp ap_record_failure_current
 
-# Assembly routine for jumping to the park stub. This routine does not
-# use the caller's stack, so it is safe as an exception target or a direct
-# x64/EFI ABI call from C or Rust.
-ap_park:
-    cli
-    cld
-
-    mov rcx, qword ptr [rip + AP_PARK_CONFIG]
-    test rcx, rcx
-    jz park_unavailable
-
-    mov rax, qword ptr [rip + AP_PARK_ENTRY]
-    test rax, rax
-    jz park_unavailable
-    jmp rax
-
-park_unavailable:
-    hlt
-    jmp park_unavailable
+context_not_found:
+    mov r9d, edx
+    mov edx, r8d
+    mov r8d, r9d
+    mov ecx, {failure_context_not_found}
+    jmp ap_record_failure
