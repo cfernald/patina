@@ -42,9 +42,14 @@ impl<T: SerialIO> SharedSerial<T> {
     /// same core re-enters the port while already holding it (e.g. logging from a panic handler
     /// mid-write). Prefer [`SharedSerial::new`] unless you specifically need lossless output.
     #[must_use]
-    pub fn with_blocking(mut self) -> Self {
-        self.blocking = true;
+    pub const fn with_blocking(mut self) -> Self {
+        self.enable_blocking();
         self
+    }
+
+    /// Enables blocking (spinning) acquisition in place.
+    pub const fn enable_blocking(&mut self) {
+        self.blocking = true;
     }
 
     /// Acquire the underlying serial port, honoring the configured blocking behavior.
@@ -54,6 +59,7 @@ impl<T: SerialIO> SharedSerial<T> {
     fn acquire(&self) -> Result<spin::MutexGuard<'_, T, spin::Spin>, EfiError> {
         if self.blocking { Ok(self.serial.lock()) } else { self.serial.try_lock().ok_or(EfiError::DeviceError) }
     }
+
     /// Initialize the serial port.
     pub fn init(&self) -> Result<(), EfiError> {
         with_interrupts_disabled(|| {

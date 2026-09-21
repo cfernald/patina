@@ -77,7 +77,7 @@ where
         hardware_port: S,
     ) -> Self {
         Self {
-            hardware_port: SharedSerial::new(hardware_port),
+            hardware_port: SharedSerial::new(hardware_port).with_blocking(),
             target_filters,
             max_level,
             hw_print_level_override_callback: None,
@@ -85,6 +85,15 @@ where
             memory_log: RwLock::new(None),
             timer: Service::new_uninit(),
         }
+    }
+
+    /// Enables blocking hardware-port access so concurrent writes are serialized.
+    ///
+    /// This may be enabled on systems that support MP services where the APs may log concurrently.
+    #[must_use]
+    pub const fn with_concurrency_allowed(mut self) -> Self {
+        self.hardware_port.enable_blocking();
+        self
     }
 
     /// Sets a callback that can override the effective hardware print level before each hardware port write.
