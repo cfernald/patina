@@ -128,6 +128,7 @@ pub mod dxe_dispatch;
 pub mod memory;
 pub mod perf_timer;
 pub mod performance;
+pub mod random;
 
 pub use patina_macro::IntoService;
 
