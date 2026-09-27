@@ -135,6 +135,7 @@ pub mod memory;
 pub mod perf_timer;
 pub mod performance;
 pub mod uefi_services;
+pub mod random;
 
 pub use patina_macro::IntoService;
 
