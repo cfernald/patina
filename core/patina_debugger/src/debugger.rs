@@ -251,8 +251,9 @@ impl<T: SerialIO> PatinaDebugger<T> {
             // Until some traffic is received, wait for the timeout before entering the state machine.
             if timeout != 0
                 && let Some(timer) = debug.timer
+                && let frequency = timer.perf_frequency()
+                && frequency != 0
             {
-                let frequency = timer.perf_frequency();
                 let initial_count = timer.cpu_count();
                 loop {
                     if (timer.cpu_count() - initial_count) / frequency >= u64::from(timeout) {
@@ -526,4 +527,101 @@ fn debugger_crash(error: DebugError, exception_type: ExceptionType) -> ! {
     // debugger bugs easier for now.
     #[allow(clippy::empty_loop)]
     loop {}
+}
+
+#[cfg(test)]
+#[cfg_attr(coverage, coverage(off))]
+mod tests {
+    use alloc::boxed::Box;
+    use core::sync::atomic::AtomicU64;
+
+    use patina::peripheral::serial::MockSerialIO;
+
+    use super::*;
+    use crate::ExceptionType as DebugExceptionType;
+
+    struct TestTimer {
+        frequency: u64,
+        count: AtomicU64,
+    }
+
+    impl TestTimer {
+        const fn new(frequency: u64) -> Self {
+            Self { frequency, count: AtomicU64::new(0) }
+        }
+    }
+
+    impl ArchTimerFunctionality for TestTimer {
+        fn cpu_count(&self) -> u64 {
+            self.count.fetch_add(1, Ordering::Relaxed)
+        }
+
+        fn perf_frequency(&self) -> u64 {
+            self.frequency
+        }
+    }
+
+    fn exception_info() -> ExceptionInfo {
+        // SAFETY: An all-zero exception context is valid test data because these commands do not inspect registers.
+        let context = unsafe { core::mem::zeroed() };
+        ExceptionInfo { exception_type: DebugExceptionType::Breakpoint, instruction_pointer: 0, context }
+    }
+
+    fn initialize_debugger<T: SerialIO>(debugger: &'static PatinaDebugger<T>, timer: Option<&'static TestTimer>) {
+        let mut internal = debugger.internal.lock();
+        internal.gdb_buffer = Some(NonNull::new(Box::leak(Box::new([0; GDB_BUFF_LEN]))).unwrap());
+        internal.timer = timer.map(|timer| timer as &dyn ArchTimerFunctionality);
+        internal.initial_breakpoint = timer.is_some();
+    }
+
+    #[test]
+    fn test_debugger_enter_debugger_resumes() {
+        let mut resume_packet = b"$c#63".iter().copied();
+        let mut serial = MockSerialIO::new();
+        serial.expect_try_read().once().return_const(None);
+        serial.expect_read().times(5).returning(move || resume_packet.next().unwrap());
+        serial.expect_write().returning(|_| ());
+
+        let debugger = Box::leak(Box::new(PatinaDebugger::new(serial)));
+        initialize_debugger(debugger, None);
+        let result = debugger.enter_debugger(exception_info(), false);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_debugger_timeout() {
+        let mut serial = MockSerialIO::new();
+        serial.expect_try_read().once().return_const(None);
+        serial.expect_write().returning(|_| ());
+
+        let timer = Box::leak(Box::new(TestTimer::new(1)));
+        let debugger = Box::leak(Box::new(PatinaDebugger::new(serial).with_timeout(1)));
+        initialize_debugger(debugger, Some(timer));
+
+        let result = debugger.enter_debugger(exception_info(), false);
+
+        assert!(result.is_ok());
+        assert!(debugger.connection_timed_out.load(Ordering::Relaxed));
+        assert_eq!(timer.count.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn test_debugger_timeout_no_frequency() {
+        let mut resume_packet = b"$c#63".iter().copied();
+        let mut serial = MockSerialIO::new();
+        serial.expect_try_read().once().return_const(None);
+        serial.expect_read().times(5).returning(move || resume_packet.next().unwrap());
+        serial.expect_write().returning(|_| ());
+
+        let timer = Box::leak(Box::new(TestTimer::new(0)));
+        let debugger = Box::leak(Box::new(PatinaDebugger::new(serial).with_timeout(1)));
+        initialize_debugger(debugger, Some(timer));
+
+        let result = debugger.enter_debugger(exception_info(), false);
+
+        assert!(result.is_ok());
+        assert!(!debugger.connection_timed_out.load(Ordering::Relaxed));
+        assert_eq!(timer.count.load(Ordering::Relaxed), 0);
+    }
 }

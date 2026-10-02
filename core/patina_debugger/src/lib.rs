@@ -110,7 +110,6 @@ mod arch;
 #[cfg_attr(coverage, coverage(off))]
 // The debugger needs integration test infrastructure. Disabling coverage until this is completed.
 mod dbg_target;
-#[cfg_attr(coverage, coverage(off))]
 // The debugger needs integration test infrastructure. Disabling coverage until this is completed.
 mod debugger;
 mod memory;

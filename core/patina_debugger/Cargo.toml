@@ -24,6 +24,7 @@ bitfield-struct = { workspace = true  }
 
 [dev-dependencies]
 mockall = { workspace = true }
+patina = { workspace = true, features = ["mockall"] }
 serial_test = { workspace = true }
 
 [target.'cfg(all(target_arch="x86_64"))'.dependencies]
