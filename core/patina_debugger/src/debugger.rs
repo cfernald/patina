@@ -23,7 +23,7 @@ use gdbstub::{
     stub::{GdbStubBuilder, SingleThreadStopReason, state_machine::GdbStubStateMachine},
 };
 use patina::{
-    component::service::perf_timer::ArchTimerFunctionality,
+    component::service::perf_timer::{ArchTimerFunctionality, ArchTimerFunctionalityExt},
     peripheral::serial::{SerialIO, shared::SharedSerial},
 };
 use patina_internal_cpu::interrupts::{ExceptionType, HandlerType, InterruptHandler, InterruptManager};
@@ -251,12 +251,10 @@ impl<T: SerialIO> PatinaDebugger<T> {
             // Until some traffic is received, wait for the timeout before entering the state machine.
             if timeout != 0
                 && let Some(timer) = debug.timer
-                && let frequency = timer.perf_frequency()
-                && frequency != 0
+                && let Some(mut stopwatch) = timer.start_stopwatch()
             {
-                let initial_count = timer.cpu_count();
                 loop {
-                    if (timer.cpu_count() - initial_count) / frequency >= u64::from(timeout) {
+                    if stopwatch.elapsed_seconds() >= u64::from(timeout) {
                         timeout_reached = true;
                         break;
                     }
