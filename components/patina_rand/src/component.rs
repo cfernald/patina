@@ -48,10 +48,14 @@ impl RandomNumberGenerator {
         storage: &mut Storage,
         timer: Option<Service<dyn ArchTimerFunctionality>>,
     ) -> patina::error::Result<()> {
-        if let Some(arch_rng) = crate::sources::get_architecture_rng_source() {
+        // Prioritize architecture-backed RNG sources first.
+        if let Some(arch_rng) = crate::sources::get_cpu_rng_source() {
             self.add_source(arch_rng);
+        } else {
+            log::warn!("No CPU-backed RNG source found. Only timer-based RNG will be available.");
         }
 
+        // Add a timer-based RNG source as a fallback.
         if let Some(timer) = timer {
             let timer_rng = sources::timer::TimerRngSource::new(*timer);
             self.add_source(Box::new(timer_rng));
