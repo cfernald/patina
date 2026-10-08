@@ -19,6 +19,9 @@ use patina::{
 const ARM_RNDR_ALGORITHM_GUID: efi::Guid =
     efi::Guid::from_fields(0x43d2fde3, 0x9d4e, 0x4d79, 0x02, 0x96, &[0xa8, 0x9b, 0xca, 0x78, 0x08, 0x41]);
 
+const EDKII_RNG_ALGORITHM_UNSAFE_GUID: efi::Guid =
+    efi::Guid::from_fields(0x869f728c, 0x409d, 0x4ab4, 0xac, 0x03, &[0x71, 0xd3, 0x09, 0xc1, 0xb3, 0xf4]);
+
 #[repr(C)]
 pub(crate) struct RngProtocol<R> {
     protocol: rng::Protocol,
@@ -41,7 +44,8 @@ unsafe impl<R> ProtocolInterface for RngProtocol<R> {
 fn algorithm_guid(algorithm: RandomAlgorithm) -> efi::Guid {
     match algorithm {
         RandomAlgorithm::Sp80090Ctr256 => rng::ALGORITHM_SP800_90_CTR_256_GUID,
-        RandomAlgorithm::UnknownNist => ARM_RNDR_ALGORITHM_GUID,
+        RandomAlgorithm::UnknownNistRndr => ARM_RNDR_ALGORITHM_GUID,
+        RandomAlgorithm::UnsafePseudoRandom => EDKII_RNG_ALGORITHM_UNSAFE_GUID,
     }
 }
 
@@ -49,7 +53,9 @@ fn algorithm_from_guid(guid: efi::Guid) -> Option<RandomAlgorithm> {
     if guid == rng::ALGORITHM_SP800_90_CTR_256_GUID {
         Some(RandomAlgorithm::Sp80090Ctr256)
     } else if guid == ARM_RNDR_ALGORITHM_GUID {
-        Some(RandomAlgorithm::UnknownNist)
+        Some(RandomAlgorithm::UnknownNistRndr)
+    } else if guid == EDKII_RNG_ALGORITHM_UNSAFE_GUID {
+        Some(RandomAlgorithm::UnsafePseudoRandom)
     } else {
         None
     }

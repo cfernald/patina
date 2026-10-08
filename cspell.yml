@@ -182,6 +182,7 @@ words:
   - qword
   - rdmsr
   - rdram
+  - rdrand
   - rdtsc
   - reborrow
   - reentrancy
