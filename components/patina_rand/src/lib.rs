@@ -5,8 +5,7 @@
 
 extern crate alloc;
 
-mod architecture;
-mod protocol;
+// mod protocol;
 mod sources;
 
 pub mod component;
