@@ -1,3 +1,12 @@
+//! x64 RDRAND instruction random-number source.
+//!
+//! ## License
+//!
+//! Copyright (c) Microsoft Corporation.
+//!
+//! SPDX-License-Identifier: Apache-2.0
+//!
+
 use core::arch::{asm, x86_64::__cpuid};
 
 use patina::{
@@ -16,7 +25,7 @@ impl RdRand {
     const CPU_ID_LEAF: u32 = 1;
     const CPU_ID_SUPPORT: u32 = bit!(30);
 
-    /// Creates a new instance of `RdRand` if the CPU supports the RDRAND instruction and it passes the self-test.
+    /// Creates a new instance of [`RdRand`] if the CPU supports the RDRAND instruction and it passes the test.
     /// Returns `None` otherwise.
     pub fn new() -> Option<Self> {
         if !Self::is_supported() {
@@ -40,8 +49,7 @@ impl RdRand {
 
     /// A test of the RDRAND instruction to check for CPU errata.
     ///
-    /// This is unexpected to fail on a modern CPU, but left in out of an abundance of caution and parity
-    /// with EDKII.
+    /// This is unexpected to fail on a modern CPU, but left in out of an abundance of caution and parity with EDKII.
     fn test_rdrand(&self) -> bool {
         const RETRY_LIMIT: usize = 10;
         const SAMPLES: usize = 10;
@@ -73,7 +81,7 @@ impl RdRand {
         changes >= MIN_CHANGES
     }
 
-    /// Draws a random 64-bit word using the RDRAND instruction.
+    /// Gets a random 64-bit word using the RDRAND instruction.
     pub fn rdrand(&self) -> Option<u64> {
         let value: u64;
         let success: u8;

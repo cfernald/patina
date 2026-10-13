@@ -57,7 +57,7 @@ impl Rndr {
 
 impl RngSource for Rndr {
     fn algorithm(&self) -> RandomAlgorithm {
-        RandomAlgorithm::UnknownNistRndr
+        RandomAlgorithm::UnknownAArch64Rndr
     }
 
     fn generate(&self) -> Result<u64, RandomError> {

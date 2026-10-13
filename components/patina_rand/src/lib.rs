@@ -5,7 +5,7 @@
 
 extern crate alloc;
 
-// mod protocol;
+mod protocol;
 mod sources;
 
 pub mod component;

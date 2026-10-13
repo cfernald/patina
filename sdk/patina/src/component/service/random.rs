@@ -7,6 +7,7 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
+use crate::standard::efi;
 use core::mem::size_of;
 
 #[cfg(any(test, feature = "mockall"))]
@@ -15,12 +16,27 @@ use mockall::automock;
 /// A random-number generation algorithm exposed by the firmware.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RandomAlgorithm {
-    /// NIST SP 800-90A AES-CTR with a 256-bit key, as provided by x86 `RDRAND`.
+    /// NIST SP 800-90A AES-CTR with a 256-bit key.
+    ///
+    /// This algorithm is used by the x86 `RDRAND` instruction.
     Sp80090Ctr256,
-    /// The implementation-defined NIST SP 800-90A compliant algorithm provided by `AArch64` `RNDR`.
-    UnknownNistRndr,
-    /// A software-based pseudo-random number generator. Not suitable for cryptographic purposes.
-    UnsafePseudoRandom,
+    /// The implementation-defined "market requirement appropriate" algorithm provided by `AArch64` `RNDR`.
+    ///
+    /// Reference: [Properties of the generated random number.](https://support.arm.com/documentation/ddi0487/md/-Part-K-Appendixes/-Appendix-K12-Random-Number-Generation/-K12-1-Properties-of-the-generated-random-number)
+    UnknownAArch64Rndr,
+    /// An insecure, non-cryptographic pseudo-random number generator.
+    InsecurePseudoRandom,
+}
+
+impl RandomAlgorithm {
+    /// Returns `true` if the algorithm is considered insecure and should not be used for cryptographic
+    /// or other security critical purposes.
+    pub fn is_insecure(&self) -> bool {
+        match self {
+            RandomAlgorithm::Sp80090Ctr256 | RandomAlgorithm::UnknownAArch64Rndr => false,
+            RandomAlgorithm::InsecurePseudoRandom => true,
+        }
+    }
 }
 
 /// An error returned by a [`Random`] service.
@@ -30,6 +46,15 @@ pub enum RandomError {
     UnsupportedAlgorithm,
     /// The random source did not produce data within its bounded retry limit.
     NotReady,
+}
+
+impl From<RandomError> for efi::Status {
+    fn from(error: RandomError) -> Self {
+        match error {
+            RandomError::UnsupportedAlgorithm => efi::Status::UNSUPPORTED,
+            RandomError::NotReady => efi::Status::NOT_READY,
+        }
+    }
 }
 
 /// Provides random bytes using a platform random-number generator.
@@ -44,6 +69,7 @@ pub trait Random: Send + Sync {
     fn fill_bytes_with_algorithm(&self, algorithm: RandomAlgorithm, output: &mut [u8]) -> Result<(), RandomError>;
 }
 
+/// Extension trait for [`Random`] providing convenience methods.
 pub trait RandomExt: Random {
     /// Fills `output` using the service's preferred algorithm.
     fn fill_bytes(&self, output: &mut [u8]) -> Result<(), RandomError> {

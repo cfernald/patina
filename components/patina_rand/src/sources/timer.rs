@@ -1,3 +1,12 @@
+//! Time & counter based pseudo-random number generator source.
+//!
+//! ## License
+//!
+//! Copyright (c) Microsoft Corporation.
+//!
+//! SPDX-License-Identifier: Apache-2.0
+//!
+
 use core::hash::{Hash, Hasher};
 
 use core::sync::atomic::AtomicU64;
@@ -25,7 +34,7 @@ impl<'a> TimerRngSource<'a> {
 
 impl<'a> RngSource for TimerRngSource<'a> {
     fn algorithm(&self) -> RandomAlgorithm {
-        RandomAlgorithm::UnsafePseudoRandom
+        RandomAlgorithm::InsecurePseudoRandom
     }
 
     fn generate(&self) -> Result<u64, RandomError> {

@@ -16,12 +16,16 @@ use patina::{
             IntoService, Service,
             perf_timer::ArchTimerFunctionality,
             random::{Random, RandomAlgorithm, RandomError},
+            uefi_services::protocol::{ProtocolServices, ProtocolServicesExt},
         },
     },
     error::EfiError,
 };
 
-use crate::sources::{self, RngSource};
+use crate::{
+    protocol::RngProtocol,
+    sources::{self, RngSource},
+};
 
 /// Provides architecture-backed random numbers as a Rust service and the UEFI RNG protocol.
 #[derive(IntoService)]
@@ -29,16 +33,28 @@ use crate::sources::{self, RngSource};
 pub struct RandomNumberGenerator {
     algorithms: Vec<RandomAlgorithm>,
     sources: Vec<Box<dyn RngSource>>,
+    allow_insecure: bool,
 }
 
 #[component]
 impl RandomNumberGenerator {
     /// Creates a random-number generator component.
     pub const fn new() -> Self {
-        Self { algorithms: Vec::new(), sources: Vec::new() }
+        Self { algorithms: Vec::new(), sources: Vec::new(), allow_insecure: false }
     }
 
+    /// Enables the use of insecure pseudo-random number generator sources.
+    pub const fn with_allow_insecure_algorithms(mut self) -> Self {
+        self.allow_insecure = true;
+        self
+    }
+
+    /// Adds a random-number generator source to the component.
+    ///
+    /// This could be made public in the future to allow for platform extensions, but is being
+    /// left private until there is a clear need non-standard sources.
     fn add_source(&mut self, source: Box<dyn RngSource>) {
+        debug_assert!(self.allow_insecure || !source.algorithm().is_insecure());
         self.algorithms.push(source.algorithm());
         self.sources.push(source);
     }
@@ -55,8 +71,10 @@ impl RandomNumberGenerator {
             log::warn!("No CPU-backed RNG source found. Only timer-based RNG will be available.");
         }
 
-        // Add a timer-based RNG source as a fallback.
-        if let Some(timer) = timer {
+        // Add a timer-based RNG source as a fallback if allowed.
+        if self.allow_insecure
+            && let Some(timer) = timer
+        {
             let timer_rng = sources::timer::TimerRngSource::new(*timer);
             self.add_source(Box::new(timer_rng));
         }
@@ -95,12 +113,27 @@ impl Random for RandomNumberGenerator {
         algorithm: RandomAlgorithm,
         output: &mut [u8],
     ) -> core::result::Result<(), RandomError> {
-        let rng = self.get_rng(algorithm)?;
+        let rng: &dyn RngSource = self.get_rng(algorithm)?;
         for chunk in output.chunks_mut(8) {
-            let word = rng.generate()?;
-            let bytes = word.to_ne_bytes();
-            chunk.copy_from_slice(&bytes);
+            let rand_bytes = rng.generate()?.to_ne_bytes();
+            chunk.copy_from_slice(&rand_bytes[..chunk.len()]);
         }
+        Ok(())
+    }
+}
+
+/// Component responsible for installing the RNG protocol.
+pub struct RngProtocolPublisher;
+
+#[component]
+impl RngProtocolPublisher {
+    fn entry_point(
+        self,
+        rng: Service<dyn Random>,
+        protocols: Service<dyn ProtocolServices>,
+    ) -> patina::error::Result<()> {
+        let rng_protocol = Box::new(RngProtocol::new(rng));
+        protocols.install_protocol::<RngProtocol>(None, rng_protocol)?;
         Ok(())
     }
 }
