@@ -13,7 +13,7 @@ use patina::{
     BinaryGuid,
     component::service::{
         Service,
-        random::{Random, RandomAlgorithm, RandomError, RandomExt},
+        random::{Random, RandomAlgorithm, RandomExt},
     },
     protocol::ProtocolInterface,
     standard::efi::{self, protocols::rng},

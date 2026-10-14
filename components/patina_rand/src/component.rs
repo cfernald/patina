@@ -52,7 +52,7 @@ impl RandomNumberGenerator {
     /// Adds a random-number generator source to the component.
     ///
     /// This could be made public in the future to allow for platform extensions, but is being
-    /// left private until there is a clear need non-standard sources.
+    /// left private until there is a clear need for non-standard sources.
     fn add_source(&mut self, source: Box<dyn RngSource>) {
         debug_assert!(self.allow_insecure || !source.algorithm().is_insecure());
         self.algorithms.push(source.algorithm());
@@ -122,7 +122,7 @@ impl Random for RandomNumberGenerator {
     }
 }
 
-/// Component responsible for installing the RNG protocol.
+/// Component responsible for installing the RNG protocol using the [`Random`] service.
 pub struct RngProtocolPublisher;
 
 #[component]
