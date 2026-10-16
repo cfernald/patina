@@ -52,5 +52,28 @@ impl<'a> RngSource for TimerRngSource<'a> {
 #[cfg(test)]
 #[cfg_attr(coverage, coverage(off))]
 mod tests {
+    use patina::component::service::perf_timer::MockArchTimerFunctionality;
+
     use super::*;
+
+    #[test]
+    fn test_timer_rng() {
+        const ITERATIONS: usize = 10;
+        let mut values = vec![0u64; ITERATIONS];
+
+        let mut timer: MockArchTimerFunctionality = MockArchTimerFunctionality::new();
+        for index in 0..ITERATIONS {
+            timer.expect_cpu_count().returning(move || index as u64 / 2);
+        }
+
+        let rng = TimerRngSource::new(&timer);
+        assert!(rng.algorithm() == RandomAlgorithm::InsecurePseudoRandom);
+        for index in 0..ITERATIONS {
+            values[index] = rng.generate().unwrap();
+        }
+
+        values.sort_unstable();
+        values.dedup();
+        assert!(values.len() == ITERATIONS);
+    }
 }

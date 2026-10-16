@@ -18,8 +18,6 @@ mockall = { workspace = true }
 patina = { workspace = true, features = ["mockall"] }
 
 [features]
-mockall = ["patina/mockall", "std"]
-std = []
 ci_features = []
 
 [lints]
