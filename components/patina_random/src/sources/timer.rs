@@ -1,4 +1,4 @@
-//! Time & counter based pseudo-random number generator source.
+//! Performance time & counter based pseudo-random number generator source.
 //!
 //! ## License
 //!
@@ -39,7 +39,7 @@ impl<'a> RngSource for TimerRngSource<'a> {
 
     fn generate(&self) -> Result<u64, RandomError> {
         // To avoid returning the same timer value twice, keep a counter as well. This will ensure
-        // a different value is used each time regardless of the timer's resolution.
+        // a different value is used each time regardless of the timer resolution.
         let tick = self.timer.cpu_count();
         let counter = self.counter.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
 
@@ -47,4 +47,10 @@ impl<'a> RngSource for TimerRngSource<'a> {
         tick.wrapping_add(counter).hash(&mut hasher);
         Ok(hasher.finish())
     }
+}
+
+#[cfg(test)]
+#[cfg_attr(coverage, coverage(off))]
+mod tests {
+    use super::*;
 }

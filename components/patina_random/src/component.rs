@@ -123,6 +123,10 @@ impl Random for RandomNumberGenerator {
 }
 
 /// Component responsible for installing the RNG protocol using the [`Random`] service.
+///
+/// This component takes the [`Random`] service as a dependency and will install the corresponding RNG protocol
+/// wrapping its functionality. This component takes no dependency on the specific [`Random`] trait implementation
+/// provided.
 pub struct RngProtocolPublisher;
 
 #[component]

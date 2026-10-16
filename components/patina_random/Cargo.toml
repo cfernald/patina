@@ -1,0 +1,26 @@
+[package]
+name = "patina_random"
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+description = "Random number generation components and infrastructure for Patina."
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+patina = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+mockall = { workspace = true }
+patina = { workspace = true, features = ["mockall"] }
+
+[features]
+mockall = ["patina/mockall", "std"]
+std = []
+ci_features = []
+
+[lints]
+workspace = true

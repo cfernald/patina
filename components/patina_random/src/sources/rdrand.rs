@@ -110,3 +110,9 @@ impl RngSource for RdRand {
         self.rdrand().ok_or(RandomError::NotReady)
     }
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage, coverage(off))]
+mod tests {
+    use super::*;
+}

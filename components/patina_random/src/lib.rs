@@ -5,7 +5,10 @@
 
 extern crate alloc;
 
+mod component;
 mod protocol;
 mod sources;
+mod test;
 
-pub mod component;
+pub use component::RandomNumberGenerator;
+pub use component::RngProtocolPublisher;
