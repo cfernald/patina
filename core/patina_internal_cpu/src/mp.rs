@@ -17,6 +17,8 @@ mod x64;
 
 mod work;
 
+use core::num::NonZero;
+
 #[cfg(any(test, feature = "mockall"))]
 use mockall::automock;
 use patina::{
@@ -65,7 +67,8 @@ pub struct ProcessorHandOff {
     /// Whether the processor passed its built-in self-test in PEI.
     pub healthy: bool,
     /// Address of the word the AP monitors for the wake-up signal value.
-    pub startup_signal_address: u64,
+    /// `None` requires architecture-specific processor startup instead.
+    pub startup_signal_address: Option<NonZero<u64>>,
     /// Address of the slot into which the BSP writes the AP entry-point address.
     pub startup_procedure_address: u64,
 }
@@ -75,7 +78,8 @@ pub struct MpHandOffInfo<'a> {
     /// Pointer width (in bytes) of the phase that produced the handoff.
     pub wait_loop_execution_mode: u32,
     /// Value the BSP writes to each AP's startup signal address to wake it.
-    pub startup_signal_value: u32,
+    /// `None` requires architecture-specific processor startup instead.
+    pub startup_signal_value: Option<u32>,
     /// Per-processor handoff records (including the BSP entry)
     pub processors: &'a [ProcessorHandOff],
 }
@@ -92,7 +96,7 @@ pub trait MpDispatcher: Sized {
         timer: &'static dyn ArchTimerFunctionality,
     ) -> Result<Self, EfiError>;
 
-    /// Migrates each AP from its handoff loop into the dispatcher.
+    /// Starts each AP in the dispatcher, using its handoff loop when compatible.
     fn setup_aps<'a>(
         &mut self,
         contexts: &'static mut [ApContext],

@@ -141,7 +141,9 @@ without any safety requirements.
 
 On x64, initial AP startup uses the processors inherited from PEI. PEI leaves them
 in a known wait loop and provides the information DXE needs to redirect them into
-the Patina dispatch environment. Each AP then adopts the required BSP state,
+the Patina dispatch environment. If store-based wakeup is unavailable or the
+wait-loop execution width is incompatible, Patina starts the APs using
+INIT-SIPI-SIPI instead. Each AP then adopts the required BSP state,
 applies the BSP's MTRR configuration, and waits for work from DXE Core. Later
 recovery uses INIT-SIPI-SIPI and the same long-mode setup path.
 
@@ -153,8 +155,8 @@ in the common MP interface:
 
 DXE Core separately allocates one persistent context and guarded stack for each AP.
 The x64 setup phase installs each AP's GDT and TSS, publishes the shared exception
-IDT and BSP control-register state, captures the BSP MTRRs, and wakes the APs from
-their PEI wait loops. An AP is counted as started only after it has applied the MTRR
+IDT and BSP control-register state, captures the BSP MTRRs, and starts the APs via
+their PEI wait loops or INIT-SIPI-SIPI. An AP is counted as started only after it has applied the MTRR
 state and entered the dispatch state machine.
 
 x64 APs will follow the following states in normal execution.
@@ -171,6 +173,7 @@ stateDiagram
 
   [*] --> Handoff: PEI starts AP
   Handoff --> Setup: handoff store wake
+  Handoff --> WaitForSipi: INIT (no compatible store wakeup)
   Setup --> Dispatch: Setup context (Paging, MTRR, stack, etc)
   Dispatch --> WaitForSipi: INIT
   WaitForSipi --> Bootstrap16: SIPI (x2)
@@ -185,20 +188,20 @@ stateDiagram
 MP startup uses the EDK II `MP_HAND_OFF`, `MP_HAND_OFF_CONFIG`, and optionally
 `MP_INFORMATION2` HOBs. The handoff must provide:
 
-- A compatible 64-bit AP wait-loop environment.
 - A unique and valid identity for every processor, including the BSP.
-- Valid wake-up information for each AP.
+- Valid wake-up information for each AP using store-based wakeup.
 - Consistent processor information across the supplied records.
 
 EDK2 controls the PEI AP wait loop with `gUefiCpuPkgTokenSpaceGuid.PcdCpuApLoopMode`.
-Patina requires a loop that can be woken by a memory write, so suitable settings are:
+Patina can wake these loops with a memory write:
 
 - `2`, the MWAIT loop, when MONITOR/MWAIT is available.
 - `3`, the Run loop.
 
-The default value, `1`, selects the HLT loop and does not provide a usable
-store-based handoff. The PEI handoff must also report an execution mode matching
-x64 DXE (`WaitLoopExecutionMode` equal to `8`).
+The default value, `1`, selects the HLT loop and leaves the HOB wake-up fields zero.
+These are represented as absent wake-up information and use INIT-SIPI-SIPI.
+Store-based wakeup also requires an execution mode matching x64 DXE
+(`WaitLoopExecutionMode` equal to `8`); other widths use INIT-SIPI-SIPI.
 
 Malformed or incompatible handoff data falls back to BSP-only operation. PEI BIST
 health is retained and reported through `GetProcessorInfo`.

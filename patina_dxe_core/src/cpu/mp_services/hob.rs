@@ -12,6 +12,7 @@
 //!
 
 use alloc::vec::Vec;
+use core::num::NonZero;
 
 use patina::component::hob::{FromHob, Hob, HobParseError};
 use patina::standard::efi::protocols::mp_services;
@@ -166,7 +167,7 @@ impl FromHob for MpHandOff {
             processors.push(ProcessorHandOff {
                 processor_id: raw.apic_id,
                 healthy: raw.health == 0,
-                startup_signal_address: raw.startup_signal_address,
+                startup_signal_address: NonZero::new(raw.startup_signal_address),
                 startup_procedure_address: raw.startup_procedure_address,
             });
             off = match off.checked_add(core::mem::size_of::<RawProcessorHandOff>()) {
@@ -236,7 +237,8 @@ impl MpHobs {
             .as_ref()
             .map(|config| MpHandOffInfo {
                 wait_loop_execution_mode: config.wait_loop_execution_mode,
-                startup_signal_value: config.startup_signal_value,
+                startup_signal_value: (config.wait_loop_execution_mode == core::mem::size_of::<usize>() as u32)
+                    .then_some(config.startup_signal_value),
                 processors: &self.processor_handoffs,
             })
             .filter(|handoff| {
@@ -305,7 +307,7 @@ mod tests {
         ProcessorHandOff {
             processor_id,
             healthy: true,
-            startup_signal_address: 0x1000,
+            startup_signal_address: NonZero::new(0x1000),
             startup_procedure_address: 0x2000,
         }
     }
@@ -334,6 +336,42 @@ mod tests {
 
         assert!(handoff.processors[0].healthy);
         assert!(!handoff.processors[1].healthy);
+    }
+
+    #[test]
+    fn test_mp_handoff_parses_optional_signal_addresses() {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&0u32.to_ne_bytes());
+        bytes.extend_from_slice(&2u32.to_ne_bytes());
+        for (apic_id, signal_address) in [(0u32, 0u64), (1, 0x1000)] {
+            bytes.extend_from_slice(&apic_id.to_ne_bytes());
+            bytes.extend_from_slice(&0u32.to_ne_bytes());
+            bytes.extend_from_slice(&signal_address.to_ne_bytes());
+            bytes.extend_from_slice(&0u64.to_ne_bytes());
+        }
+
+        let handoff = MpHandOff::parse(&bytes).unwrap();
+
+        assert_eq!(handoff.processors[0].startup_signal_address, None);
+        assert_eq!(handoff.processors[1].startup_signal_address, NonZero::new(0x1000));
+    }
+
+    #[test]
+    fn test_mp_hobs_selects_signal_value_by_wait_loop_mode() {
+        for (mode, signal_value, expected) in [(0, 0, None), (4, 0xA5, None), (8, 0xA5, Some(0xA5)), (8, 0, Some(0))] {
+            let hobs = MpHobs {
+                processors: Vec::new(),
+                processor_handoffs: vec![processor_handoff(0), processor_handoff(1)],
+                handoff_config: Some(MpHandOffConfig {
+                    wait_loop_execution_mode: mode,
+                    startup_signal_value: signal_value,
+                }),
+            };
+
+            let handoff = hobs.build_handoff().unwrap();
+            assert_eq!(handoff.wait_loop_execution_mode, mode);
+            assert_eq!(handoff.startup_signal_value, expected);
+        }
     }
 
     #[test]
@@ -464,7 +502,7 @@ mod tests {
         assert_eq!(hobs.processors[0].processor_id, 0);
         assert_eq!(hobs.processors[1].processor_id, 1);
         assert_eq!(built.wait_loop_execution_mode, 8);
-        assert_eq!(built.startup_signal_value, 0xA5);
+        assert_eq!(built.startup_signal_value, Some(0xA5));
         assert_eq!(built.processors.len(), 2);
         assert_eq!(built.processors[0].processor_id, 0);
         assert_eq!(built.processors[1].processor_id, 1);

@@ -1,7 +1,7 @@
 //! `x86_64` Multiprocessor (MP) startup support.
 //!
 //! Brings Application Processors (APs) online by migrating them out of the PEI
-//! wait loop into the DXE dispatch loop.
+//! wait loop or using INIT-SIPI-SIPI to enter the DXE dispatch loop.
 //!
 //! ## Context Array
 //!
@@ -54,7 +54,7 @@ const SIPI_DELAY_US: u64 = 200;
 /// Maximum time to wait for started APs to enter the reserved park loop.
 const AP_PARK_TIMEOUT_US: u64 = 100_000;
 
-/// Required wait loop mode for APs to be considered ready.
+/// Required wait loop mode for store-based AP wakeup.
 const REQUIRED_WAIT_LOOP_MODE: u32 = 8;
 
 /// Per-processor context structure.
@@ -140,24 +140,27 @@ impl MpSupport {
     }
 
     fn parse_handoff<'a>(&self, handoff: Option<MpHandOffInfo<'a>>) -> Option<MpHandOffInfo<'a>> {
-        let handoff = handoff.filter(|handoff| {
-            if handoff.wait_loop_execution_mode != REQUIRED_WAIT_LOOP_MODE {
-                log::error!(
-                    "MP handoff wait-loop execution mode is {} bytes; x86_64 requires processors handed off in \
-                     64-bit mode ({REQUIRED_WAIT_LOOP_MODE} bytes). Continuing with the BSP only.",
-                    handoff.wait_loop_execution_mode
-                );
-                return false;
-            }
-            if handoff.processors.len() < 2 {
-                log::warn!(
-                    "MP handoff described {} processor(s); continuing with the BSP only.",
-                    handoff.processors.len()
-                );
-                return false;
-            }
-            self.validate_handoff(handoff)
-        });
+        let handoff = handoff
+            .map(|mut handoff| {
+                if handoff.wait_loop_execution_mode != REQUIRED_WAIT_LOOP_MODE {
+                    log::info!(
+                        "MP handoff wait-loop execution mode is {} bytes; using INIT-SIPI-SIPI for x86_64 startup.",
+                        handoff.wait_loop_execution_mode
+                    );
+                    handoff.startup_signal_value = None;
+                }
+                handoff
+            })
+            .filter(|handoff| {
+                if handoff.processors.len() < 2 {
+                    log::warn!(
+                        "MP handoff described {} processor(s); continuing with the BSP only.",
+                        handoff.processors.len()
+                    );
+                    return false;
+                }
+                self.validate_handoff(handoff)
+            });
 
         if handoff.is_none() {
             log::warn!("No usable processor handoff. MP Services will report a single processor!");
@@ -184,8 +187,9 @@ impl MpSupport {
             }
 
             if processor.processor_id != bsp_apic_id
-                && (processor.startup_signal_address == 0
-                    || !processor.startup_signal_address.is_multiple_of(core::mem::align_of::<u32>() as u64)
+                && handoff.startup_signal_value.is_some()
+                && let Some(signal_address) = processor.startup_signal_address
+                && (!signal_address.get().is_multiple_of(core::mem::align_of::<u32>() as u64)
                     || processor.startup_procedure_address == 0
                     || !processor.startup_procedure_address.is_multiple_of(core::mem::align_of::<u64>() as u64))
             {
@@ -290,14 +294,12 @@ impl MpSupport {
         // Without a usable handoff there is still a BSP to describe, so the protocol
         // is published for a uniprocessor system rather than withheld entirely.
         let processors = handoff.as_ref().map(|handoff| handoff.processors).unwrap_or_default();
-        let startup_signal_value = handoff.as_ref().map_or(0, |handoff| handoff.startup_signal_value);
+        let startup_signal_value = handoff.as_ref().and_then(|handoff| handoff.startup_signal_value);
         log::info!("BSP APIC ID: {:#x}", self.bsp_processor_id);
         let ap_handoffs = || processors.iter().filter(|p| p.processor_id != self.bsp_processor_id);
         self.contexts = Self::prepare_contexts(contexts, processors, self.bsp_processor_id)?;
         ap_setup::setup(self.contexts);
 
-        // Wake each AP by writing the entry point into its handoff procedure
-        // slot and raising its startup signal.
         let ap_count = self.contexts.len();
         if ap_count == 0 {
             log::info!("MP Services initialized: uniprocessor system (BSP only)");
@@ -307,10 +309,16 @@ impl MpSupport {
         log::info!("Waking APs via handoff...");
         let start_timestamp = self.timer.cpu_count();
         for p in ap_handoffs() {
-            // SAFETY: the addresses come from the handoff for APs still parked
-            // in their wait loop. `wake_ap` publishes the entry before the signal.
-            unsafe {
-                ap_setup::wake_ap(p.startup_procedure_address, p.startup_signal_address, startup_signal_value);
+            if let (Some(signal_address), Some(signal_value)) = (p.startup_signal_address, startup_signal_value) {
+                // SAFETY: the validated addresses come from the handoff for APs still parked
+                // in their compatible wait loop. `wake_ap` publishes the entry before the signal.
+                unsafe {
+                    ap_setup::wake_ap(p.startup_procedure_address, signal_address.get(), signal_value);
+                }
+            } else {
+                self.apic.send_init(p.processor_id);
+                self.attempt_with_timeout(INIT_TO_SIPI_DELAY_US, || false);
+                self.send_startup(p.processor_id);
             }
         }
 
@@ -338,15 +346,19 @@ impl MpSupport {
         // SAFETY: INIT delivery has completed and the architectural settle time
         // has elapsed, so this AP is in wait-for-SIPI and cannot reload TR.
         unsafe { ctx.gdt.reset_tss_descriptor(core::ptr::addr_of!(ctx.tss) as u64) };
-        self.apic.send_startup(apic_id, self.startup_vector);
-        self.attempt_with_timeout(SIPI_DELAY_US, || false);
-        self.apic.send_startup(apic_id, self.startup_vector);
-        self.attempt_with_timeout(SIPI_DELAY_US, || false);
+        self.send_startup(apic_id);
         let recovered = self.attempt_with_timeout(AP_ABORT_TIMEOUT_US, || ctx.sm.state() == ProcessorState::Ready);
         if !recovered {
             ctx.sm.set_healthy(false);
         }
         recovered
+    }
+
+    fn send_startup(&self, apic_id: u32) {
+        self.apic.send_startup(apic_id, self.startup_vector);
+        self.attempt_with_timeout(SIPI_DELAY_US, || false);
+        self.apic.send_startup(apic_id, self.startup_vector);
+        self.attempt_with_timeout(SIPI_DELAY_US, || false);
     }
 }
 
@@ -651,13 +663,13 @@ mod tests {
         super::super::ProcessorHandOff {
             processor_id,
             healthy: true,
-            startup_signal_address: 0x1000,
+            startup_signal_address: NonZeroU64::new(0x1000),
             startup_procedure_address: 0x2000,
         }
     }
 
     fn handoff(processors: &[super::super::ProcessorHandOff]) -> MpHandOffInfo<'_> {
-        MpHandOffInfo { wait_loop_execution_mode: REQUIRED_WAIT_LOOP_MODE, startup_signal_value: 1, processors }
+        MpHandOffInfo { wait_loop_execution_mode: REQUIRED_WAIT_LOOP_MODE, startup_signal_value: Some(1), processors }
     }
 
     fn test_support(apic: apic::MockApicBackend, contexts: &'static [ApContext], shutting_down: bool) -> MpSupport {
@@ -733,16 +745,8 @@ mod tests {
     #[test]
     #[serial(ap_setup)]
     fn test_mp_support_parse_handoff_rejects_unusable_handoffs() {
-        let wrong_mode_processors = [processor_handoff(0x10), processor_handoff(0x20)];
         let uniprocessor = [processor_handoff(0x10)];
-        let unusable = [
-            MpHandOffInfo {
-                wait_loop_execution_mode: REQUIRED_WAIT_LOOP_MODE / 2,
-                startup_signal_value: 1,
-                processors: &wrong_mode_processors,
-            },
-            handoff(&uniprocessor),
-        ];
+        let unusable = [handoff(&uniprocessor)];
 
         for handoff in unusable {
             let support = test_support(apic::MockApicBackend::new(), &[], false);
@@ -765,12 +769,12 @@ mod tests {
         let signal = Box::leak(Box::new(0_u32));
         let processors = [
             super::super::ProcessorHandOff {
-                startup_signal_address: 0,
+                startup_signal_address: None,
                 startup_procedure_address: 0,
                 ..processor_handoff(0x10)
             },
             super::super::ProcessorHandOff {
-                startup_signal_address: core::ptr::from_mut(signal) as u64,
+                startup_signal_address: NonZeroU64::new(core::ptr::from_mut(signal) as u64),
                 startup_procedure_address: core::ptr::from_mut(procedure) as u64,
                 ..processor_handoff(0x20)
             },
@@ -795,6 +799,71 @@ mod tests {
         assert_eq!(*signal, 1);
         assert_eq!(support.ap_count(), 1);
         assert_eq!(support.started_ap_count(), 0);
+    }
+
+    #[test]
+    #[serial(ap_setup)]
+    fn test_mp_support_setup_uses_init_sipi_sipi_without_compatible_wakeup() {
+        const INIT_COMMAND: u32 = (0b101 << 8) | bit!(14);
+        const STARTUP_COMMAND: u32 = (0b110 << 8) | bit!(14) | 8;
+
+        for (mode, signal_value, signal_address) in [
+            (0, None, None),
+            (4, Some(1), NonZeroU64::new(0x1000)),
+            (8, None, NonZeroU64::new(0x1001)),
+            (8, Some(1), None),
+        ] {
+            let processors = [
+                processor_handoff(0x10),
+                super::super::ProcessorHandOff {
+                    startup_signal_address: signal_address,
+                    startup_procedure_address: 0,
+                    ..processor_handoff(0x20)
+                },
+            ];
+            let contexts = Box::leak(Box::new([ApContext::new()]));
+            let stack = Box::leak(Box::new(TestStack([0; 64])));
+            // SAFETY: the leaked stack is aligned, writable, and remains live with the leaked context.
+            unsafe { contexts[0].set_stack_top(stack.top()) }.unwrap();
+
+            let mut sequence = Sequence::new();
+            let mut apic = apic::MockApicBackend::new();
+            apic.expect_current_apic_id().once().return_const(0x10_u32);
+            apic.expect_max_apic_id().once().return_const(0xFE_u32);
+            apic.expect_send_icr().with(eq(0x20), eq(INIT_COMMAND)).once().in_sequence(&mut sequence).return_const(());
+            apic.expect_send_icr()
+                .with(eq(0x20), eq(STARTUP_COMMAND))
+                .once()
+                .in_sequence(&mut sequence)
+                .return_const(());
+            apic.expect_send_icr()
+                .with(eq(0x20), eq(STARTUP_COMMAND))
+                .once()
+                .in_sequence(&mut sequence)
+                .return_const(());
+
+            let count = AtomicU64::new(0);
+            let mut timer = MockArchTimerFunctionality::new();
+            timer.expect_cpu_count().returning(move || count.fetch_add(AP_STARTUP_TIMEOUT_US + 1, Ordering::Relaxed));
+            let mut support = MpSupport {
+                bsp_processor_id: 0x10,
+                startup_vector: 8,
+                timer: Box::leak(Box::new(timer)),
+                ..test_support(apic, &[], false)
+            };
+            let handoff = support.parse_handoff(Some(MpHandOffInfo {
+                wait_loop_execution_mode: mode,
+                startup_signal_value: signal_value,
+                processors: &processors,
+            }));
+            assert!(handoff.is_some());
+
+            assert_eq!(support.setup_aps_with(contexts, handoff), Ok(()));
+            assert_eq!(support.ap_count(), 1);
+            assert_eq!(support.ap_processor_id(0), Some(0x20));
+            assert!(support.ap_healthy(0));
+            assert_eq!(support.started_ap_count(), 0);
+        }
     }
 
     #[test]
@@ -908,7 +977,7 @@ mod tests {
     fn mp_support_accepts_valid_handoff_for_current_apic_mode() {
         let processors = [
             super::super::ProcessorHandOff {
-                startup_signal_address: 0,
+                startup_signal_address: None,
                 startup_procedure_address: 0,
                 ..processor_handoff(0x10)
             },
@@ -940,8 +1009,10 @@ mod tests {
     #[test]
     fn mp_support_rejects_invalid_ap_wake_slots() {
         for processor in [
-            super::super::ProcessorHandOff { startup_signal_address: 0, ..processor_handoff(0x20) },
-            super::super::ProcessorHandOff { startup_signal_address: 0x1001, ..processor_handoff(0x20) },
+            super::super::ProcessorHandOff {
+                startup_signal_address: NonZeroU64::new(0x1001),
+                ..processor_handoff(0x20)
+            },
             super::super::ProcessorHandOff { startup_procedure_address: 0, ..processor_handoff(0x20) },
             super::super::ProcessorHandOff { startup_procedure_address: 0x2001, ..processor_handoff(0x20) },
         ] {
