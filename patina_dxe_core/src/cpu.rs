@@ -128,6 +128,15 @@ pub trait CpuInfo {
         &[]
     }
 
+    /// Returns the platform's PSCI conduit for `AArch64` MP Services.
+    ///
+    /// This must be configured when enabling MP Services on `AArch64`. The default
+    /// does not attempt either conduit because an incorrect call can trap.
+    /// The setting is ignored on x64.
+    fn psci_conduit() -> Option<patina::arch::psci::Conduit> {
+        None
+    }
+
     /// Enables the Patina MP services component from the DXE Core.
     ///
     /// - If `true`, MP services will be installed.
@@ -177,5 +186,6 @@ mod tests {
 
         assert!(<TestPlatform as CpuInfo>::perf_timer_frequency().is_none());
         assert!(<TestPlatform as CpuInfo>::exception_handlers().is_empty());
+        assert!(<TestPlatform as CpuInfo>::psci_conduit().is_none());
     }
 }

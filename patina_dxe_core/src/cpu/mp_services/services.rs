@@ -136,7 +136,7 @@ impl<D: MpDispatcher + 'static> MpServices<D> {
             debug_assert!(pending.is_empty());
             self.mp.sync_aps()
         });
-        assert!(synchronized, "failed to synchronize BSP MTRRs to every enabled AP");
+        assert!(synchronized, "failed to synchronize architectural state to every enabled AP");
     }
 
     /// Returns the [`mp_services::ProcessorInformation`] for `index`.
@@ -150,7 +150,7 @@ impl<D: MpDispatcher + 'static> MpServices<D> {
         let mut info = self
             .processors
             .iter()
-            .find(|p| p.processor_id == u64::from(processor_id))
+            .find(|p| p.processor_id == processor_id)
             .copied()
             .unwrap_or_else(|| topology_unknown(processor_id));
         info.status_flag = self.status_flag(index);
@@ -314,9 +314,9 @@ impl<D: MpDispatcher + 'static> MpServices<D> {
 /// Placeholder information for a processor the PEI information HOB did not
 /// describe. The topology fields are unknown, but the processor still exists and
 /// its status flags are derived live.
-fn topology_unknown(processor_id: u32) -> mp_services::ProcessorInformation {
+fn topology_unknown(processor_id: u64) -> mp_services::ProcessorInformation {
     mp_services::ProcessorInformation {
-        processor_id: u64::from(processor_id),
+        processor_id,
         status_flag: 0,
         location: mp_services::CpuPhysicalLocation { package: 0, core: 0, thread: 0 },
         extended_information: mp_services::ExtendedProcessorInformation {
@@ -484,7 +484,7 @@ mod tests {
     fn test_mp_services_processor_info_handles_bsp_disabled_and_missing_ap() {
         let mut mp = MockMpDispatcher::new();
         mp.expect_who_am_i().once().return_const(Some(Processor::Bsp));
-        mp.expect_bsp_processor_id().once().return_const(0x2Au32);
+        mp.expect_bsp_processor_id().once().return_const(0x2Au64);
         let service = test_service(mp);
         let Ok(info) = service.processor_info(0) else { panic!("BSP should have processor information") };
         assert_eq!(info.processor_id, 0x2A);

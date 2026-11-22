@@ -2,7 +2,7 @@
 //!
 //! This provides a [`MpDispatcher`] so that crates depending on MP support compile
 //! and link on architectures where the AP startup mechanism has not yet been
-//! implemented (e.g. aarch64). Its constructor returns [`EfiError::Unsupported`],
+//! implemented. Its constructor returns [`EfiError::Unsupported`],
 //! so an instance is never created and the remaining methods are unreachable.
 //!
 //! ## License
@@ -22,7 +22,7 @@ use patina::{
     error::EfiError,
 };
 
-use super::{ApWorkItem, MpDispatcher, MpHandOffInfo, Processor, ProcessorState};
+use super::{ApWorkItem, MpDispatcher, MpStartup, Processor, ProcessorState};
 
 /// An MP manager placeholder for architectures without AP startup support. It's construction
 /// will always fail so its functions are not reachable. It is a empty enum so it can't be instantiated.
@@ -47,6 +47,8 @@ impl ApContext {
 }
 
 impl MpDispatcher for MpSupport {
+    type Context = ApContext;
+
     fn initialize(
         _memory_manager: &dyn MemoryManager,
         _timer: &'static dyn ArchTimerFunctionality,
@@ -57,7 +59,7 @@ impl MpDispatcher for MpSupport {
     fn setup_aps(
         &mut self,
         _contexts: &'static mut [ApContext],
-        _handoff: Option<MpHandOffInfo<'_>>,
+        _handoff: Option<MpStartup<'_>>,
     ) -> Result<(), EfiError> {
         unreachable!()
     }
@@ -86,11 +88,11 @@ impl MpDispatcher for MpSupport {
         unreachable!();
     }
 
-    fn bsp_processor_id(&self) -> u32 {
+    fn bsp_processor_id(&self) -> u64 {
         unreachable!();
     }
 
-    fn ap_processor_id(&self, _index: usize) -> Option<u32> {
+    fn ap_processor_id(&self, _index: usize) -> Option<u64> {
         unreachable!();
     }
 

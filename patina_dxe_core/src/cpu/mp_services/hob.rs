@@ -13,10 +13,51 @@
 
 use alloc::vec::Vec;
 
-use patina::component::hob::{FromHob, Hob, HobParseError};
 use patina::standard::efi::protocols::mp_services;
+use patina::{
+    arch::psci::MPIDR_AFFINITY_MASK,
+    component::hob::{FromHob, Hob, HobParseError},
+};
 use patina_internal_cpu::mp::{MpHandOffInfo, ProcessorHandOff};
 use zerocopy::FromBytes;
+
+#[derive(Clone, Copy, zerocopy_derive::FromBytes)]
+#[repr(C)]
+struct RawArmCoreInfo {
+    mpidr: u64,
+    mailbox_set_address: u64,
+    mailbox_get_address: u64,
+    mailbox_clear_address: u64,
+    mailbox_clear_value: u64,
+}
+
+/// Processor inventory from EDK II's `ARM_CORE_INFO` GUID HOB.
+pub(super) struct ArmMpCoreInfo {
+    pub processors: Vec<u64>,
+}
+
+impl FromHob for ArmMpCoreInfo {
+    const HOB_GUID: patina::BinaryGuid = patina::BinaryGuid::from_string("A4EE0728-E5D7-4AC5-B21E-658ED857E834");
+
+    fn parse(bytes: &[u8]) -> Result<Self, HobParseError> {
+        let entry_size = core::mem::size_of::<RawArmCoreInfo>();
+        if bytes.is_empty() || !bytes.len().is_multiple_of(entry_size) {
+            return Err(HobParseError::Invalid("ARM core info must contain complete ARM_CORE_INFO entries"));
+        }
+
+        let mut processors = Vec::with_capacity(bytes.len() / entry_size);
+        for entry in bytes.chunks_exact(entry_size) {
+            let raw = RawArmCoreInfo::read_from_bytes(entry)
+                .map_err(|_| HobParseError::Invalid("invalid ARM_CORE_INFO entry"))?;
+            let affinity = raw.mpidr & MPIDR_AFFINITY_MASK;
+            if processors.contains(&affinity) {
+                return Err(HobParseError::Invalid("duplicate MPIDR affinity in ARM core info"));
+            }
+            processors.push(affinity);
+        }
+        Ok(Self { processors })
+    }
+}
 
 /// One `EFI_PROCESSOR_INFORMATION` record as laid out at the start of each
 /// `MP_INFORMATION2_ENTRY`. Read via `zerocopy`, then converted to the SDK's
@@ -164,7 +205,7 @@ impl FromHob for MpHandOff {
             let Some(entry) = bytes.get(off..) else { break };
             let Ok((raw, _)) = RawProcessorHandOff::read_from_prefix(entry) else { break };
             processors.push(ProcessorHandOff {
-                processor_id: raw.apic_id,
+                processor_id: u64::from(raw.apic_id),
                 healthy: raw.health == 0,
                 startup_signal_address: raw.startup_signal_address,
                 startup_procedure_address: raw.startup_procedure_address,
@@ -287,6 +328,29 @@ impl MpHobs {
 mod tests {
     use super::*;
 
+    fn arm_core_info_bytes(mpidrs: &[u64]) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        for mpidr in mpidrs {
+            bytes.extend_from_slice(&mpidr.to_ne_bytes());
+            bytes.extend_from_slice(&[0; 32]);
+        }
+        bytes
+    }
+
+    #[test]
+    fn test_mp_arm_hob_preserves_aff3_and_strips_non_affinity_bits() {
+        let bytes = arm_core_info_bytes(&[0x8000_0000, 0x12_8102_0304]);
+        let hob = ArmMpCoreInfo::parse(&bytes).unwrap();
+        assert_eq!(hob.processors, [0, 0x12_0002_0304]);
+    }
+
+    #[test]
+    fn test_mp_arm_hob_rejects_empty_truncated_and_duplicate_entries() {
+        assert!(ArmMpCoreInfo::parse(&[]).is_err());
+        assert!(ArmMpCoreInfo::parse(&[0; 39]).is_err());
+        assert!(ArmMpCoreInfo::parse(&arm_core_info_bytes(&[1, 0x8000_0001])).is_err());
+    }
+
     fn processor_info_bytes(processor_id: u64, status_flag: u32, location: [u32; 3], location2: [u32; 6]) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&processor_id.to_ne_bytes());
@@ -303,7 +367,7 @@ mod tests {
 
     fn processor_handoff(processor_id: u32) -> ProcessorHandOff {
         ProcessorHandOff {
-            processor_id,
+            processor_id: u64::from(processor_id),
             healthy: true,
             startup_signal_address: 0x1000,
             startup_procedure_address: 0x2000,

@@ -530,7 +530,7 @@ mod tests {
     fn test_mp_protocol_writes_bsp_processor_information() {
         let mut mp = MockMpDispatcher::new();
         mp.expect_who_am_i().once().return_const(Some(patina_internal_cpu::mp::Processor::Bsp));
-        mp.expect_bsp_processor_id().once().return_const(0x2Au32);
+        mp.expect_bsp_processor_id().once().return_const(0x2Au64);
         let mut wrapper = test_wrapper(mp);
         let protocol = &raw mut wrapper.protocol;
         let mut info = core::mem::MaybeUninit::<mp_services::ProcessorInformation>::uninit();

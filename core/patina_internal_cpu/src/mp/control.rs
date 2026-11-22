@@ -108,6 +108,11 @@ impl ApStateMachine {
         processor_state(self.load(), self.enabled.load(Ordering::Acquire))
     }
 
+    #[cfg(any(target_arch = "aarch64", test))]
+    pub(crate) fn is_idle(&self) -> bool {
+        self.load() == RunState::Idle
+    }
+
     pub(crate) fn set_enabled(&self, enabled: bool) {
         self.enabled.store(enabled, Ordering::Release);
     }
@@ -187,6 +192,7 @@ impl ApStateMachine {
 
     /// Returns the processor to its pre-start state so an architectural reset
     /// can re-enter through [`Self::start`].
+    #[cfg(any(target_arch = "x86_64", test))]
     pub(crate) fn reset(&self) {
         // Work is intentionally left alone. It is not safe to write to it here,
         // and it will be overwritten if/when the AP returns to idle and new work
@@ -276,7 +282,7 @@ impl ApConsumer<'_> {
     }
 }
 
-/// Whether a processor should still wait after arming its monitor.
+/// Whether a processor should still wait after arming its wake-up mechanism.
 pub(crate) fn should_wait(state: &AtomicU8) -> bool {
     RunState::from_u8(state.load(Ordering::Acquire)) == RunState::Idle
 }

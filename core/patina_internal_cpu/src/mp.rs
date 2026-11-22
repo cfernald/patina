@@ -9,8 +9,10 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
-#[cfg(target_arch = "x86_64")] // Will use for aarch64 too.
 mod control;
+
+#[cfg(any(target_arch = "aarch64", test))]
+mod aarch64;
 
 #[cfg(target_arch = "x86_64")]
 mod x64;
@@ -20,6 +22,7 @@ mod work;
 #[cfg(any(test, feature = "mockall"))]
 use mockall::automock;
 use patina::{
+    arch::psci::Conduit,
     component::service::{memory::MemoryManager, perf_timer::ArchTimerFunctionality},
     error::EfiError,
 };
@@ -28,6 +31,9 @@ pub use work::ApWorkItem;
 cfg_select! {
     target_arch = "x86_64" => {
         pub use x64::{ApContext, MpSupport};
+    }
+    target_arch = "aarch64" => {
+        pub use aarch64::{ApContext, MpSupport};
     }
     _ => {
         mod stub;
@@ -62,7 +68,7 @@ pub enum Processor {
 #[derive(Clone, Copy)]
 pub struct ProcessorHandOff {
     /// Architecture specific ID of the processor.
-    pub processor_id: u32,
+    pub processor_id: u64,
     /// Whether the processor passed its built-in self-test in PEI.
     pub healthy: bool,
     /// Address of the word the AP monitors for the wake-up signal value.
@@ -81,23 +87,49 @@ pub struct MpHandOffInfo<'a> {
     pub processors: &'a [ProcessorHandOff],
 }
 
+/// Architecture-specific source of processors and their startup mechanism.
+pub enum MpStartup<'a> {
+    /// Processors owned by a PEI wait loop on x64.
+    Pei(MpHandOffInfo<'a>),
+    /// Off `AArch64` processors managed through PSCI.
+    Psci {
+        /// Platform-selected PSCI conduit.
+        conduit: Conduit,
+        /// MPIDR affinity values, including the BSP, in stable processor order.
+        processors: &'a [u64],
+    },
+}
+
+impl MpStartup<'_> {
+    /// Number of processors described by the startup source, including the BSP.
+    pub fn processor_count(&self) -> usize {
+        match self {
+            Self::Pei(handoff) => handoff.processors.len(),
+            Self::Psci { processors, .. } => processors.len(),
+        }
+    }
+}
+
 /// Architecture abstraction interface for multiprocessor management.
 ///
 /// This trait explicitly only operates on the APs, and not the BSP. The BSP
 /// is not included in dispatching, counts, indexes, etc.
-#[cfg_attr(any(test, feature = "mockall"), automock)]
+#[cfg_attr(any(test, feature = "mockall"), automock(type Context = ApContext;))]
 pub trait MpDispatcher: Sized {
+    /// Persistent, architecture-specific context allocated for each AP.
+    type Context: 'static;
+
     /// Creates multiprocessor support and its architecture-specific memory.
     fn initialize(
         memory_manager: &dyn MemoryManager,
         timer: &'static dyn ArchTimerFunctionality,
     ) -> Result<Self, EfiError>;
 
-    /// Migrates each AP from its handoff loop into the dispatcher.
+    /// Starts each AP using the architecture-specific startup source.
     fn setup_aps<'a>(
         &mut self,
-        contexts: &'static mut [ApContext],
-        handoff: Option<MpHandOffInfo<'a>>,
+        contexts: &'static mut [Self::Context],
+        handoff: Option<MpStartup<'a>>,
     ) -> Result<(), EfiError>;
 
     /// Number of application processors known to the dispatcher.
@@ -123,10 +155,10 @@ pub trait MpDispatcher: Sized {
     fn who_am_i(&self) -> Option<Processor>;
 
     /// Architectural processor ID of the BSP.
-    fn bsp_processor_id(&self) -> u32;
+    fn bsp_processor_id(&self) -> u64;
 
     /// Architectural processor ID recorded for the AP at `index`.
-    fn ap_processor_id(&self, index: usize) -> Option<u32>;
+    fn ap_processor_id(&self, index: usize) -> Option<u64>;
 
     /// Whether the AP at `index` has completed the dispatch identified by `work_id`
     fn ap_finished(&self, index: usize, work_id: u64) -> bool;
@@ -146,6 +178,9 @@ pub trait MpDispatcher: Sized {
     /// Returns `true` when recovery completes within the architecture-specific
     /// health deadline. A `false` result still guarantees termination, but the
     /// caller should consider the processor unhealthy and unavailable.
+    ///
+    /// `AArch64` currently fails stop if the procedure is still executing:
+    /// PSCI does not provide remote termination, and recovery is not implemented.
     fn abort_ap(&self, index: usize, work_id: u64) -> bool;
 
     /// Quiesce every AP for OS handoff at `ExitBootServices`, leaving them in the

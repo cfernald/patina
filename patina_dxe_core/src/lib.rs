@@ -653,7 +653,7 @@ impl<P: PlatformInfo> Core<P> {
         dispatcher.insert_component(0, cpu::CpuArchProtocolInstaller::default().into_component());
         if P::CpuInfo::ENABLE_MP_SERVICES {
             dispatcher.add_config(cpu::MpServicesEnabled(true));
-            dispatcher.insert_component(0, cpu::MpServicesComponent::default().into_component());
+            dispatcher.insert_component(0, cpu::MpServicesComponent::new(P::CpuInfo::psci_conduit()).into_component());
             dispatcher.insert_component(0, cpu::MpServicesProtocolInstaller::default().into_component());
             dispatcher.insert_component(0, cpu::MpBistReporter.into_component());
         }

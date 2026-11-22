@@ -7,6 +7,8 @@
 //! SPDX-License-Identifier: Apache-2.0
 //!
 
+pub mod psci;
+
 cfg_select! {
     not(target_os = "uefi") => {
         #[cfg_attr(coverage, coverage(off))]

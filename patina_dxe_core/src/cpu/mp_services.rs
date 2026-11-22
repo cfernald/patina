@@ -15,6 +15,7 @@ use core::{num::NonZeroUsize, time::Duration};
 
 use patina::{
     BinaryGuid,
+    arch::psci::Conduit,
     component::{
         Storage, component,
         hob::Hob,
@@ -45,8 +46,8 @@ mod notification;
 mod protocol;
 mod services;
 
-use hob::{MpHandOff, MpHandOffConfig, MpInformation2};
-use patina_internal_cpu::mp::{ApContext, MpDispatcher, MpSupport};
+use hob::{ArmMpCoreInfo, MpHandOff, MpHandOffConfig, MpInformation2};
+use patina_internal_cpu::mp::{ApContext, MpDispatcher, MpStartup, MpSupport};
 use protocol::MpProtocolWrapper;
 use services::MpServices;
 
@@ -60,7 +61,27 @@ const CACHE_ATTRIBUTE_CHANGE_GUID: BinaryGuid = CACHE_ATTRIBUTE_CHANGE_EVENT_GRO
 
 /// Initializes and publishes the MP Services implementation.
 #[derive(Default)]
-pub(crate) struct MpServicesComponent;
+pub(crate) struct MpServicesComponent {
+    psci_conduit: Option<Conduit>,
+}
+
+impl MpServicesComponent {
+    pub(crate) fn new(psci_conduit: Option<Conduit>) -> Self {
+        Self { psci_conduit }
+    }
+
+    fn psci_startup<'a>(&self, processors: &'a [u64]) -> Result<MpStartup<'a>, EfiError> {
+        let conduit = self.psci_conduit.ok_or_else(|| {
+            log::error!("AArch64 MP Services requires an explicit PSCI conduit");
+            EfiError::Unsupported
+        })?;
+        if processors.is_empty() {
+            log::error!("AArch64 MP Services requires the ARM MP core information HOB");
+            return Err(EfiError::NotFound);
+        }
+        Ok(MpStartup::Psci { conduit, processors })
+    }
+}
 
 /// Installs the UEFI MP Services Protocol.
 #[derive(Default)]
@@ -71,7 +92,12 @@ pub(crate) struct MpServicesProtocolInstaller;
 pub(crate) struct MpBistReporter;
 
 /// Optional MP HOBs consumed by [`MpServicesComponent`].
-type MpHobParams<'h> = (Option<Hob<'h, MpInformation2>>, Option<Hob<'h, MpHandOff>>, Option<Hob<'h, MpHandOffConfig>>);
+type MpHobParams<'h> = (
+    Option<Hob<'h, MpInformation2>>,
+    Option<Hob<'h, MpHandOff>>,
+    Option<Hob<'h, MpHandOffConfig>>,
+    Option<Hob<'h, ArmMpCoreInfo>>,
+);
 
 #[component]
 impl MpServicesComponent {
@@ -84,12 +110,18 @@ impl MpServicesComponent {
         hobs: MpHobParams<'_>,
         storage: &mut Storage,
     ) -> Result<(), EfiError> {
-        let (mp_info, mp_handoff, mp_handoff_config) = hobs;
+        let (mp_info, mp_handoff, mp_handoff_config, arm_core_info) = hobs;
 
         // Collect context and config.
         let parsed_hobs = MpHobs::parse_hobs(mp_info, mp_handoff, mp_handoff_config);
-        let handoff = parsed_hobs.build_handoff();
-        let ap_count = handoff.as_ref().map_or(0, |handoff| handoff.processors.len().saturating_sub(1));
+        let arm_processors: Vec<u64> =
+            arm_core_info.iter().flat_map(Hob::iter).flat_map(|hob| hob.processors.iter().copied()).collect();
+        let handoff = if cfg!(target_arch = "aarch64") {
+            Some(self.psci_startup(&arm_processors)?)
+        } else {
+            parsed_hobs.build_handoff().map(MpStartup::Pei)
+        };
+        let ap_count = handoff.as_ref().map_or(0, |handoff| handoff.processor_count().saturating_sub(1));
 
         // Build the context for each AP.
         let contexts = self.allocate_ap_contexts(&mm, ap_count)?;
@@ -543,16 +575,26 @@ mod tests {
         let mut storage = Storage::new();
 
         assert!(matches!(
-            MpServicesComponent.entry_point(
+            MpServicesComponent::default().entry_point(
                 Service::mock(Box::new(MockEventServices::new())),
                 Service::mock(Box::new(MockTimerEventServices::new())),
                 memory_service(memory),
                 Service::mock(Box::new(MockArchTimerFunctionality::new())),
-                (None, Some(handoff), Some(config)),
+                (None, Some(handoff), Some(config), None),
                 &mut storage,
             ),
             Err(EfiError::OutOfResources)
         ));
+    }
+
+    #[test]
+    fn test_mp_services_component_validates_psci_platform_inputs() {
+        assert!(matches!(MpServicesComponent::new(None).psci_startup(&[0, 1]), Err(EfiError::Unsupported)));
+        let component = MpServicesComponent::new(Some(Conduit::Hvc));
+        assert!(matches!(component.psci_startup(&[]), Err(EfiError::NotFound)));
+        let startup = component.psci_startup(&[0, 0x12_0000_0001]).unwrap();
+        assert_eq!(startup.processor_count(), 2);
+        assert!(matches!(startup, MpStartup::Psci { conduit: Conduit::Hvc, .. }));
     }
 
     #[test]
@@ -576,7 +618,8 @@ mod tests {
             .returning(|_, _, _, _| Ok(()));
         let memory = memory_service(memory);
 
-        let contexts = MpServicesComponent.allocate_ap_contexts(&memory, 2).expect("AP contexts should be allocated");
+        let contexts =
+            MpServicesComponent::default().allocate_ap_contexts(&memory, 2).expect("AP contexts should be allocated");
 
         assert_eq!(contexts.len(), 2);
     }
@@ -585,8 +628,9 @@ mod tests {
     fn test_mp_services_component_allocates_no_stacks_for_bsp_only() {
         let memory = memory_service(MockMemoryManager::new());
 
-        let contexts =
-            MpServicesComponent.allocate_ap_contexts(&memory, 0).expect("BSP-only context allocation should succeed");
+        let contexts = MpServicesComponent::default()
+            .allocate_ap_contexts(&memory, 0)
+            .expect("BSP-only context allocation should succeed");
 
         assert!(contexts.is_empty());
     }
@@ -597,7 +641,10 @@ mod tests {
         memory.expect_allocate_pages().once().returning(|_, _| Err(MemoryError::NoAvailableMemory));
         let memory = memory_service(memory);
 
-        assert!(matches!(MpServicesComponent.allocate_ap_contexts(&memory, 1), Err(EfiError::OutOfResources)));
+        assert!(matches!(
+            MpServicesComponent::default().allocate_ap_contexts(&memory, 1),
+            Err(EfiError::OutOfResources)
+        ));
     }
 
     #[test]
@@ -607,7 +654,7 @@ mod tests {
         memory.expect_set_page_attributes().once().returning(|_, _, _, _| Err(MemoryError::InternalError));
         let memory = memory_service(memory);
 
-        assert!(matches!(MpServicesComponent.allocate_ap_contexts(&memory, 1), Err(EfiError::DeviceError)));
+        assert!(matches!(MpServicesComponent::default().allocate_ap_contexts(&memory, 1), Err(EfiError::DeviceError)));
     }
 
     #[test]
@@ -630,7 +677,7 @@ mod tests {
         let events: Service<dyn EventServices> = Service::mock(Box::new(events));
         let timer_events: Service<dyn TimerEventServices> = Service::mock(Box::new(timer_events));
 
-        assert!(MpServicesComponent.register_events(&events, &timer_events, services).is_ok());
+        assert!(MpServicesComponent::default().register_events(&events, &timer_events, services).is_ok());
     }
 
     #[test]
@@ -645,7 +692,7 @@ mod tests {
         let timer_events: Service<dyn TimerEventServices> = Service::mock(Box::new(MockTimerEventServices::new()));
 
         assert!(matches!(
-            MpServicesComponent.register_events(&events, &timer_events, services),
+            MpServicesComponent::default().register_events(&events, &timer_events, services),
             Err(EfiError::InvalidParameter)
         ));
     }
@@ -671,6 +718,6 @@ mod tests {
         let events: Service<dyn EventServices> = Service::mock(Box::new(events));
         let timer_events: Service<dyn TimerEventServices> = Service::mock(Box::new(timer_events));
 
-        assert!(MpServicesComponent.register_events(&events, &timer_events, services).is_ok());
+        assert!(MpServicesComponent::default().register_events(&events, &timer_events, services).is_ok());
     }
 }

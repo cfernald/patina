@@ -33,6 +33,7 @@ extern "efiapi" fn increment_counter(arg: *mut c_void) {
 }
 
 // Procedure used to force the MP timeout and INIT-SIPI-SIPI recovery path.
+#[cfg(target_arch = "x86_64")]
 extern "efiapi" fn never_returns(_arg: *mut c_void) {
     loop {
         core::hint::spin_loop();
@@ -218,6 +219,8 @@ fn mp_services_startup_this_ap_runs_on_one_ap(
 
 // Verify that timing out an executing AP terminates the procedure through the
 // INIT-SIPI-SIPI recovery entry and leaves the same processor available for later work.
+// TODO: Enable on AArch64 after forced AP recovery is implemented.
+#[cfg(target_arch = "x86_64")]
 #[patina_test]
 fn mp_services_timeout_recovers_ap(
     protocols: Service<dyn ProtocolServices>,

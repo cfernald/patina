@@ -77,6 +77,13 @@ output formats. No scheduling or processor-control policy belongs at this bounda
 
 Switching the BSP is not supported at this time.
 
+On AArch64, forced termination and recovery of timed-out procedures is not yet
+implemented. If a dispatch reaches its deadline while an AP is unfinished, the
+BSP panics instead of returning `EFI_TIMEOUT` while that AP could still access
+caller-owned memory. Successfully completed finite-timeout requests and requests
+without a deadline are supported. This restriction applies to blocking and
+non-blocking requests alike.
+
 ## Architectural Processor Control
 
 The CPU layer (`patina_internal_cpu`) provides a common multiprocessor control
@@ -293,3 +300,46 @@ exceptions will be able to write to valid memory with only a single page. Since
 no code reads the stack, concurrent writes from multiple APs are harmless.
 
 The BSP waits for all APs to increment the parked counter before exiting.
+
+## AArch64
+
+AArch64 uses PSCI 0.2 or newer to start and power off application processors.
+Platforms must set `CpuInfo::psci_conduit()` to the appropriate SMC or HVC conduit,
+enable `CpuInfo::ENABLE_MP_SERVICES`, and remove any competing provider, including
+`ArmPsciMpServicesDxe`.
+
+The `ARM_CORE_INFO` GUID HOB supplies processor MPIDR affinity values. PSCI does
+not enumerate processors, so a missing or invalid inventory prevents MP Services
+initialization. Processor identities retain all four affinity fields, including
+Aff3. BSP processor number remains zero even when its HOB entry is not first.
+Optional `MP_INFORMATION2` records supply physical topology; otherwise the
+existing unknown-topology representation is used.
+
+Every secondary processor must initially be off. Patina checks this before
+starting any AP rather than attempting to take over another provider's live
+processors. `CPU_ON` receives an identity-mapped physical bootstrap entry and a
+persistent context pointer in `context_id`. The bootstrap configures an exclusive
+guarded stack, BSP translation state, FP/SIMD access, and private exception vectors
+before entering Rust. EL1 and non-VHE EL2 execution are supported, including PSCI
+entry at EL2 when the BSP runs at EL1. Bootstrap code and context memory are
+validated for identity mapping and cleaned to the point of coherency before startup.
+
+APs remain in the shared dispatch loop between procedures. Enable/disable changes
+dispatch eligibility, not physical power state. Idle APs use `WFE`; the BSP
+completes work or exit publication before issuing `SEV`. The idle path primes the
+event register and rechecks the lifecycle state so a wake-up cannot be lost.
+They share the BSP page tables and invalidate local TLB entries before each
+procedure. Cache-attribute-change
+synchronization dispatches mandatory work through that same preparation path.
+The translation regime and MAIR layout must remain unchanged after startup.
+
+AP exceptions publish the first failure's MPIDR, ESR, and FAR without using a
+stack, then halt. BSP polling paths fail stop on that diagnostic record. Startup
+failure after a power-on request and unconfirmed shutdown also fail stop rather
+than leaving AP execution unaccounted for.
+
+At `ExitBootServices`, Patina rejects further dispatches and requests terminal
+exit on every AP, including logically disabled APs. Each AP calls PSCI `CPU_OFF`
+after leaving its dispatch loop. The BSP confirms `AFFINITY_INFO` reports every
+AP off before returning; a dispatch-loop exit acknowledgement alone does not
+permit boot-services memory to be reclaimed.

@@ -32,7 +32,7 @@ use patina::{
 };
 
 use super::control::{self, ApStateMachine};
-use super::{ApWorkItem, MpDispatcher, MpHandOffInfo, Processor, ProcessorState};
+use super::{ApWorkItem, MpDispatcher, MpHandOffInfo, MpStartup, Processor, ProcessorState};
 
 mod ap_bootstrap;
 mod ap_setup;
@@ -96,9 +96,14 @@ impl ApContext {
         self.gdtr = self.gdt.descriptor();
     }
 
-    fn assign_processor(&mut self, processor: &super::ProcessorHandOff) {
-        self.apic_id.store(processor.processor_id, Ordering::Relaxed);
+    fn assign_processor(&mut self, processor: &super::ProcessorHandOff) -> Result<(), EfiError> {
+        let apic_id = u32::try_from(processor.processor_id).map_err(|_| {
+            log::error!("MP handoff APIC ID exceeds 32 bits: {:#x}", processor.processor_id);
+            EfiError::InvalidParameter
+        })?;
+        self.apic_id.store(apic_id, Ordering::Relaxed);
         self.sm.set_healthy(processor.healthy);
+        Ok(())
     }
 
     /// Records the top of the stack provisioned for this AP.
@@ -166,6 +171,8 @@ impl MpSupport {
     }
 
     fn validate_handoff_for(handoff: &MpHandOffInfo<'_>, bsp_apic_id: u32, max_apic_id: u32) -> bool {
+        let bsp_apic_id = u64::from(bsp_apic_id);
+        let max_apic_id = u64::from(max_apic_id);
         let mut bsp_found = false;
 
         for (index, processor) in handoff.processors.iter().enumerate() {
@@ -206,6 +213,7 @@ impl MpSupport {
         processors: &[super::ProcessorHandOff],
         bsp_processor_id: u32,
     ) -> Result<&'a mut [ApContext], EfiError> {
+        let bsp_processor_id = u64::from(bsp_processor_id);
         let ap_count = processors.len().saturating_sub(1);
         if processors.iter().filter(|processor| processor.processor_id != bsp_processor_id).count() != ap_count {
             log::error!("MP handoff must contain exactly one BSP");
@@ -229,7 +237,7 @@ impl MpSupport {
         let ap_handoffs = || processors.iter().filter(|p| p.processor_id != bsp_processor_id);
         let assigned = contexts.iter().zip(ap_handoffs()).count();
         for (ctx, processor) in contexts.iter_mut().zip(ap_handoffs()) {
-            ctx.assign_processor(processor);
+            ctx.assign_processor(processor)?;
         }
 
         if assigned < contexts.len() {
@@ -292,7 +300,7 @@ impl MpSupport {
         let processors = handoff.as_ref().map(|handoff| handoff.processors).unwrap_or_default();
         let startup_signal_value = handoff.as_ref().map_or(0, |handoff| handoff.startup_signal_value);
         log::info!("BSP APIC ID: {:#x}", self.bsp_processor_id);
-        let ap_handoffs = || processors.iter().filter(|p| p.processor_id != self.bsp_processor_id);
+        let ap_handoffs = || processors.iter().filter(|p| p.processor_id != u64::from(self.bsp_processor_id));
         self.contexts = Self::prepare_contexts(contexts, processors, self.bsp_processor_id)?;
         ap_setup::setup(self.contexts);
 
@@ -351,6 +359,8 @@ impl MpSupport {
 }
 
 impl MpDispatcher for MpSupport {
+    type Context = ApContext;
+
     fn initialize(
         memory_manager: &dyn MemoryManager,
         timer: &'static dyn ArchTimerFunctionality,
@@ -436,8 +446,16 @@ impl MpDispatcher for MpSupport {
     fn setup_aps(
         &mut self,
         contexts: &'static mut [ApContext],
-        handoff: Option<MpHandOffInfo<'_>>,
+        handoff: Option<MpStartup<'_>>,
     ) -> Result<(), EfiError> {
+        let handoff = match handoff {
+            Some(MpStartup::Pei(handoff)) => Some(handoff),
+            None => None,
+            Some(MpStartup::Psci { .. }) => {
+                log::error!("PSCI startup is not supported on x64");
+                return Err(EfiError::Unsupported);
+            }
+        };
         let handoff = self.parse_handoff(handoff);
         if handoff.is_some() && cpu_state::capture().is_err() {
             log::error!("Failed to prepare BSP MTRRs for AP startup");
@@ -489,12 +507,12 @@ impl MpDispatcher for MpSupport {
         }
     }
 
-    fn bsp_processor_id(&self) -> u32 {
-        self.bsp_processor_id
+    fn bsp_processor_id(&self) -> u64 {
+        u64::from(self.bsp_processor_id)
     }
 
-    fn ap_processor_id(&self, index: usize) -> Option<u32> {
-        self.contexts.get(index).map(|ctx| ctx.apic_id.load(Ordering::Relaxed))
+    fn ap_processor_id(&self, index: usize) -> Option<u64> {
+        self.contexts.get(index).map(|ctx| u64::from(ctx.apic_id.load(Ordering::Relaxed)))
     }
 
     fn ap_finished(&self, index: usize, work_id: u64) -> bool {
@@ -649,7 +667,7 @@ mod tests {
 
     fn processor_handoff(processor_id: u32) -> super::super::ProcessorHandOff {
         super::super::ProcessorHandOff {
-            processor_id,
+            processor_id: u64::from(processor_id),
             healthy: true,
             startup_signal_address: 0x1000,
             startup_procedure_address: 0x2000,
@@ -728,6 +746,23 @@ mod tests {
         let timer = Box::leak(Box::new(MockArchTimerFunctionality::new()));
 
         assert!(matches!(MpSupport::initialize(&memory, timer), Err(EfiError::OutOfResources)));
+    }
+
+    #[test]
+    fn test_mp_support_rejects_psci_startup_and_oversized_apic_ids() {
+        let mut support = test_support(apic::MockApicBackend::new(), &[], false);
+        assert_eq!(
+            support.setup_aps(
+                &mut [],
+                Some(MpStartup::Psci { conduit: patina::arch::psci::Conduit::Smc, processors: &[0] })
+            ),
+            Err(EfiError::Unsupported)
+        );
+        let mut context = ApContext::new();
+        assert_eq!(
+            context.assign_processor(&super::super::ProcessorHandOff { processor_id: 1 << 32, ..processor_handoff(0) }),
+            Err(EfiError::InvalidParameter)
+        );
     }
 
     #[test]
@@ -966,8 +1001,10 @@ mod tests {
     #[serial(ap_setup)]
     fn test_mp_support_reports_and_updates_processor_state() {
         let contexts = Box::leak(Box::new([ApContext::new(), ApContext::new()]));
-        contexts[0].assign_processor(&processor_handoff(0x20));
-        contexts[1].assign_processor(&super::super::ProcessorHandOff { healthy: false, ..processor_handoff(0x30) });
+        contexts[0].assign_processor(&processor_handoff(0x20)).unwrap();
+        contexts[1]
+            .assign_processor(&super::super::ProcessorHandOff { healthy: false, ..processor_handoff(0x30) })
+            .unwrap();
         let _consumer = contexts[0].sm.start().unwrap();
         let support = test_support(apic::MockApicBackend::new(), contexts, false);
         ap_setup::setup(&[]);
@@ -1038,7 +1075,7 @@ mod tests {
         apic.expect_current_apic_id().once().in_sequence(&mut sequence).return_const(0x30_u32);
 
         let contexts = Box::leak(Box::new([ApContext::new()]));
-        contexts[0].assign_processor(&processor_handoff(0x20));
+        contexts[0].assign_processor(&processor_handoff(0x20)).unwrap();
         let mut support = test_support(apic, contexts, false);
         support.bsp_processor_id = 0x10;
 
@@ -1059,7 +1096,7 @@ mod tests {
         apic.expect_send_icr().with(eq(0x20), eq(STARTUP_COMMAND)).once().in_sequence(&mut sequence).return_const(());
 
         let contexts = Box::leak(Box::new([ApContext::new()]));
-        contexts[0].assign_processor(&processor_handoff(0x20));
+        contexts[0].assign_processor(&processor_handoff(0x20)).unwrap();
         let count = AtomicU64::new(0);
         let mut timer = MockArchTimerFunctionality::new();
         timer.expect_cpu_count().returning(move || count.fetch_add(AP_ABORT_TIMEOUT_US + 1, Ordering::Relaxed));
@@ -1091,7 +1128,7 @@ mod tests {
         apic.expect_send_icr().with(eq(0x20), eq(STARTUP_COMMAND)).once().in_sequence(&mut sequence).return_const(());
 
         let contexts = Box::leak(Box::new([ApContext::new()]));
-        contexts[0].assign_processor(&processor_handoff(0x20));
+        contexts[0].assign_processor(&processor_handoff(0x20)).unwrap();
         let _consumer = contexts[0].sm.start().unwrap();
         ap_setup::setup(&[]);
         ap_setup::increment_started_count();
