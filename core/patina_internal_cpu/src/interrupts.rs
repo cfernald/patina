@@ -94,46 +94,6 @@ impl<T> DerefMut for ExceptionContext<T> {
 /// specific interrupt type ID.
 pub type ExceptionType = usize;
 
-/// This macro pretty prints registers in groups of four per line.
-/// The expected input is a list of name, value pairs.
-#[macro_export]
-macro_rules! log_registers {
-    ( $( $name:expr, $value:expr ),+ $(,)? ) => {
-        let registers = [$(($name, $value),)+];
-        for chunk in registers.chunks(4) {
-            match chunk {
-                [c1, c2, c3, c4] => {
-                    log::error!(
-                        "{:>4}:  {:#018X}   {:>4}:  {:#018X}   {:>4}:  {:#018X}   {:>4}:  {:#018X}",
-                        c1.0, c1.1, c2.0, c2.1, c3.0, c3.1, c4.0, c4.1
-                    );
-                },
-                [c1, c2, c3] => {
-                    log::error!(
-                        "{:>4}:  {:#018X}   {:>4}:  {:#018X}   {:>4}:  {:#018X}",
-                        c1.0, c1.1, c2.0, c2.1, c3.0, c3.1
-                    );
-                },
-                [c1, c2] => {
-                    log::error!(
-                        "{:>4}:  {:#018X}   {:>4}:  {:#018X}",
-                        c1.0, c1.1, c2.0, c2.1,
-                    );
-                },
-                [c1] => {
-                    log::error!(
-                        "{:>4}:  {:#018X}",
-                        c1.0, c1.1
-                    );
-                },
-                _ => {
-                    log::error!("");
-                }
-            }
-        }
-    };
-}
-
 /// Trait for converting the architecture specific context structures into the
 /// UEFI System Context structure.
 pub(crate) trait EfiSystemContextFactory {
@@ -213,5 +173,23 @@ mod tests {
         *exception_context = 42;
         let exception_context = exception_context;
         assert_eq!(*exception_context, 42u64);
+    }
+
+    #[test]
+    fn test_interrupts_log_registers_evaluates_arguments_once() {
+        let mut evaluations = 0;
+        crate::log_registers!(
+            "RAX",
+            {
+                evaluations += 1;
+                1_u32
+            },
+            "RBX",
+            {
+                evaluations += 1;
+                2_u32
+            },
+        );
+        assert_eq!(evaluations, 2);
     }
 }
