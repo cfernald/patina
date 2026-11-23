@@ -14,7 +14,13 @@
 pub use patina::log_registers;
 
 #[cfg(target_arch = "x86_64")]
-pub mod gdt;
+mod x64;
+
+// Temporary descriptor re-exports; remove after callers migrate to the x64 modules.
+#[cfg(target_arch = "x86_64")]
+pub use x64::gdt;
+#[cfg(all(target_arch = "x86_64", target_os = "uefi"))]
+pub(crate) use x64::idt;
 pub mod interrupts;
 #[cfg(feature = "alloc")]
 pub mod mp;

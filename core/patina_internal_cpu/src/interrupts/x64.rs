@@ -11,11 +11,6 @@ use crate::interrupts::ExceptionContextX64;
 use patina::pi::protocol::cpu_arch::EfiSystemContext;
 use patina_stacktrace::{StackFrame, StackTrace};
 
-#[cfg_attr(coverage, coverage(off))]
-#[cfg(all(target_arch = "x86_64", target_os = "uefi"))]
-mod apic;
-#[cfg(target_arch = "x86_64")]
-pub(crate) mod idt;
 mod interrupt_manager;
 
 #[allow(unused)]

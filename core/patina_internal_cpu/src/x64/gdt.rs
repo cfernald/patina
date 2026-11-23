@@ -1,4 +1,4 @@
-//! X64 GDT initialization
+//! X64 GDT initialization and task-state construction.
 //!
 //! ## License
 //!
@@ -6,9 +6,9 @@
 //!
 //! SPDX-License-Identifier: Apache-2.0
 //!
-#![cfg_attr(any(test, not(target_os = "uefi")), allow(dead_code))]
-#![cfg_attr(test, allow(unused_imports))]
 use core::ptr::{addr_of, addr_of_mut};
+
+use super::DescriptorTablePointer;
 
 // The AP GDT only exists for the `mp` module, which needs `alloc`.
 #[cfg(any(feature = "alloc", test))]
@@ -118,16 +118,13 @@ const SPARE5_SEL: GdtEntry = GdtEntry {
     base31_24: 0x00,
 };
 
-const STACK_SIZE: usize = 4096 * 5;
-
-const GDT_ENTRY_COUNT: usize = 11;
+pub(crate) const GDT_ENTRY_COUNT: usize = 11;
+pub(crate) const LONG_MODE_GDT_ENTRY_COUNT: usize = 8;
 
 // Segment selector values (GDT index * 8, RPL = 0)
 pub(crate) const CODE_SELECTOR: u16 = 7 * 8; // LINEAR_CODE64_SEL at index 7
 pub(crate) const DATA_SELECTOR: u16 = 6 * 8; // LINEAR_DATA64_SEL at index 6
 pub(crate) const TSS_SELECTOR: u16 = 8 * 8; // TSS descriptor at index 8
-
-static mut SEPARATE_EXCEPTION_STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
 
 /// 64-bit task state segment.
 ///
@@ -188,8 +185,6 @@ const _: () = assert!(core::mem::size_of::<TaskStateSegment>() == 104);
 const _: () = assert!(core::mem::offset_of!(TaskStateSegment, privilege_stacks) == 4);
 const _: () = assert!(core::mem::offset_of!(TaskStateSegment, interrupt_stacks) == 36);
 
-static mut TSS: TaskStateSegment = TaskStateSegment::new(0);
-
 /// Build a 128-bit (two u64) TSS system segment descriptor from base address and limit.
 fn tss_descriptor(base: u64) -> (u64, u64) {
     let limit = (core::mem::size_of::<TaskStateSegment>() - 1) as u32;
@@ -213,15 +208,7 @@ fn tss_descriptor(base: u64) -> (u64, u64) {
     (low, high)
 }
 
-static GDT: spin::LazyLock<[u64; GDT_ENTRY_COUNT]> = spin::LazyLock::new(|| {
-    // Initialize TSS with separate exception stack in IST1
-    // SAFETY: Single-threaded initialization guaranteed by LazyLock.
-    unsafe {
-        let ist_addr = addr_of!(SEPARATE_EXCEPTION_STACK) as u64 + STACK_SIZE as u64;
-        addr_of_mut!(TSS).write(TaskStateSegment::new(ist_addr));
-    }
-
-    let tss_base = addr_of!(TSS) as u64;
+pub(crate) fn dxe_gdt_entries(tss_base: u64) -> [u64; GDT_ENTRY_COUNT] {
     let (tss_low, tss_high) = tss_descriptor(tss_base);
 
     // We need valid 32-bit code segments for MpServices as they start in real mode, go through
@@ -240,17 +227,27 @@ static GDT: spin::LazyLock<[u64; GDT_ENTRY_COUNT]> = spin::LazyLock::new(|| {
         tss_high,
         SPARE5_SEL.into(),
     ]
-});
-
-/// Operand layout for the `lgdt` and `lidt` instructions.
-#[repr(C, packed)]
-pub(crate) struct DescriptorTablePointer {
-    pub(crate) limit: u16,
-    pub(crate) base: u64,
 }
 
-/// Descriptor-table pointer for the GDT this module owns, for callers that need to
-/// load it on another processor.
+/// Minimal GDT entries retaining the selectors used by long-mode Patina code.
+pub(crate) fn minimal_long_mode_entries() -> [u64; LONG_MODE_GDT_ENTRY_COUNT] {
+    [NULL_SEL.into(), 0, 0, 0, 0, 0, LINEAR_DATA64_SEL.into(), LINEAR_CODE64_SEL.into()]
+}
+
+const STACK_SIZE: usize = 4096 * 5;
+static mut SEPARATE_EXCEPTION_STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+static mut TSS: TaskStateSegment = TaskStateSegment::new(0);
+
+static GDT: spin::LazyLock<[u64; GDT_ENTRY_COUNT]> = spin::LazyLock::new(|| {
+    // SAFETY: LazyLock serializes initialization, before this BSP TSS is loaded.
+    unsafe {
+        let ist_addr = addr_of!(SEPARATE_EXCEPTION_STACK) as u64 + STACK_SIZE as u64;
+        addr_of_mut!(TSS).write(TaskStateSegment::new(ist_addr));
+    }
+    dxe_gdt_entries(addr_of!(TSS) as u64)
+});
+
+/// Descriptor-table pointer for the GDT owned by the BSP.
 pub(crate) fn descriptor() -> DescriptorTablePointer {
     DescriptorTablePointer {
         limit: (core::mem::size_of::<[u64; GDT_ENTRY_COUNT]>() - 1) as u16,
@@ -264,8 +261,38 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_gdt_bsp_descriptor_references_owned_table() {
+        let descriptor = descriptor();
+        let limit = descriptor.limit;
+        let base = descriptor.base;
+        assert_eq!(limit, 87);
+        assert_eq!(base, GDT.as_ptr() as u64);
+        assert_eq!((GDT[8] >> 40) & 0xF, 0x9);
+    }
+
+    #[test]
+    fn test_gdt_long_mode_entries_preserve_shared_selectors() {
+        assert_eq!(minimal_long_mode_entries(), [0, 0, 0, 0, 0, 0, 0x00CF_9200_0000_FFFF, 0x00AF_9A00_0000_FFFF],);
+        assert_eq!(CODE_SELECTOR, 0x38);
+        assert_eq!(DATA_SELECTOR, 0x30);
+        assert_eq!(TSS_SELECTOR, 0x40);
+    }
+
+    #[test]
+    fn test_gdt_tss_descriptor_preserves_full_base_and_limit() {
+        let (low, high) = tss_descriptor(0x1234_5678_9ABC_DEF0);
+        let base = ((low >> 16) & 0xFFFF) | (((low >> 32) & 0xFF) << 16) | (((low >> 56) & 0xFF) << 24) | (high << 32);
+        assert_eq!(base, 0x1234_5678_9ABC_DEF0);
+        assert_eq!(low & 0xFFFF, 103);
+        assert_eq!((low >> 40) & 0xF, 9);
+        assert_ne!(low & (1 << 47), 0);
+        assert_eq!((low >> 48) & 0xF, 0);
+    }
+
+    #[test]
     pub fn test_dxe_default_entries() {
-        for (i, &entry) in GDT.iter().enumerate() {
+        let entries = dxe_gdt_entries(0x1234_5678_9ABC_DEF0);
+        for (i, &entry) in entries.iter().enumerate() {
             match i {
                 0 => assert_eq!(entry, NULL_SEL.into()),
                 1 => assert_eq!(entry, LINEAR_SEL.into()),
@@ -286,7 +313,7 @@ mod tests {
                 _ => panic!("Unexpected GDT entry"),
             }
         }
-        assert_eq!(GDT.len(), 11);
+        assert_eq!(entries.len(), 11);
     }
 
     #[test]

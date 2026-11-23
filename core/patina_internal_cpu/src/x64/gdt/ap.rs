@@ -11,9 +11,8 @@ use core::{
     sync::atomic::{Ordering, fence},
 };
 
-use super::{DescriptorTablePointer, LINEAR_CODE64_SEL, LINEAR_DATA64_SEL, NULL_SEL, tss_descriptor};
+use super::{DescriptorTablePointer, LONG_MODE_GDT_ENTRY_COUNT, minimal_long_mode_entries, tss_descriptor};
 
-const LONG_MODE_GDT_ENTRY_COUNT: usize = 8;
 const TSS_DESCRIPTOR_ENTRY_COUNT: usize = 2;
 const AP_GDT_ENTRY_COUNT: usize = LONG_MODE_GDT_ENTRY_COUNT + TSS_DESCRIPTOR_ENTRY_COUNT;
 
@@ -70,16 +69,11 @@ impl ApGdt {
     }
 }
 
-/// Minimal GDT entries retaining the selectors used by long-mode Patina code.
-pub(crate) fn minimal_long_mode_entries() -> [u64; LONG_MODE_GDT_ENTRY_COUNT] {
-    [NULL_SEL.into(), 0, 0, 0, 0, 0, LINEAR_DATA64_SEL.into(), LINEAR_CODE64_SEL.into()]
-}
-
 #[cfg(test)]
 #[cfg_attr(coverage, coverage(off))]
 mod tests {
+    use super::super::TSS_SELECTOR;
     use super::*;
-    use crate::gdt::TSS_SELECTOR;
 
     fn descriptor_base(low: u64, high: u64) -> u64 {
         ((low >> 16) & 0xFFFF) | (((low >> 32) & 0xFF) << 16) | (((low >> 56) & 0xFF) << 24) | (high << 32)
@@ -99,5 +93,17 @@ mod tests {
         assert_eq!(descriptor_base(entries[8], entries[9]), tss_address);
         assert_eq!((entries[8] >> 40) & 0xF, 0x9);
         assert_eq!(TSS_SELECTOR, 64);
+    }
+
+    #[test]
+    fn test_ap_gdt_reset_restores_available_tss_without_changing_other_entries() {
+        let address = 0x1234_5678_9ABC_DEF0;
+        let mut gdt = ApGdt::new();
+        gdt.initialize(address);
+        let expected = *gdt.entries();
+        gdt.entries.get_mut()[8] |= 2 << 40;
+        // SAFETY: No processor can load this test-owned GDT.
+        unsafe { gdt.reset_tss_descriptor(address) };
+        assert_eq!(*gdt.entries(), expected);
     }
 }

@@ -17,10 +17,12 @@ use patina_paging::{
     MemoryAttributes, PageTable, PagingType, PtError, page_allocator::PageAllocator, x64::X64PageTable,
 };
 
-use crate::{
-    gdt::{CODE_SELECTOR, DescriptorTablePointer},
-    interrupts::x64::idt::{Idt, IdtEntry},
+use crate::x64::{
+    DescriptorTablePointer,
+    gdt::{CODE_SELECTOR, minimal_long_mode_entries},
+    idt::{Idt, IdtEntry},
 };
+use zerocopy::IntoBytes;
 
 pub(super) const PAGE_COUNT: usize = 8;
 // A 16Kb alignment ensures  that the 3 mapped pages will be in the same leaf PT.
@@ -128,8 +130,7 @@ pub(super) fn prepare(pages: &mut [u8]) -> Result<(), EfiError> {
     let idt_entry = IdtEntry::interrupt_gate(exception_entry as u64, CODE_SELECTOR, 0);
     let idt_page = page_mut(pages, IDT_PAGE_INDEX)?;
     for entry in idt_page.as_chunks_mut::<{ core::mem::size_of::<IdtEntry>() }>().0 {
-        // SAFETY: The page base and each entry-sized offset are aligned for `IdtEntry`.
-        unsafe { entry.as_mut_ptr().cast::<IdtEntry>().write(idt_entry) };
+        entry.copy_from_slice(idt_entry.as_bytes());
     }
 
     // Set the data block for the park page.
@@ -142,7 +143,7 @@ pub(super) fn prepare(pages: &mut [u8]) -> Result<(), EfiError> {
         idtr: DescriptorTablePointer { limit: (core::mem::size_of::<Idt>() - 1) as u16, base: idt as u64 },
         stack_top: (stack + UEFI_PAGE_SIZE) as u64,
         parked_count: AtomicU32::new(0),
-        gdt: crate::gdt::ap::minimal_long_mode_entries(),
+        gdt: minimal_long_mode_entries(),
     };
 
     // SAFETY: The data page is page-aligned, large enough for `ParkData`, and

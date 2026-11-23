@@ -34,10 +34,13 @@ use patina::{
 
 use super::control::{self, ApStateMachine};
 use super::{ApWorkItem, MpDispatcher, MpHandOffInfo, Processor, ProcessorState};
+use crate::x64::{
+    DescriptorTablePointer, apic,
+    gdt::{TaskStateSegment, ap::ApGdt},
+};
 
 mod ap_bootstrap;
 mod ap_setup;
-mod apic;
 mod cpu_state;
 mod park;
 
@@ -68,11 +71,11 @@ pub struct ApContext {
     /// Dispatch state machine plus the work slot it guards for this AP.
     sm: ApStateMachine,
     /// Task state used to reset the stack before terminal double-fault handling.
-    tss: crate::gdt::TaskStateSegment,
+    tss: TaskStateSegment,
     /// GDT containing this AP's unique TSS descriptor.
-    gdt: crate::gdt::ap::ApGdt,
+    gdt: ApGdt,
     /// Descriptor-table operand used by the assembly entry path.
-    gdtr: crate::gdt::DescriptorTablePointer,
+    gdtr: DescriptorTablePointer,
 }
 
 impl ApContext {
@@ -84,15 +87,15 @@ impl ApContext {
             stack_top: AtomicU64::new(0),
             apic_id: AtomicU32::new(APIC_ID_INVALID),
             sm: ApStateMachine::new(),
-            tss: crate::gdt::TaskStateSegment::new(0),
-            gdt: crate::gdt::ap::ApGdt::new(),
-            gdtr: crate::gdt::DescriptorTablePointer { limit: 0, base: 0 },
+            tss: TaskStateSegment::new(0),
+            gdt: ApGdt::new(),
+            gdtr: DescriptorTablePointer { limit: 0, base: 0 },
         }
     }
 
     fn initialize_descriptor_tables(&mut self) {
         let stack_top = self.stack_top.load(Ordering::Relaxed);
-        self.tss = crate::gdt::TaskStateSegment::new(stack_top);
+        self.tss = TaskStateSegment::new(stack_top);
         self.gdt.initialize(core::ptr::addr_of!(self.tss) as u64);
         self.gdtr = self.gdt.descriptor();
     }
@@ -273,8 +276,12 @@ impl MpSupport {
     }
 
     fn fail_ap(reason: u32, detail: u64) -> ! {
+        let (reason, detail, apic_id) = match apic::Apic::current() {
+            Ok(apic) => (reason, detail, apic.current_apic_id()),
+            Err(_) => (ap_setup::FAILURE_APIC_SETUP, 0, APIC_ID_INVALID),
+        };
         // SAFETY: The assembly routine follows the EFIAPI register convention and never returns.
-        unsafe { ap_setup::ap_record_failure(reason, detail, apic::Apic::current().current_apic_id()) }
+        unsafe { ap_setup::ap_record_failure(reason, detail, apic_id) }
     }
 
     fn apply_mtrrs_or_fail() {
@@ -421,7 +428,7 @@ impl MpDispatcher for MpSupport {
             EfiError::Unsupported
         })?;
 
-        let apic = apic::Apic::current();
+        let apic = apic::Apic::current()?;
         let bsp_processor_id = apic.current_apic_id();
         Ok(Self {
             apic,

@@ -12,8 +12,11 @@ use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 use super::{ApContext, cpu_state::CpuControl};
-use crate::gdt::{CODE_SELECTOR, DATA_SELECTOR, DescriptorTablePointer};
-use crate::interrupts::x64::idt::{Idt, IdtEntry};
+use crate::x64::{
+    DescriptorTablePointer, apic,
+    gdt::{CODE_SELECTOR, DATA_SELECTOR, TSS_SELECTOR},
+    idt::{Idt, IdtEntry},
+};
 
 #[unsafe(no_mangle)]
 static AP_SETUP: ApSetup = ApSetup {
@@ -44,6 +47,7 @@ const FAILURE_PAGE_FAULT: u32 = 8;
 pub(super) const FAILURE_START_REJECTED: u32 = 9;
 pub(super) const FAILURE_MTRR_SETUP: u32 = 10;
 const FAILURE_ENTRY_RETURNED: u32 = 11;
+pub(super) const FAILURE_APIC_SETUP: u32 = 12;
 const FAILURE_RECORDING: u32 = u32::MAX;
 
 /// The AP IDT, used to handle exceptions before terminal parking.
@@ -114,7 +118,7 @@ global_asm!(
     ap_ctx_gdtr_off = const core::mem::offset_of!(ApContext, gdtr),
     code64_sel = const CODE_SELECTOR,
     data64_sel = const DATA_SELECTOR,
-    tss_selector = const crate::gdt::TSS_SELECTOR,
+    tss_selector = const TSS_SELECTOR,
     ap_entry = sym ap_entry,
 );
 global_asm!(
@@ -231,6 +235,7 @@ fn panic_for_failure(reason: u32, apic_id: u32, detail: u64) -> ! {
         FAILURE_START_REJECTED => panic!("AP {apic_id:#x} could not enter its dispatch loop"),
         FAILURE_MTRR_SETUP => panic!("AP {apic_id:#x} could not apply the BSP MTRR state"),
         FAILURE_ENTRY_RETURNED => panic!("AP {apic_id:#x} unexpectedly returned from its entry point"),
+        FAILURE_APIC_SETUP => panic!("AP {apic_id:#x} could not initialize its local APIC"),
         _ => panic!("AP {apic_id:#x} reported unknown failure {reason:#x} with detail {detail:#x}"),
     }
 }
@@ -262,7 +267,12 @@ extern "efiapi" fn ap_entry(context: *const ApContext) -> ! {
         super::MpSupport::fail_ap(FAILURE_CONTEXT_NOT_FOUND, u64::from(context_count()))
     };
     super::MpSupport::apply_mtrrs_or_fail();
-    let apic = super::apic::Apic::current();
+    let apic = match apic::Apic::current() {
+        Ok(apic) => apic,
+        // SAFETY: The assembly failure recorder follows EFIAPI and never returns. The APIC ID
+        // is explicitly unknown because APIC discovery failed.
+        Err(_) => unsafe { ap_record_failure(FAILURE_APIC_SETUP, 0, super::APIC_ID_INVALID) },
+    };
     super::MpSupport::ap_run_dispatch_loop(context, &apic);
     super::park_ap();
 }
@@ -284,6 +294,12 @@ mod tests {
     fn panic_message(f: impl FnOnce() + UnwindSafe) -> String {
         let panic = catch_unwind(f).expect_err("failure must panic");
         panic.downcast_ref::<String>().expect("panic payload must be a String").clone()
+    }
+
+    #[test]
+    fn test_ap_setup_reports_apic_initialization_failure() {
+        let message = panic_message(|| panic_for_failure(FAILURE_APIC_SETUP, super::super::APIC_ID_INVALID, 0));
+        assert_eq!(message, "AP 0xffffffff could not initialize its local APIC");
     }
 
     #[test]

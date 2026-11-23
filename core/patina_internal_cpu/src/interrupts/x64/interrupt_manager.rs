@@ -17,6 +17,9 @@ use patina::{
 use patina_mtrr::{Mtrr, error::MtrrError};
 use patina_paging::PageTable;
 
+#[cfg(target_os = "uefi")]
+use crate::x64::gdt::{CODE_SELECTOR, DATA_SELECTOR, TSS_SELECTOR};
+
 use crate::interrupts::{EfiExceptionInfoDump, ExceptionType, HandlerType, InterruptHandler, InterruptManager};
 
 /// X64 Implementation of the `InterruptManager`.
@@ -136,7 +139,9 @@ impl InterruptsX64 {
         if patina::arch::is_cc_guest() {
             return Ok(());
         }
-        super::apic::initialize_virtual_wire_mode()
+        let apic = crate::x64::apic::Apic::current()?;
+        apic.initialize_virtual_wire_mode();
+        Ok(())
     }
 
     #[cfg_attr(coverage, coverage(off))]
@@ -147,7 +152,7 @@ impl InterruptsX64 {
         let gdt_ptr = gdtr.base as *const u64;
         assert!((gdt_ptr as usize) < patina::SIZE_4GB, "GDT above 4GB, MP services will fail");
 
-        let idtr = super::idt::prepare_idt(crate::gdt::CODE_SELECTOR);
+        let idtr = crate::idt::prepare_idt(CODE_SELECTOR);
         let idt_ptr = idtr.base as *const u64;
         assert!((idt_ptr as usize) < patina::SIZE_4GB, "IDT above 4GB, MP services will fail");
 
@@ -170,9 +175,9 @@ impl InterruptsX64 {
                 "lidt [{idtr}]",           // Load the IDT Register
                 gdtr = in(reg) &raw const gdtr,
                 idtr = in(reg) &raw const idtr,
-                code = in(reg) u64::from(crate::gdt::CODE_SELECTOR),
-                data = in(reg) crate::gdt::DATA_SELECTOR,
-                tss = in(reg) crate::gdt::TSS_SELECTOR,
+                code = in(reg) u64::from(CODE_SELECTOR),
+                data = in(reg) DATA_SELECTOR,
+                tss = in(reg) TSS_SELECTOR,
                 label = out(reg) _,
                 options(preserves_flags),
             );
@@ -191,7 +196,7 @@ impl InterruptsX64 {
         unsafe {
             core::arch::asm!("mov {0:x}, cs", out(reg) cs, options(nomem, nostack, preserves_flags));
         }
-        let idtr = super::idt::prepare_idt(cs);
+        let idtr = crate::idt::prepare_idt(cs);
 
         // SAFETY: `idtr` describes the fully initialized static IDT. Every gate uses the active code
         // segment, and the TSS in TR must provide a valid IST 1 stack.
